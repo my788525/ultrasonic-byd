@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    A crescent moon used for the sleep timer. The fill is white so that app:tint can recolor
+    it to the accent color when the timer is active.
+-->
+<vector xmlns:a="http://schemas.android.com/apk/res/android"
+    a:width="24dp"
+    a:height="24dp"
+    a:viewportWidth="24"
+    a:viewportHeight="24">
+    <path
+        a:fillColor="#FFFFFFFF"
+        a:pathData="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" />
+</vector>

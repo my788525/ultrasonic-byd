@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Layout of the overlay player.
+
+  Every tier shares this single layout; the service only changes the width, which parts are
+  visible and the alpha. Sharing one layout means switching the tier is a geometry change
+  instead of loading another screen, which matters on a slow head unit.
+
+  Sizes (from the smallest): title only, compact, standard, lyrics, minimal lyrics.
+-->
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    a:id="@+id/floating_root"
+    a:layout_width="wrap_content"
+    a:layout_height="wrap_content"
+    a:background="@drawable/floating_bg"
+    a:orientation="vertical"
+    a:paddingStart="12dp"
+    a:paddingTop="10dp"
+    a:paddingEnd="12dp"
+    a:paddingBottom="10dp">
+
+    <LinearLayout
+        a:id="@+id/floating_header"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:gravity="center_vertical"
+        a:orientation="horizontal">
+
+        <ImageView
+            a:id="@+id/floating_art"
+            a:layout_width="48dp"
+            a:layout_height="48dp"
+            a:contentDescription="@string/button_bar.now_playing"
+            a:importantForAccessibility="no"
+            a:scaleType="centerCrop" />
+
+        <LinearLayout
+            a:id="@+id/floating_text"
+            a:layout_width="0dp"
+            a:layout_height="wrap_content"
+            a:layout_marginStart="10dp"
+            a:layout_weight="1"
+            a:orientation="vertical">
+
+            <TextView
+                a:id="@+id/floating_title"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:ellipsize="marquee"
+                a:marqueeRepeatLimit="marquee_forever"
+                a:singleLine="true"
+                a:textColor="#FFFFFFFF"
+                a:textSize="17sp"
+                tools:text="Song title" />
+
+            <TextView
+                a:id="@+id/floating_artist"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:ellipsize="end"
+                a:singleLine="true"
+                a:textColor="#B3FFFFFF"
+                a:textSize="13sp"
+                tools:text="Artist" />
+
+            <!-- The state of the playback: buffering, paused or broken. A driver has to be
+                 able to tell "it is loading" from "it is stopped", otherwise a buffering
+                 song looks like a paused one and the driver starts the music again. -->
+            <TextView
+                a:id="@+id/floating_status"
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:textColor="#FFFFC107"
+                a:textSize="12sp"
+                a:visibility="gone"
+                tools:text="Buffering…"
+                tools:visibility="visible" />
+
+        </LinearLayout>
+
+        <ImageButton
+            a:id="@+id/floating_close"
+            a:layout_width="44dp"
+            a:layout_height="44dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/common_close"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_menu_close"
+            app:tint="#FFFFFFFF" />
+
+    </LinearLayout>
+
+    <!-- Three lines: previous, current, next. Used by the lyrics tier. -->
+    <TextView
+        a:id="@+id/floating_lyrics"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="8dp"
+        a:gravity="center_horizontal"
+        a:lineSpacingExtra="6dp"
+        a:ellipsize="end"
+        a:maxLines="3"
+        a:minLines="3"
+        a:textColor="#E6FFFFFF"
+        a:textSize="15sp"
+        a:visibility="gone"
+        tools:text="Lyrics line" />
+
+    <!-- Two lines and no buttons: the smallest window that still shows the lyrics. -->
+    <TextView
+        a:id="@+id/floating_lyrics_min"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:gravity="center_horizontal"
+        a:lineSpacingExtra="4dp"
+        a:ellipsize="end"
+        a:maxLines="2"
+        a:minLines="2"
+        a:textColor="#E6FFFFFF"
+        a:textSize="15sp"
+        a:visibility="gone"
+        tools:text="Lyrics line" />
+
+    <ProgressBar
+        a:id="@+id/floating_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        a:layout_width="match_parent"
+        a:layout_height="4dp"
+        a:layout_marginTop="8dp"
+        a:max="1000"
+        a:progressTint="#CCFFFFFF"
+        a:visibility="gone" />
+
+    <LinearLayout
+        a:id="@+id/floating_controls"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="4dp"
+        a:gravity="center"
+        a:orientation="horizontal">
+
+        <ImageButton
+            a:id="@+id/floating_previous"
+            a:layout_width="64dp"
+            a:layout_height="56dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.previous"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_backward"
+            app:tint="#FFFFFFFF" />
+
+        <ImageButton
+            a:id="@+id/floating_play"
+            a:layout_width="76dp"
+            a:layout_height="56dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.play"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_pause"
+            app:tint="#FFFFFFFF" />
+
+        <ImageButton
+            a:id="@+id/floating_next"
+            a:layout_width="64dp"
+            a:layout_height="56dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.next"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_forward"
+            app:tint="#FFFFFFFF" />
+
+        <ImageButton
+            a:id="@+id/floating_sleep"
+            a:layout_width="56dp"
+            a:layout_height="56dp"
+            a:layout_marginStart="4dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/sleep_timer"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_sleep"
+            app:tint="#FFFFFFFF" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        Debug only probes that verify the audio focus handling on a real device. They are not
+        part of the release build. The permission keeps them from being reachable by other
+        apps, they are only triggered from the adb shell.
+    -->
+    <application>
+        <service
+            android:name="org.moire.ultrasonic.debug.DuckProbeService"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            tools:ignore="ExportedService" />
+
+        <!--
+            Runs in its own process, so that the focus request really goes through the focus
+            arbitration of the platform, like a navigation app would.
+        -->
+        <service
+            android:name="org.moire.ultrasonic.debug.DuckTriggerService"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:process=":ducktrigger"
+            tools:ignore="ExportedService" />
+
+        <!--
+            Verifies that a song which was downloaded is found by the player and is protected
+            from the cache cleanup.
+        -->
+        <service
+            android:name="org.moire.ultrasonic.debug.OfflineProbeService"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            tools:ignore="ExportedService" />
+    </application>
+
+</manifest>
