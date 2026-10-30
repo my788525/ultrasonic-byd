@@ -8,6 +8,8 @@
 >
 > - **构建**：`./gradlew :ultrasonic:assembleRelease`（JDK 17 + SDK 34；签名配置见下面「签名」）
 > - **发版**：推送 `v*` 标签 → Actions 构建签名 APK → 生成 `update.json` → 创建 Release
+>   （工作流文件在 `.github/workflows.disabled/release.yml`：GitHub 不允许用只有 `repo` 权限的
+>   令牌写 `.github/workflows/`，把它在网页上移进 `.github/workflows/` 即启用）
 > - **自动更新**：App 读 `update.json` 发现新版本，只用通知提醒；下载与安装都要司机确认，
 >   行车中不弹窗。GitHub 在部分网络下连不上，因此依次尝试 raw → gh-proxy → jsDelivr，
 >   并可在设置里填自己的镜像。
