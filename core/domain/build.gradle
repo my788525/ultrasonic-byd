@@ -1,0 +1,16 @@
+plugins {
+    alias libs.plugins.ksp
+}
+
+apply from: bootstrap.androidModule
+
+dependencies {
+    implementation libs.core
+    implementation libs.roomRuntime
+    implementation libs.roomKtx
+    ksp libs.room
+}
+
+android {
+    namespace 'org.moire.ultrasonic.subsonic.domain'
+}

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One genre in the list of genres.
+
+  The button on the right starts a radio of this genre: the songs of the genre are fetched
+  and played in random order. On a head unit that is the difference between two taps and a
+  walk through a list, so the button is a large target on its own.
+-->
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    a:layout_width="match_parent"
+    a:layout_height="72dp"
+    a:gravity="center_vertical"
+    a:orientation="horizontal">
+
+    <TextView
+        a:id="@android:id/text1"
+        a:layout_width="0dp"
+        a:layout_height="match_parent"
+        a:layout_weight="1"
+        a:ellipsize="marquee"
+        a:gravity="center_vertical"
+        a:paddingStart="16dp"
+        a:paddingEnd="8dp"
+        a:singleLine="true"
+        a:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+        tools:text="Genre" />
+
+    <ImageButton
+        a:id="@+id/genre_radio"
+        a:layout_width="64dp"
+        a:layout_height="64dp"
+        a:layout_marginEnd="12dp"
+        a:background="?attr/selectableItemBackgroundBorderless"
+        a:contentDescription="@string/home_radio_title"
+        a:scaleType="fitCenter"
+        a:src="@drawable/ic_home_radio"
+        app:tint="?attr/colorControlNormal" />
+
+</LinearLayout>

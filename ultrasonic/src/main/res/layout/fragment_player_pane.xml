@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    a:id="@+id/player_pane_root"
+    a:layout_width="match_parent"
+    a:layout_height="match_parent"
+    a:orientation="vertical"
+    a:paddingStart="24dp"
+    a:paddingEnd="24dp"
+    a:paddingTop="16dp"
+    a:paddingBottom="16dp">
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:gravity="center_vertical"
+        a:orientation="horizontal">
+
+        <ImageView
+            a:id="@+id/pane_album_art"
+            a:layout_width="96dp"
+            a:layout_height="96dp"
+            a:contentDescription="@string/button_bar.now_playing"
+            a:elevation="4dp"
+            a:importantForAccessibility="no"
+            a:scaleType="centerCrop" />
+
+        <LinearLayout
+            a:layout_width="0dp"
+            a:layout_height="wrap_content"
+            a:layout_marginStart="16dp"
+            a:layout_weight="1"
+            a:orientation="vertical">
+
+            <TextView
+                a:id="@+id/pane_title"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:ellipsize="marquee"
+                a:marqueeRepeatLimit="marquee_forever"
+                a:singleLine="true"
+                a:textAppearance="@style/TextAppearance.Material3.TitleLarge"
+                tools:text="Song title" />
+
+            <TextView
+                a:id="@+id/pane_artist"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:ellipsize="end"
+                a:maxLines="1"
+                a:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                tools:text="Artist" />
+
+            <TextView
+                a:id="@+id/pane_position"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:alpha="0.7"
+                a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                tools:text="3 / 28" />
+
+            <!-- The state of the playback. The panel has to tell "buffering" from
+                 "paused" apart, otherwise the driver starts the music again while it
+                 is still loading. -->
+            <TextView
+                a:id="@+id/pane_status"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+                a:textColor="#FFC107"
+                a:visibility="gone"
+                tools:text="Buffering …"
+                tools:visibility="visible" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- The lyrics and the queue share the same space. Only one of them is shown, so
+         the driver can switch between "what is playing" and "what comes next" without
+         leaving the panel and without losing the player. -->
+    <FrameLayout
+        a:layout_width="match_parent"
+        a:layout_height="0dp"
+        a:layout_marginTop="12dp"
+        a:layout_weight="1">
+
+        <ScrollView
+            a:id="@+id/pane_lyrics_scroll"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent"
+            a:fillViewport="true"
+            a:scrollbars="vertical">
+
+            <TextView
+                a:id="@+id/pane_lyrics"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:alpha="0.92"
+                a:gravity="center_horizontal"
+                a:lineSpacingExtra="6dp"
+                a:paddingTop="8dp"
+                a:paddingBottom="8dp"
+                a:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                tools:text="Lyrics" />
+
+        </ScrollView>
+
+        <androidx.recyclerview.widget.RecyclerView
+            a:id="@+id/pane_queue"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent"
+            a:scrollbars="vertical"
+            a:visibility="gone"
+            tools:visibility="visible" />
+
+    </FrameLayout>
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="8dp"
+        a:gravity="center_vertical"
+        a:orientation="horizontal">
+
+        <TextView
+            a:id="@+id/pane_elapsed"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:minWidth="56dp"
+            a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            a:textSize="16sp"
+            tools:text="0:00" />
+
+        <!-- Seeking by dragging a thumb is unreliable while driving, so the same distance is
+             also available as a 64 dp button on both sides of the bar. -->
+        <TextView
+            a:id="@+id/pane_seek_back"
+            a:layout_width="64dp"
+            a:layout_height="56dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/seek_backward_15"
+            a:gravity="center"
+            a:text="@string/seek_label_back_15"
+            a:textSize="17sp" />
+
+        <SeekBar
+            a:id="@+id/pane_seek"
+            a:layout_width="0dp"
+            a:layout_height="44dp"
+            a:layout_weight="1"
+            a:thumb="@drawable/car_seek_thumb" />
+
+        <TextView
+            a:id="@+id/pane_seek_forward"
+            a:layout_width="64dp"
+            a:layout_height="56dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/seek_forward_15"
+            a:gravity="center"
+            a:text="@string/seek_label_forward_15"
+            a:textSize="17sp" />
+
+        <TextView
+            a:id="@+id/pane_total"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:gravity="end"
+            a:minWidth="56dp"
+            a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            a:textSize="16sp"
+            tools:text="0:00" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="4dp"
+        a:gravity="center"
+        a:orientation="horizontal">
+
+        <ImageButton
+            a:id="@+id/pane_shuffle"
+            a:layout_width="52dp"
+            a:layout_height="52dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.shuffle"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_shuffle" />
+
+        <ImageButton
+            a:id="@+id/pane_previous"
+            a:layout_width="64dp"
+            a:layout_height="64dp"
+            a:layout_marginStart="8dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.previous"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_backward" />
+
+        <ImageButton
+            a:id="@+id/pane_play"
+            a:layout_width="80dp"
+            a:layout_height="80dp"
+            a:layout_marginStart="8dp"
+            a:layout_marginEnd="8dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.play"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_pause" />
+
+        <ImageButton
+            a:id="@+id/pane_next"
+            a:layout_width="64dp"
+            a:layout_height="64dp"
+            a:layout_marginEnd="8dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.next"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_forward" />
+
+        <ImageButton
+            a:id="@+id/pane_repeat"
+            a:layout_width="52dp"
+            a:layout_height="52dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.repeat"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_repeat_off" />
+
+        <!-- The queue shows what comes next. Without it the driver cannot tell whether
+             the queue still holds a song worth hearing. -->
+        <ImageButton
+            a:id="@+id/pane_queue_button"
+            a:layout_width="52dp"
+            a:layout_height="52dp"
+            a:layout_marginStart="8dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/queue_title"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_queue" />
+
+        <!-- One tap stops the music after a while, so the driver does not leave the car
+             playing all night. The buttons repeat the same distance as the rest of the bar. -->
+        <ImageButton
+            a:id="@+id/pane_sleep"
+            a:layout_width="52dp"
+            a:layout_height="52dp"
+            a:layout_marginStart="8dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/sleep_timer"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_sleep" />
+
+    </LinearLayout>
+
+</LinearLayout>

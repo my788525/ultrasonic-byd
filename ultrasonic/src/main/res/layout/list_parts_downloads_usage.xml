@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The space the offline music takes, and what the user can throw away.
+
+    The numbers are deliberately split: the downloads that did not finish are the only
+    files the app may remove on its own, while the songs the user asked for are the
+    offline library of the car and stay until the driver deletes them by hand.
+-->
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    a:layout_width="match_parent"
+    a:layout_height="wrap_content"
+    a:orientation="vertical"
+    a:paddingStart="16dp"
+    a:paddingEnd="16dp"
+    a:paddingTop="8dp"
+    a:paddingBottom="8dp">
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:orientation="horizontal">
+
+        <TextView
+            a:id="@+id/downloads_usage_total_label"
+            a:layout_width="0dp"
+            a:layout_height="wrap_content"
+            a:layout_weight="1"
+            a:textAppearance="?android:attr/textAppearanceMedium" />
+
+        <TextView
+            a:id="@+id/downloads_usage_total_value"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:textAppearance="?android:attr/textAppearanceMedium"
+            a:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="4dp"
+        a:orientation="horizontal">
+
+        <TextView
+            a:id="@+id/downloads_usage_reclaimable_label"
+            a:layout_width="0dp"
+            a:layout_height="wrap_content"
+            a:layout_weight="1"
+            a:textAppearance="?android:attr/textAppearanceSmall" />
+
+        <TextView
+            a:id="@+id/downloads_usage_reclaimable_value"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:textAppearance="?android:attr/textAppearanceSmall" />
+    </LinearLayout>
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="4dp"
+        a:orientation="horizontal">
+
+        <TextView
+            a:id="@+id/downloads_usage_library_label"
+            a:layout_width="0dp"
+            a:layout_height="wrap_content"
+            a:layout_weight="1"
+            a:textAppearance="?android:attr/textAppearanceSmall" />
+
+        <TextView
+            a:id="@+id/downloads_usage_library_value"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:textAppearance="?android:attr/textAppearanceSmall" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        a:id="@+id/downloads_clean_button"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="8dp"
+        a:text="@string/downloads_clean_all" />
+
+</LinearLayout>

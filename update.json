@@ -1,0 +1,14 @@
+{
+  "versionCode": 495,
+  "versionName": "4.8.0-byd.15",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.15/NavMusic-4.8.0-byd.15.apk",
+  "sha256": "2dad282416495acc9e1f0951d9e788392bbcc879ac20c0c30a59c86cd3eae47d",
+  "size": 11398852,
+  "publishedAt": "2026-10-30T15:53:13Z",
+  "changelog": [
+    "新增：应用内更新检测（设置 → 更新），多镜像回退，下载前校验 SHA-256",
+    "新增：GitHub Release 发版通道与 update.json 规范",
+    "新增：GitHub Actions —— 推送 v* 标签即自动构建、签名、发版",
+    "安全：签名密钥与口令移出仓库，改用 keystore.properties 或环境变量"
+  ]
+}
