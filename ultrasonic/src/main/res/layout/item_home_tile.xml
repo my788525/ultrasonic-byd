@@ -15,8 +15,8 @@
 
     <ImageView
         a:id="@+id/home_tile_icon"
-        a:layout_width="44dp"
-        a:layout_height="44dp"
+        a:layout_width="22dp"
+        a:layout_height="22dp"
         a:contentDescription="@null"
         a:scaleType="fitCenter" />
 

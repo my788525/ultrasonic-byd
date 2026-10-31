@@ -473,13 +473,17 @@
     <string name="eq_preset_acoustic">原声</string>
     <string name="eq_preset_loudness">响度</string>
 
-    <string name="player_pane_position">%1$d / %2$d</string>
     <string name="player_pane_lyrics_empty">这首歌没有找到歌词</string>
     <string name="player_pane_lyrics_loading">正在加载歌词…</string>
     <string name="player_pane_status_buffering">缓冲中…</string>
     <string name="player_pane_status_paused">已暂停</string>
     <string name="player_pane_status_error">播放出错</string>
     <string name="player_pane_status_offline">正在等待网络…</string>
+    <string name="lyric_offset_label">歌词校准 %s 秒</string>
+    <string name="lyric_offset_back">歌词延后</string>
+    <string name="lyric_offset_forward">歌词提前</string>
+    <string name="lyric_offset_back_short">延后</string>
+    <string name="lyric_offset_forward_short">提前</string>
     <string name="queue_title">播放队列</string>
     <string name="queue_remove">把这首歌移出队列</string>
     <string name="settings.two_pane_title">两栏布局</string>
@@ -536,6 +540,12 @@
     <string name="floating_color_white">白色</string>
     <string name="floating_color_amber">琥珀黄</string>
     <string name="floating_color_accent">主题强调色</string>
+    <string name="floating_color_neon_green">荧光绿</string>
+    <string name="floating_color_cyan">青色</string>
+    <string name="floating_color_magenta">洋红</string>
+    <string name="floating_color_orange">橙色</string>
+    <string name="floating_color_red">红色</string>
+    <string name="floating_color_yellow">黄色</string>
     <string name="floating_opacity_title">背景透明度</string>
     <string name="floating_opacity_summary">文字底板的实心程度。调到 0 则完全没有背景，只在地图上显示文字。</string>
     <string name="floating_color_title">文字颜色</string>

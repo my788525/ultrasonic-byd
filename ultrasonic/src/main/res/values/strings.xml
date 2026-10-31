@@ -493,13 +493,17 @@
     <string name="eq_preset_acoustic">Acoustic</string>
     <string name="eq_preset_loudness">Loudness</string>
 
-    <string name="player_pane_position">%1$d / %2$d</string>
     <string name="player_pane_lyrics_empty">No lyrics found for this song</string>
     <string name="player_pane_lyrics_loading">Loading lyrics…</string>
     <string name="player_pane_status_buffering">Buffering …</string>
     <string name="player_pane_status_paused">Paused</string>
     <string name="player_pane_status_error">Playback failed</string>
     <string name="player_pane_status_offline">Waiting for the network…</string>
+    <string name="lyric_offset_label">Lyrics calibration %s s</string>
+    <string name="lyric_offset_back">Delay lyrics</string>
+    <string name="lyric_offset_forward">Advance lyrics</string>
+    <string name="lyric_offset_back_short">Later</string>
+    <string name="lyric_offset_forward_short">Earlier</string>
     <string name="queue_title">Queue</string>
     <string name="queue_remove">Take this song out of the queue</string>
     <string name="settings.two_pane_title">Two pane layout</string>
@@ -558,6 +562,12 @@
     <string name="floating_color_white">White</string>
     <string name="floating_color_amber">Amber</string>
     <string name="floating_color_accent">Accent colour</string>
+    <string name="floating_color_neon_green">Neon green</string>
+    <string name="floating_color_cyan">Cyan</string>
+    <string name="floating_color_magenta">Magenta</string>
+    <string name="floating_color_orange">Orange</string>
+    <string name="floating_color_red">Red</string>
+    <string name="floating_color_yellow">Yellow</string>
     <string name="floating_opacity_title">Background opacity</string>
     <string name="floating_opacity_summary">How solid the plate behind the text is. At 0 there is no background at all and only the text is drawn over the map.</string>
     <string name="floating_color_title">Text colour</string>

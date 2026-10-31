@@ -430,8 +430,8 @@ class HomeFragment : ScopeFragment() {
                 )
             }
             icon.layoutParams = icon.layoutParams.apply {
-                width = CarTheme.dp(context, 40f).toInt()
-                height = CarTheme.dp(context, 40f).toInt()
+                width = CarTheme.dp(context, 20f).toInt()
+                height = CarTheme.dp(context, 20f).toInt()
             }
             label.layoutParams = (label.layoutParams as LinearLayout.LayoutParams).apply {
                 width = LinearLayout.LayoutParams.MATCH_PARENT
@@ -527,8 +527,8 @@ class HomeFragment : ScopeFragment() {
 
         /** Portrait: one big row per entry, the way the parked layout is designed. */
         private const val PORTRAIT_COLUMNS = 1
-        private const val PORTRAIT_CARD_HEIGHT_DP = 208f
-        private const val PORTRAIT_COVER_DP = 156f
+        private const val PORTRAIT_CARD_HEIGHT_DP = 104f
+        private const val PORTRAIT_COVER_DP = 78f
         private const val PORTRAIT_ROW_HEIGHT_DP = 96f
 
         private const val TILE_GAP_DP = 12f

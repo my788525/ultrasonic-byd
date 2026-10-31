@@ -77,6 +77,15 @@ object Settings {
     @JvmStatic
     var floatingTextColor by StringSetting(getKey(R.string.setting_key_floating_text_color), "theme")
 
+    /**
+     * A global lyrics calibration in milliseconds, added to (or subtracted from) the song position
+     * before the highlighted line is chosen. Positive values delay the lyrics, negative ones show
+     * them earlier, so the words can be lined up with what is actually heard. Set from the +/- bar
+     * in the player panel.
+     */
+    @JvmStatic
+    var lyricsOffsetMs by IntSetting(getKey(R.string.setting_key_lyrics_offset), 0)
+
     /** Number of songs kept on disk ahead of the current one, 0 disables the preloading. */
     @JvmStatic
     var carPreload by StringIntSetting(getKey(R.string.setting_key_car_preload), 1)

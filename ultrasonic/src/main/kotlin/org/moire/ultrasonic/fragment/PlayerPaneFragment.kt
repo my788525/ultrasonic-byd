@@ -14,7 +14,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
-import android.widget.ImageView
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.widget.SeekBar
@@ -34,7 +33,6 @@ import org.moire.ultrasonic.adapters.QueueAdapter
 import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.service.MediaPlayerManager
 import org.moire.ultrasonic.service.MusicServiceFactory
-import org.moire.ultrasonic.subsonic.ImageLoaderProvider
 import org.moire.ultrasonic.service.RxBus
 import org.moire.ultrasonic.service.plusAssign
 import org.moire.ultrasonic.ui.CarPalette
@@ -63,15 +61,12 @@ import timber.log.Timber
 class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     private val mediaPlayerManager: MediaPlayerManager by inject()
-    private val imageLoaderProvider: ImageLoaderProvider by inject()
     private val sleepTimerManager: SleepTimerManager by inject()
 
-    private var albumArt: ImageView? = null
-    private var titleView: TextView? = null
-    private var artistView: TextView? = null
-    private var positionView: TextView? = null
     private var lyricsView: TextView? = null
     private var lyricsScroll: View? = null
+    private var offsetBar: View? = null
+    private var offsetLabel: TextView? = null
     private var seekBar: SeekBar? = null
     private var elapsedView: TextView? = null
     private var totalView: TextView? = null
@@ -127,10 +122,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        albumArt = view.findViewById(R.id.pane_album_art)
-        titleView = view.findViewById(R.id.pane_title)
-        artistView = view.findViewById(R.id.pane_artist)
-        positionView = view.findViewById(R.id.pane_position)
         lyricsView = view.findViewById(R.id.pane_lyrics)
         lyricsScroll = view.findViewById(R.id.pane_lyrics_scroll)
         seekBar = view.findViewById(R.id.pane_seek)
@@ -148,9 +139,14 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         queueButton = view.findViewById(R.id.pane_queue_button)
         sleepButton = view.findViewById(R.id.pane_sleep)
 
-        // The marquee of the title only moves when the view is marked as selected.
-        titleView?.isSelected = true
-        titleView?.marqueeRepeatLimit = Int.MAX_VALUE
+        offsetBar = view.findViewById(R.id.pane_lyric_offset)
+        offsetLabel = view.findViewById(R.id.pane_offset_label)
+        view.findViewById<View>(R.id.pane_offset_back).setOnClickListener {
+            adjustLyricOffset(+LYRIC_OFFSET_STEP_MS)
+        }
+        view.findViewById<View>(R.id.pane_offset_forward).setOnClickListener {
+            adjustLyricOffset(-LYRIC_OFFSET_STEP_MS)
+        }
 
         lyricsView?.let { lyrics ->
             syncedLyrics = SyncedLyricsView(lyricsScroll, lyrics).apply {
@@ -258,8 +254,12 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         val duration = mediaPlayerManager.playerDuration
         val position = mediaPlayerManager.playerPosition
 
-        // Keep the lyrics in sync with the playback position
-        syncedLyrics?.update(position.toLong())
+        // Keep the lyrics in sync with the playback position, shifted by the calibration offset
+        syncedLyrics?.update(lyricSearchPosition())
+
+        // The calibration bar only makes sense when the lyrics carry a time axis
+        offsetBar?.visibility = if (syncedLyrics?.hasTimedLyrics == true) View.VISIBLE else View.GONE
+        updateOffsetLabel()
 
         if (!seekBarTracking) {
             seekBar?.max = if (duration > 0) duration else 1
@@ -294,29 +294,11 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             if (mediaPlayerManager.isShufflePlayEnabled) ALPHA_ACTIVE else ALPHA_INACTIVE
 
         updateRepeatButton()
-
-        val index = mediaPlayerManager.currentMediaItemIndex
-        val size = mediaPlayerManager.playlistSize
-        positionView?.text = if (size > 0 && index >= 0) {
-            getString(R.string.player_pane_position, index + 1, size)
-        } else {
-            ""
-        }
     }
 
     private fun showTrack(track: Track?) {
-        // An empty pane looks broken on a head unit, so it says what to do instead
-        if (track == null) {
-            titleView?.setText(R.string.player_pane_idle)
-        } else {
-            titleView?.text = track.title
-        }
-        artistView?.text = track?.artist ?: getString(R.string.player_pane_idle_hint)
-
-        imageLoaderProvider.executeOn {
-            it.loadImage(albumArt, track, true, 0)
-        }
-
+        // The cover, title and artist are shown in the left list, so the panel only carries the
+        // lyrics. An empty pane still says what to do, though.
         loadLyrics(track)
     }
 
@@ -326,11 +308,8 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         if (track == null) {
             synced.showPlaceholder(getString(R.string.player_pane_idle_hint))
             currentLyricsTrackId = null
-            albumArt?.alpha = EMPTY_COVER_ALPHA
             return
         }
-
-        albumArt?.alpha = 1f
 
         if (currentLyricsTrackId == track.id) return
         currentLyricsTrackId = track.id
@@ -523,6 +502,37 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         mediaPlayerManager.seekTo(target)
     }
 
+    // region lyric calibration
+
+    /**
+     * The position used to highlight the lyrics, shifted by the user calibration.
+     *
+     * A positive offset delays the lyrics (they appear later), a negative one shows them earlier.
+     * Many servers return timestamps that run ahead of or behind the audio, so the driver nudges
+     * the whole block until the words line up with what is heard.
+     */
+    private fun lyricSearchPosition(): Long {
+        return (mediaPlayerManager.playerPosition.toLong() - Settings.lyricsOffsetMs).coerceAtLeast(0L)
+    }
+
+    /** Changes the calibration by [deltaMs] and refreshes the lyrics and the label right away. */
+    private fun adjustLyricOffset(deltaMs: Int) {
+        Settings.lyricsOffsetMs = (Settings.lyricsOffsetMs + deltaMs).coerceIn(
+            -LYRIC_OFFSET_LIMIT_MS,
+            LYRIC_OFFSET_LIMIT_MS
+        )
+        updateOffsetLabel()
+        syncedLyrics?.update(lyricSearchPosition())
+    }
+
+    /** Shows the current calibration as a signed number of seconds on the bar. */
+    private fun updateOffsetLabel() {
+        val seconds = Settings.lyricsOffsetMs / 1000.0
+        offsetLabel?.text = getString(R.string.lyric_offset_label, String.format("%.1f", seconds))
+    }
+
+    // endregion
+
     // region sleep timer
 
     /** Tells the driver which duration is now running, or that it is off. */
@@ -574,8 +584,11 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         private const val ALPHA_INACTIVE = 0.4f
         private const val SEEK_STEP_MS = 15_000
 
-        /** The cover placeholder is a bright asset, it has to be dimmed on the dark UI. */
-        private const val EMPTY_COVER_ALPHA = 0.22f
+        /** One tap on the calibration bar shifts the lyrics by this many milliseconds. */
+        private const val LYRIC_OFFSET_STEP_MS = 500
+
+        /** The calibration cannot drift further than this from the real position. */
+        private const val LYRIC_OFFSET_LIMIT_MS = 20_000
         private const val REPEAT_OFF = 0
         private const val REPEAT_ALL = 1
         private const val REPEAT_ONE = 2

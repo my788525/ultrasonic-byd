@@ -279,7 +279,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
             ACTION_NAV_ON -> {
                 navMode = true
-                tier = TIER_COMPACT
+                // Keep the style the driver picked (lyrics, standard, …) instead of forcing the
+                // compact tier, so a chosen lyrics window does not silently collapse to minimal.
+                tier = intent?.getIntExtra(EXTRA_TIER, TIER_COMPACT) ?: TIER_COMPACT
                 if (rootView == null) showOverlay() else applyTier()
                 return START_STICKY
             }
@@ -702,6 +704,12 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         return when (FloatingAppearance.colorFor(Settings.floatingTextColor)) {
             FloatingAppearance.COLOR_WHITE -> Color.WHITE
             FloatingAppearance.COLOR_AMBER -> AMBER_COLOR
+            FloatingAppearance.COLOR_NEON_GREEN -> NEON_GREEN_COLOR
+            FloatingAppearance.COLOR_CYAN -> CYAN_COLOR
+            FloatingAppearance.COLOR_MAGENTA -> MAGENTA_COLOR
+            FloatingAppearance.COLOR_ORANGE -> ORANGE_COLOR
+            FloatingAppearance.COLOR_RED -> RED_COLOR
+            FloatingAppearance.COLOR_YELLOW -> YELLOW_COLOR
             // The accent colour is brightened here. The palette accent is a rather dark
             // blue, and as the colour of a text over the map it has too little contrast.
             // The window can also be fully transparent, so the text has to carry itself.
@@ -1210,7 +1218,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             return
         }
 
-        val index = LyricsParser.lineIndexAt(timedLyrics, positionMs)
+        // Shift the position by the driver calibration so the highlighted line lines up with the
+        // audio. Positive offset delays the lyrics, negative ones show them earlier.
+        val index = LyricsParser.lineIndexAt(timedLyrics, positionMs - Settings.lyricsOffsetMs)
         if (index == lyricIndex) return
         lyricIndex = index
 
@@ -1437,6 +1447,12 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
         /** The amber colour, the most readable one over a dark map. */
         private val AMBER_COLOR = Color.rgb(0xFF, 0xC1, 0x07)
+        private val NEON_GREEN_COLOR = Color.rgb(0x39, 0xFF, 0x14)
+        private val CYAN_COLOR = Color.rgb(0x00, 0xE5, 0xFF)
+        private val MAGENTA_COLOR = Color.rgb(0xFF, 0x3D, 0xF5)
+        private val ORANGE_COLOR = Color.rgb(0xFF, 0x8A, 0x00)
+        private val RED_COLOR = Color.rgb(0xFF, 0x4D, 0x4D)
+        private val YELLOW_COLOR = Color.rgb(0xFF, 0xEA, 0x00)
         private val STATUS_COLOR_WARNING = Color.rgb(0xFF, 0xC1, 0x07)
         private val STATUS_COLOR_ERROR = Color.rgb(0xFF, 0x53, 0x4D)
         private const val ALPHA_FULL = 1.0f
@@ -1532,9 +1548,12 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
                 return
             }
 
+            // Nav mode keeps the style the driver picked (lyrics, standard, …); it only docks the
+            // window to the lower left and dims it, it does not downgrade the chosen tier.
+            val tier = tierForKey(Settings.floatingMode) ?: TIER_COMPACT
             val intent = Intent(context, FloatingPlayerService::class.java).apply {
                 action = ACTION_NAV_ON
-                putExtra(EXTRA_TIER, TIER_COMPACT)
+                putExtra(EXTRA_TIER, tier)
                 putExtra(EXTRA_NAV, true)
             }
             start(context, intent)
@@ -1561,17 +1580,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
         /** Applies the mode stored in the settings, hiding the window when it is off. */
         fun applyFromSettings(context: Context) {
-            if (Settings.navFloating) {
-                show(context, TIER_COMPACT, navMode = true)
-                return
-            }
-
-            val tier = tierForKey(Settings.floatingMode)
-            if (tier == null) {
-                hide(context)
-            } else {
-                show(context, tier, navMode = false)
-            }
+            val tier = tierForKey(Settings.floatingMode) ?: return hide(context)
+            show(context, tier, navMode = Settings.navFloating)
         }
 
         private fun start(context: Context, intent: Intent) {

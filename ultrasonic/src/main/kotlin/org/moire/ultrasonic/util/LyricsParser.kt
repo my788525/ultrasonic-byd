@@ -27,6 +27,13 @@ object LyricsParser {
      */
     private val TIME_TAG = Regex("""\[(?:(\d{1,3}):)?(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?]""")
 
+    /**
+     * `[offset:±123]` or `[offset:±1.5]`. A negative value shifts the lyrics earlier, a positive
+     * one later. The LRC spec uses milliseconds, but a decimal point means seconds, which a lot of
+     * editors emit, so both are supported. One such line anywhere in the file shifts every line.
+     */
+    private val OFFSET_TAG = Regex("""\[offset:\s*([+-]?\d+(?:\.\d+)?)\s*]""")
+
     private const val MS_PER_SECOND = 1_000L
     private const val MS_PER_MINUTE = 60_000L
     private const val MS_PER_HOUR = 3_600_000L
@@ -34,8 +41,15 @@ object LyricsParser {
     fun parse(raw: String?): List<TimedLyric> {
         if (raw.isNullOrBlank()) return emptyList()
 
+        var globalOffsetMs = 0L
         val timed = ArrayList<TimedLyric>()
         raw.lineSequence().forEach { line ->
+            val offsetMatch = OFFSET_TAG.find(line)
+            if (offsetMatch != null) {
+                globalOffsetMs = parseOffset(offsetMatch.groupValues[1])
+                return@forEach
+            }
+
             val tags = TIME_TAG.findAll(line).toList()
             if (tags.isEmpty()) return@forEach
 
@@ -44,17 +58,19 @@ object LyricsParser {
                 val hours = match.groupValues[1].toLongOrNull() ?: 0L
                 val minutes = match.groupValues[2].toLongOrNull() ?: 0L
                 val seconds = match.groupValues[3].toLongOrNull() ?: 0L
-                timed.add(
-                    TimedLyric(
-                        hours * MS_PER_HOUR + minutes * MS_PER_MINUTE +
-                            seconds * MS_PER_SECOND + fractionMs(match.groupValues[4]),
-                        text
-                    )
-                )
+                val startMs = hours * MS_PER_HOUR + minutes * MS_PER_MINUTE +
+                    seconds * MS_PER_SECOND + fractionMs(match.groupValues[4])
+                timed.add(TimedLyric(startMs + globalOffsetMs, text))
             }
         }
 
         return timed.sortedBy { it.startMs }
+    }
+
+    /** Parses an LRC offset value: decimals are seconds, integers are milliseconds. */
+    private fun parseOffset(value: String): Long {
+        val double = value.toDoubleOrNull() ?: return 0L
+        return if (value.contains('.')) (double * MS_PER_SECOND).toLong() else double.toLong()
     }
 
     /** Index of the line that is playing at [positionMs], or -1 before the first line starts. */

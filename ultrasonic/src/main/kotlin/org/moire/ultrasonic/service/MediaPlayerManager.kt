@@ -28,6 +28,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
@@ -51,6 +52,12 @@ import timber.log.Timber
 private const val CONTROLLER_SWITCH_DELAY = 500L
 private const val VOLUME_DELTA = 0.05f
 
+/** How many times a transient playback error is retried before it is shown as a hard failure. */
+private const val MAX_PLAYBACK_ERROR_RETRIES = 3
+
+/** Base backoff between auto-retries; it grows with the attempt number (1x, 2x, 3x). */
+private const val PLAYBACK_ERROR_RETRY_DELAY_MS = 1500L
+
 /**
  * The Media Player Manager can forward commands to the Media3 controller as
  * well as switch between different player interfaces (local, remote, cast etc).
@@ -67,6 +74,13 @@ class MediaPlayerManager(
     var suggestedPlaylistName: String? = null
     var keepScreenOn = false
     private var autoPlayStart = false
+
+    /**
+     * Counts the automatic retries of a failing song. It is reset as soon as the music plays
+     * again or the track changes, so a permanently broken file is only retried a few times and
+     * then left to the driver, while a song that recovers mid-buffer heals by itself.
+     */
+    private var playbackErrorRetries = 0
 
     private val scrobbler = Scrobbler()
 
@@ -116,11 +130,16 @@ class MediaPlayerManager(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            // A song that actually plays again means the retries (if any) worked, so the counter
+            // must not keep growing on the next hiccup of a different track.
+            if (isPlaying) playbackErrorRetries = 0
             playerStateChangedHandler()
             publishPlaybackState()
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // A new song starts a fresh error budget; the previous one does not carry over.
+            playbackErrorRetries = 0
             clearBookmark()
             // TRANSITION_REASON_AUTO means that the previous track finished playing and a new one has started.
             if (reason == MEDIA_ITEM_TRANSITION_REASON_AUTO && cachedMediaItem != null) {
@@ -151,6 +170,30 @@ class MediaPlayerManager(
             // show that the playback is waiting.
             RxBus.playerErrorPublisher.onNext(error)
 
+            // A local song that fails to buffer can often be restarted by hand, so it is retried
+            // automatically. Re-preparing the current item after a short, growing backoff lets the
+            // music resume by itself instead of getting stuck on the error banner. Only transient
+            // network/IO failures are retried, and only a few times, so a truly broken file is
+            // left to the driver.
+            if (!isJukeboxEnabled && controller?.playWhenReady == true &&
+                shouldAutoRetry(error) && playbackErrorRetries < MAX_PLAYBACK_ERROR_RETRIES
+            ) {
+                playbackErrorRetries++
+                val attempt = playbackErrorRetries
+                mainScope.launch {
+                    delay(PLAYBACK_ERROR_RETRY_DELAY_MS * attempt)
+                    // Bail out if the driver paused or the error was cleared while we waited.
+                    if (controller?.playWhenReady == true && controller?.playerError != null) {
+                        Timber.w(
+                            "Auto-retrying playback after error (attempt %d/%d)",
+                            attempt, MAX_PLAYBACK_ERROR_RETRIES
+                        )
+                        controller?.prepare()
+                        controller?.play()
+                    }
+                }
+            }
+
             if (!isJukeboxEnabled) return
 
             mainScope.launch {
@@ -175,6 +218,21 @@ class MediaPlayerManager(
                 )
                 Timber.d("Shuffle: windowIndex: $windowIndex, at: $count")
             }
+        }
+    }
+
+    /**
+     * True for the kind of playback errors that are worth retrying automatically: a dropped
+     * network, a timeout while buffering, or a generic IO failure. Permanent problems such as an
+     * unsupported format or a missing decoder are not retried, because a second attempt would fail
+     * the same way and only delay the error the driver has to act on.
+     */
+    private fun shouldAutoRetry(error: PlaybackException): Boolean {
+        return when (error.errorCode) {
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+            PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
+            PlaybackException.ERROR_CODE_IO_UNSPECIFIED -> true
+            else -> false
         }
     }
 
@@ -361,6 +419,7 @@ class MediaPlayerManager(
 
     @Synchronized
     fun play(index: Int) {
+        playbackErrorRetries = 0
         controller?.seekTo(index, 0L)
         controller?.prepare()
         controller?.play()
@@ -368,6 +427,7 @@ class MediaPlayerManager(
 
     @Synchronized
     fun play() {
+        playbackErrorRetries = 0
         controller?.prepare()
         controller?.play()
     }

@@ -38,12 +38,36 @@ object FloatingAppearance {
     /** The accent colour of the current palette. */
     const val COLOR_ACCENT = "accent"
 
+    /** A bright green that stays readable over both a dark map and a bright one. */
+    const val COLOR_NEON_GREEN = "neon_green"
+
+    /** A cyan that pops against the amber of most navigation maps. */
+    const val COLOR_CYAN = "cyan"
+
+    /** A magenta / hot pink, the most eye-catching choice for a quick glance. */
+    const val COLOR_MAGENTA = "magenta"
+
+    /** A warm orange, easy to tell apart from the yellow of road markings. */
+    const val COLOR_ORANGE = "orange"
+
+    /** A pure red, for when the window has to be impossible to miss. */
+    const val COLOR_RED = "red"
+
+    /** A bright yellow, the classic high-visibility colour. */
+    const val COLOR_YELLOW = "yellow"
+
     /** The colours the driver can pick, in the order they are offered. */
     val COLOR_NAMES = listOf(
         COLOR_THEME,
         COLOR_WHITE,
         COLOR_AMBER,
-        COLOR_ACCENT
+        COLOR_ACCENT,
+        COLOR_NEON_GREEN,
+        COLOR_CYAN,
+        COLOR_MAGENTA,
+        COLOR_ORANGE,
+        COLOR_RED,
+        COLOR_YELLOW
     )
 
     /**

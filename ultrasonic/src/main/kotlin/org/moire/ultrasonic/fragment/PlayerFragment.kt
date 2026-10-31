@@ -1309,8 +1309,8 @@ class PlayerFragment :
         val progress = mediaPlayerManager.bufferedPercentage
         updateBufferProgress(playbackState, progress)
 
-        // Follow the playback position in the lyrics page
-        syncedLyrics?.update(millisPlayed.toLong())
+        // Follow the playback position in the lyrics page (apply manual offset calibration)
+        syncedLyrics?.update((millisPlayed.toLong() - Settings.lyricsOffsetMs).coerceAtLeast(0))
     }
 
     private fun updateTitle(playbackState: Int) {

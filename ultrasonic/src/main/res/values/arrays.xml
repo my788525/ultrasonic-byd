@@ -306,12 +306,24 @@
         <item>white</item>
         <item>amber</item>
         <item>accent</item>
+        <item>neon_green</item>
+        <item>cyan</item>
+        <item>magenta</item>
+        <item>orange</item>
+        <item>red</item>
+        <item>yellow</item>
     </string-array>
     <string-array name="floatingTextColorNames" translatable="false">
         <item>@string/floating_color_theme</item>
         <item>@string/floating_color_white</item>
         <item>@string/floating_color_amber</item>
         <item>@string/floating_color_accent</item>
+        <item>@string/floating_color_neon_green</item>
+        <item>@string/floating_color_cyan</item>
+        <item>@string/floating_color_magenta</item>
+        <item>@string/floating_color_orange</item>
+        <item>@string/floating_color_red</item>
+        <item>@string/floating_color_yellow</item>
     </string-array>
     <string-array name="carPreloadValues" translatable="false">
         <item>0</item>
