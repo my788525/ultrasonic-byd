@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Banner variant of the overlay player.
+
+  A horizontal strip that spans the full screen width (or half of it), so it can be dropped on top
+  of the navigation screen like a banner. One side holds the song name and the transport controls
+  (play/pause, previous, next, sleep); the rest of the strip shows two lines of lyrics. The side of
+  the panel is chosen at runtime, so the same layout serves both the left and the right variant:
+  the service reorders the three children (panel, lyrics, close) and docks the close button to the
+  far edge.
+-->
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    a:id="@+id/floating_root"
+    a:layout_width="wrap_content"
+    a:layout_height="wrap_content"
+    a:background="@drawable/floating_bg"
+    a:gravity="center_vertical"
+    a:orientation="horizontal"
+    a:paddingStart="12dp"
+    a:paddingTop="8dp"
+    a:paddingEnd="12dp"
+    a:paddingBottom="8dp">
+
+    <!-- Song name + transport controls. Width is fixed, the lyrics take the rest. -->
+    <LinearLayout
+        a:id="@+id/floating_banner_panel"
+        a:layout_width="wrap_content"
+        a:layout_height="wrap_content"
+        a:gravity="center_vertical"
+        a:orientation="vertical">
+
+        <TextView
+            a:id="@+id/floating_title"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:ellipsize="marquee"
+            a:marqueeRepeatLimit="marquee_forever"
+            a:singleLine="true"
+            a:textColor="#FFFFFFFF"
+            a:textSize="17sp"
+            tools:text="Song title" />
+
+        <LinearLayout
+            a:id="@+id/floating_controls"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:layout_marginTop="2dp"
+            a:gravity="center_vertical"
+            a:orientation="horizontal">
+
+            <ImageButton
+                a:id="@+id/floating_previous"
+                a:layout_width="60dp"
+                a:layout_height="52dp"
+                a:background="?attr/selectableItemBackgroundBorderless"
+                a:contentDescription="@string/buttons.previous"
+                a:scaleType="fitCenter"
+                a:src="@drawable/media_backward"
+                app:tint="#FFFFFFFF" />
+
+            <ImageButton
+                a:id="@+id/floating_play"
+                a:layout_width="70dp"
+                a:layout_height="52dp"
+                a:background="?attr/selectableItemBackgroundBorderless"
+                a:contentDescription="@string/buttons.play"
+                a:scaleType="fitCenter"
+                a:src="@drawable/media_pause"
+                app:tint="#FFFFFFFF" />
+
+            <ImageButton
+                a:id="@+id/floating_next"
+                a:layout_width="60dp"
+                a:layout_height="52dp"
+                a:background="?attr/selectableItemBackgroundBorderless"
+                a:contentDescription="@string/buttons.next"
+                a:scaleType="fitCenter"
+                a:src="@drawable/media_forward"
+                app:tint="#FFFFFFFF" />
+
+            <ImageButton
+                a:id="@+id/floating_sleep"
+                a:layout_width="52dp"
+                a:layout_height="52dp"
+                a:layout_marginStart="4dp"
+                a:background="?attr/selectableItemBackgroundBorderless"
+                a:contentDescription="@string/sleep_timer"
+                a:scaleType="fitCenter"
+                a:src="@drawable/ic_sleep"
+                app:tint="#FFFFFFFF" />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+    <!-- Two lines of lyrics fill the remaining width of the banner. -->
+    <TextView
+        a:id="@+id/floating_lyrics_min"
+        a:layout_width="0dp"
+        a:layout_height="wrap_content"
+        a:layout_marginStart="16dp"
+        a:layout_marginEnd="16dp"
+        a:layout_weight="1"
+        a:ellipsize="end"
+        a:gravity="center_vertical|start"
+        a:lineSpacingExtra="4dp"
+        a:maxLines="2"
+        a:minLines="2"
+        a:textColor="#E6FFFFFF"
+        a:textSize="15sp"
+        tools:text="Lyrics line one&#10;Lyrics line two" />
+
+    <!-- Close button, docked to the far edge of the banner by the service. -->
+    <ImageButton
+        a:id="@+id/floating_close"
+        a:layout_width="44dp"
+        a:layout_height="44dp"
+        a:background="?attr/selectableItemBackgroundBorderless"
+        a:contentDescription="@string/common_close"
+        a:scaleType="fitCenter"
+        a:src="@drawable/ic_menu_close"
+        app:tint="#FFFFFFFF" />
+
+</LinearLayout>

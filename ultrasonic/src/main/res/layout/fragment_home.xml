@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Home screen of the head unit.
+
+  Sized for a 1920x1080 (15.6") panel, which is about 1280x720 dp, but every dimension is
+  relative: the two rows of tiles share the remaining height, so the screen also works in the
+  BYD split screen and on narrower panels without scrolling.
+-->
+<ScrollView xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    a:id="@+id/home_scroll"
+    a:layout_width="match_parent"
+    a:layout_height="match_parent"
+    a:background="@android:color/transparent"
+    a:clipToPadding="false"
+    a:fillViewport="true"
+    a:scrollbars="none">
+
+    <!-- A scroll view can only hold one child, and this one carries the padding of the screen
+         and the vertical stack of the card and the tile grid. -->
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:orientation="vertical"
+        a:paddingStart="24dp"
+        a:paddingTop="8dp"
+        a:paddingEnd="24dp"
+        a:paddingBottom="16dp"
+        tools:ignore="UselessParent">
+
+        <!-- Continue playing: the single biggest touch target of the screen -->
+        <FrameLayout
+            a:id="@+id/home_continue_card"
+            a:layout_width="match_parent"
+            a:layout_height="66dp"
+            a:clickable="true"
+            a:focusable="true">
+
+            <LinearLayout
+                a:layout_width="match_parent"
+                a:layout_height="match_parent"
+                a:gravity="center_vertical"
+                a:orientation="horizontal"
+                a:paddingStart="10dp"
+                a:paddingEnd="10dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    a:id="@+id/home_cover_card"
+                    a:layout_width="46dp"
+                    a:layout_height="46dp"
+                    app:cardBackgroundColor="#14000000"
+                    app:cardCornerRadius="10dp"
+                    app:cardElevation="0dp"
+                    app:strokeWidth="0dp">
+
+                    <ImageView
+                        a:id="@+id/home_cover"
+                        a:layout_width="match_parent"
+                        a:layout_height="match_parent"
+                        a:contentDescription="@null"
+                        a:scaleType="centerCrop" />
+                </com.google.android.material.card.MaterialCardView>
+
+                <LinearLayout
+                    a:layout_width="0dp"
+                    a:layout_height="wrap_content"
+                    a:layout_marginStart="18dp"
+                    a:layout_weight="1"
+                    a:orientation="vertical">
+
+                    <TextView
+                        a:id="@+id/home_continue_label"
+                        a:layout_width="wrap_content"
+                        a:layout_height="wrap_content"
+                        a:letterSpacing="0.08"
+                        a:ellipsize="end"
+                        a:maxLines="1"
+                        a:text="@string/home_continue_playing"
+                        a:textColor="@color/pal_text_secondary"
+                        a:textSize="13sp" />
+
+                    <TextView
+                        a:id="@+id/home_title"
+                        a:layout_width="match_parent"
+                        a:layout_height="wrap_content"
+                        a:layout_marginTop="2dp"
+                        a:ellipsize="end"
+                        a:maxLines="1"
+                        a:text="@string/home_idle"
+                        a:textColor="@color/pal_text_primary"
+                        a:textSize="20sp"
+                        a:textStyle="bold" />
+
+                    <TextView
+                        a:id="@+id/home_artist"
+                        a:layout_width="match_parent"
+                        a:layout_height="wrap_content"
+                        a:layout_marginTop="1dp"
+                        a:ellipsize="end"
+                        a:maxLines="1"
+                        a:text="@string/home_idle_hint"
+                        a:textColor="@color/pal_text_secondary"
+                        a:textSize="14sp" />
+                </LinearLayout>
+
+                <ImageButton
+                    a:id="@+id/home_nav_mode"
+                    a:layout_width="44dp"
+                    a:layout_height="44dp"
+                    a:layout_marginEnd="6dp"
+                    a:background="?attr/selectableItemBackgroundBorderless"
+                    a:contentDescription="@string/settings_nav_floating_title"
+                    a:padding="10dp"
+                    a:scaleType="fitCenter"
+                    a:src="@drawable/ic_nav_mode" />
+
+                <ImageButton
+                    a:id="@+id/home_shuffle"
+                    a:layout_width="48dp"
+                    a:layout_height="48dp"
+                    a:layout_marginEnd="10dp"
+                    a:background="?attr/selectableItemBackgroundBorderless"
+                    a:contentDescription="@string/home_play_all_shuffled"
+                    a:padding="12dp"
+                    a:scaleType="fitCenter"
+                    a:src="@drawable/media_shuffle" />
+
+                <ImageButton
+                    a:id="@+id/home_play"
+                    a:layout_width="54dp"
+                    a:layout_height="54dp"
+                    a:contentDescription="@string/home_play_pause"
+                    a:padding="16dp"
+                    a:scaleType="fitCenter"
+                    a:src="@drawable/media_start" />
+            </LinearLayout>
+        </FrameLayout>
+
+        <TextView
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:layout_marginTop="18dp"
+            a:layout_marginBottom="2dp"
+            a:letterSpacing="0.12"
+            a:text="@string/home_library"
+            a:textColor="@color/pal_text_secondary"
+            a:textSize="14sp" />
+
+        <LinearLayout
+            a:id="@+id/home_grid"
+            a:layout_width="match_parent"
+            a:layout_height="0dp"
+            a:layout_marginTop="10dp"
+            a:layout_weight="1"
+            a:baselineAligned="false"
+            a:orientation="vertical" />
+    </LinearLayout>
+</ScrollView>

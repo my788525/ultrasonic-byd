@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The right hand panel of the two pane layout.
+
+  The driver looks at this panel while driving, so everything that is not the lyrics or a control
+  is removed: no cover, no title, no artist. The lyrics take all the room that is left, the seek
+  bar and the transport controls sit at the bottom and are kept as short as possible so the text
+  stays readable at a glance.
+-->
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    a:id="@+id/player_pane_root"
+    a:layout_width="match_parent"
+    a:layout_height="match_parent"
+    a:orientation="vertical"
+    a:paddingStart="20dp"
+    a:paddingEnd="20dp"
+    a:paddingTop="10dp"
+    a:paddingBottom="10dp">
+
+    <!-- A single slim line for the state of the playback. The cover, title and artist live in the
+         left list, so the panel does not repeat them. The line only appears while buffering or
+         after an error, so most of the time it costs no height at all. -->
+    <TextView
+        a:id="@+id/pane_status"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginBottom="4dp"
+        a:ellipsize="end"
+        a:maxLines="1"
+        a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+        a:textColor="#FFC107"
+        a:visibility="gone"
+        tools:text="Buffering …"
+        tools:visibility="visible" />
+
+    <!-- The lyrics and the queue share the same space. Only one of them is shown, so
+         the driver can switch between "what is playing" and "what comes next" without
+         leaving the panel and without losing the player. The lyrics get every free pixel. -->
+    <FrameLayout
+        a:layout_width="match_parent"
+        a:layout_height="0dp"
+        a:layout_weight="1">
+
+        <ScrollView
+            a:id="@+id/pane_lyrics_scroll"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent"
+            a:fillViewport="true"
+            a:scrollbars="vertical">
+
+            <TextView
+                a:id="@+id/pane_lyrics"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:alpha="0.92"
+                a:gravity="center_horizontal"
+                a:lineSpacingExtra="6dp"
+                a:paddingTop="8dp"
+                a:paddingBottom="8dp"
+                a:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                tools:text="Lyrics" />
+
+        </ScrollView>
+
+        <androidx.recyclerview.widget.RecyclerView
+            a:id="@+id/pane_queue"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent"
+            a:scrollbars="vertical"
+            a:visibility="gone"
+            tools:visibility="visible" />
+
+    </FrameLayout>
+
+    <!-- The lyrics of many songs run ahead or behind the audio. This slim bar nudges the whole
+         block by half a second steps so the words line up with what is heard. It is tiny, so the
+         lyrics keep almost all the height. -->
+    <LinearLayout
+        a:id="@+id/pane_lyric_offset"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="4dp"
+        a:gravity="center_vertical"
+        a:orientation="horizontal"
+        a:visibility="gone"
+        tools:visibility="visible">
+
+        <TextView
+            a:id="@+id/pane_offset_label"
+            a:layout_width="0dp"
+            a:layout_height="wrap_content"
+            a:layout_weight="1"
+            a:alpha="0.7"
+            a:gravity="center"
+            a:textAppearance="@style/TextAppearance.Material3.LabelSmall"
+            a:textSize="13sp"
+            tools:text="歌词校准 0.0s" />
+
+        <TextView
+            a:id="@+id/pane_offset_back"
+            a:layout_width="64dp"
+            a:layout_height="36dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/lyric_offset_back"
+            a:gravity="center"
+            a:text="@string/lyric_offset_back_short"
+            a:textSize="14sp" />
+
+        <TextView
+            a:id="@+id/pane_offset_forward"
+            a:layout_width="64dp"
+            a:layout_height="36dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/lyric_offset_forward"
+            a:gravity="center"
+            a:text="@string/lyric_offset_forward_short"
+            a:textSize="14sp" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="4dp"
+        a:gravity="center_vertical"
+        a:orientation="horizontal">
+
+        <TextView
+            a:id="@+id/pane_elapsed"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:minWidth="48dp"
+            a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            a:textSize="14sp"
+            tools:text="0:00" />
+
+        <!-- Seeking by dragging a thumb is unreliable while driving, so the same distance is
+             also available as a button on both sides of the bar. -->
+        <TextView
+            a:id="@+id/pane_seek_back"
+            a:layout_width="56dp"
+            a:layout_height="40dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/seek_backward_15"
+            a:gravity="center"
+            a:text="@string/seek_label_back_15"
+            a:textSize="15sp" />
+
+        <SeekBar
+            a:id="@+id/pane_seek"
+            a:layout_width="0dp"
+            a:layout_height="36dp"
+            a:layout_weight="1"
+            a:thumb="@drawable/car_seek_thumb" />
+
+        <TextView
+            a:id="@+id/pane_seek_forward"
+            a:layout_width="56dp"
+            a:layout_height="40dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/seek_forward_15"
+            a:gravity="center"
+            a:text="@string/seek_label_forward_15"
+            a:textSize="15sp" />
+
+        <TextView
+            a:id="@+id/pane_total"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:gravity="end"
+            a:minWidth="48dp"
+            a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            a:textSize="14sp"
+            tools:text="0:00" />
+
+    </LinearLayout>
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="2dp"
+        a:gravity="center"
+        a:orientation="horizontal">
+
+        <ImageButton
+            a:id="@+id/pane_shuffle"
+            a:layout_width="44dp"
+            a:layout_height="44dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.shuffle"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_shuffle" />
+
+        <ImageButton
+            a:id="@+id/pane_previous"
+            a:layout_width="56dp"
+            a:layout_height="56dp"
+            a:layout_marginStart="6dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.previous"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_backward" />
+
+        <ImageButton
+            a:id="@+id/pane_play"
+            a:layout_width="64dp"
+            a:layout_height="64dp"
+            a:layout_marginStart="6dp"
+            a:layout_marginEnd="6dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.play"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_pause" />
+
+        <ImageButton
+            a:id="@+id/pane_next"
+            a:layout_width="56dp"
+            a:layout_height="56dp"
+            a:layout_marginEnd="6dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.next"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_forward" />
+
+        <ImageButton
+            a:id="@+id/pane_repeat"
+            a:layout_width="44dp"
+            a:layout_height="44dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/buttons.repeat"
+            a:scaleType="fitCenter"
+            a:src="@drawable/media_repeat_off" />
+
+        <!-- The queue shows what comes next. Without it the driver cannot tell whether
+             the queue still holds a song worth hearing. -->
+        <ImageButton
+            a:id="@+id/pane_queue_button"
+            a:layout_width="44dp"
+            a:layout_height="44dp"
+            a:layout_marginStart="6dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/queue_title"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_queue" />
+
+        <!-- One tap stops the music after a while, so the driver does not leave the car
+             playing all night. -->
+        <ImageButton
+            a:id="@+id/pane_sleep"
+            a:layout_width="44dp"
+            a:layout_height="44dp"
+            a:layout_marginStart="6dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/sleep_timer"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_sleep" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Switch into the offline mode: the database of the device becomes the server, so the
+     music keeps playing without a network. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:fillColor="#FFF"
+      android:pathData="M15.67,4L14.09,5.59l2.05,2.05L17.72,6zM5.59,14.09L4,15.67l1.67,1.67 1.59,-1.59zM10.54,11.82L13.16,9.2L12,8L8.66,11.34C8.28,11.72 8,12.2 8,12.7C8,13.2 8.28,13.68 8.66,14.06L14.94,20.34C15.32,20.72 15.8,21 16.3,21C16.8,21 17.28,20.72 17.66,20.34L20,18C20.5,17.5 20.5,16.5 20,16L14,10C13.5,9.5 12.5,9.5 11.6,10L10.54,11.82M9.4,8L10.4,7L12,8.6L13,7.6C12.9,7.2 12.8,6.7 12.9,6.2C13,5.9 13.2,5.7 13.5,5.6L18,4L20,6L19,8C19.4,8.1 19.9,8.2 20.3,8.3L21.4,7.3L22,8.3L21,9.3L19.8,9.9L18.9,8.9C19,8.5 19.1,8 19,7.6L18,6L13.5,7.6C13.2,7.7 13,7.9 12.9,8.2C12.8,8.7 12.9,9.2 13,9.6L12,10.6L10.4,9L9.4,8Z" />
+</vector>
