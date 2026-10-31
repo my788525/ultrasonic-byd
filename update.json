@@ -1,14 +1,16 @@
 {
-  "versionCode": 495,
-  "versionName": "4.8.0-byd.15",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.15/NavMusic-4.8.0-byd.15.apk",
-  "sha256": "2dad282416495acc9e1f0951d9e788392bbcc879ac20c0c30a59c86cd3eae47d",
-  "size": 11398852,
-  "publishedAt": "2026-10-30T15:53:13Z",
+  "versionCode": 496,
+  "versionName": "4.8.0-byd.16",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.16/NavMusic-4.8.0-byd.16.apk",
+  "sha256": "04e5934e9130d52b120d088afcf4ccbdd55503d5b6cc0f3658cb3cd415b70297",
+  "size": 11402216,
+  "publishedAt": "2026-10-31T02:38:32Z",
   "changelog": [
-    "新增：应用内更新检测（设置 → 更新），多镜像回退，下载前校验 SHA-256",
-    "新增：GitHub Release 发版通道与 update.json 规范",
-    "新增：GitHub Actions —— 推送 v* 标签即自动构建、签名、发版",
-    "安全：签名密钥与口令移出仓库，改用 keystore.properties 或环境变量"
+    "右侧播放区改为「仅歌词 + 播放控制」：移除顶部歌曲信息块，歌词区最大化展示",
+    "修复悬浮窗切换几次后从歌词样式退回极简样式的回归问题",
+    "悬浮窗文字颜色新增霓虹绿/青/品红/橙/红/黄等醒目配色",
+    "首页音乐库图标缩小至原尺寸 50%，顶部大卡片高度减半",
+    "缓冲/播放出错自动重试：最多 3 次、退避递增，手动点击播放可恢复",
+    "歌词时间轴校正：解析 LRC [offset:] 标签 + 手动 ±0.5s 校准条（三处歌词界面统一生效）"
   ]
 }
