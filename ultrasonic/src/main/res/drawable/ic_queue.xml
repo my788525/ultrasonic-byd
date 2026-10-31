@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The queue: the songs that come next, in the order they are played. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:fillColor="#FFF"
+      android:pathData="M15,6L15,3L9,3v3h6zM3,8v9h3v-9H3zM19,13v-3h-6v3h6zM11,8L5,8v9h3v-9zM19,18v-3h-6v3h6zM15,14L15,11L9,11v3h6z" />
+</vector>

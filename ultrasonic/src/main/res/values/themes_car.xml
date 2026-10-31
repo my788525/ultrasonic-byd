@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dark car themes, one per palette.
+
+  Theme attributes are overridden instead of tinting single views, so every Material widget
+  (tabs, buttons, switches, seek bars, dialogs, lists) follows the palette automatically.
+  The window gradient itself is painted by CarTheme.applyWindowBackground(), because a
+  drawable cannot read the palette without one drawable per palette.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- windowLightStatusBar only exists from Android 6 on; older systems ignore the item. -->
+    <style name="UltrasonicTheme.Car.Base" parent="Theme.Material3.Dark" tools:targetApi="m">
+        <item name="colorOnPrimary">@color/pal_on_accent</item>
+        <item name="colorOnSecondary">@color/pal_on_accent</item>
+        <item name="colorOnPrimaryContainer">@color/pal_on_accent_container</item>
+        <item name="colorOnSecondaryContainer">@color/pal_on_accent_container</item>
+        <item name="colorOnSurface">@color/pal_text_primary</item>
+        <item name="colorOnBackground">@color/pal_text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/pal_text_secondary</item>
+        <item name="android:textColorPrimary">@color/pal_text_primary</item>
+        <item name="android:textColorSecondary">@color/pal_text_secondary</item>
+        <item name="colorControlNormal">@color/pal_text_primary</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
+    <style name="UltrasonicTheme.Car.Graphite" parent="UltrasonicTheme.Car.Base">
+        <item name="colorPrimary">@color/pal_graphite_accent</item>
+        <item name="colorSecondary">@color/pal_graphite_accent</item>
+        <item name="colorPrimaryContainer">@color/pal_graphite_accent_soft</item>
+        <item name="colorSecondaryContainer">@color/pal_graphite_accent_soft</item>
+        <item name="colorSurface">@color/pal_graphite_surface</item>
+        <item name="colorSurfaceVariant">@color/pal_graphite_surface_alt</item>
+        <item name="colorSurfaceContainer">@color/pal_graphite_surface_alt</item>
+        <item name="colorSurfaceContainerHigh">@color/pal_graphite_surface_alt</item>
+        <item name="colorOutline">@color/pal_graphite_outline</item>
+        <item name="android:colorBackground">@color/pal_graphite_bg_top</item>
+        <item name="colorControlHighlight">@color/pal_graphite_accent_soft</item>
+    </style>
+
+    <style name="UltrasonicTheme.Car.Ocean" parent="UltrasonicTheme.Car.Base">
+        <item name="colorPrimary">@color/pal_ocean_accent</item>
+        <item name="colorSecondary">@color/pal_ocean_accent</item>
+        <item name="colorPrimaryContainer">@color/pal_ocean_accent_soft</item>
+        <item name="colorSecondaryContainer">@color/pal_ocean_accent_soft</item>
+        <item name="colorSurface">@color/pal_ocean_surface</item>
+        <item name="colorSurfaceVariant">@color/pal_ocean_surface_alt</item>
+        <item name="colorSurfaceContainer">@color/pal_ocean_surface_alt</item>
+        <item name="colorSurfaceContainerHigh">@color/pal_ocean_surface_alt</item>
+        <item name="colorOutline">@color/pal_ocean_outline</item>
+        <item name="android:colorBackground">@color/pal_ocean_bg_top</item>
+        <item name="colorControlHighlight">@color/pal_ocean_accent_soft</item>
+    </style>
+
+    <style name="UltrasonicTheme.Car.Aurora" parent="UltrasonicTheme.Car.Base">
+        <item name="colorPrimary">@color/pal_aurora_accent</item>
+        <item name="colorSecondary">@color/pal_aurora_accent</item>
+        <item name="colorPrimaryContainer">@color/pal_aurora_accent_soft</item>
+        <item name="colorSecondaryContainer">@color/pal_aurora_accent_soft</item>
+        <item name="colorSurface">@color/pal_aurora_surface</item>
+        <item name="colorSurfaceVariant">@color/pal_aurora_surface_alt</item>
+        <item name="colorSurfaceContainer">@color/pal_aurora_surface_alt</item>
+        <item name="colorSurfaceContainerHigh">@color/pal_aurora_surface_alt</item>
+        <item name="colorOutline">@color/pal_aurora_outline</item>
+        <item name="android:colorBackground">@color/pal_aurora_bg_top</item>
+        <item name="colorControlHighlight">@color/pal_aurora_accent_soft</item>
+    </style>
+
+    <style name="UltrasonicTheme.Car.Violet" parent="UltrasonicTheme.Car.Base">
+        <item name="colorPrimary">@color/pal_violet_accent</item>
+        <item name="colorSecondary">@color/pal_violet_accent</item>
+        <item name="colorPrimaryContainer">@color/pal_violet_accent_soft</item>
+        <item name="colorSecondaryContainer">@color/pal_violet_accent_soft</item>
+        <item name="colorSurface">@color/pal_violet_surface</item>
+        <item name="colorSurfaceVariant">@color/pal_violet_surface_alt</item>
+        <item name="colorSurfaceContainer">@color/pal_violet_surface_alt</item>
+        <item name="colorSurfaceContainerHigh">@color/pal_violet_surface_alt</item>
+        <item name="colorOutline">@color/pal_violet_outline</item>
+        <item name="android:colorBackground">@color/pal_violet_bg_top</item>
+        <item name="colorControlHighlight">@color/pal_violet_accent_soft</item>
+    </style>
+
+    <style name="UltrasonicTheme.Car.Bordeaux" parent="UltrasonicTheme.Car.Base">
+        <item name="colorPrimary">@color/pal_bordeaux_accent</item>
+        <item name="colorSecondary">@color/pal_bordeaux_accent</item>
+        <item name="colorPrimaryContainer">@color/pal_bordeaux_accent_soft</item>
+        <item name="colorSecondaryContainer">@color/pal_bordeaux_accent_soft</item>
+        <item name="colorSurface">@color/pal_bordeaux_surface</item>
+        <item name="colorSurfaceVariant">@color/pal_bordeaux_surface_alt</item>
+        <item name="colorSurfaceContainer">@color/pal_bordeaux_surface_alt</item>
+        <item name="colorSurfaceContainerHigh">@color/pal_bordeaux_surface_alt</item>
+        <item name="colorOutline">@color/pal_bordeaux_outline</item>
+        <item name="android:colorBackground">@color/pal_bordeaux_bg_top</item>
+        <item name="colorControlHighlight">@color/pal_bordeaux_accent_soft</item>
+    </style>
+
+    <style name="UltrasonicTheme.Car.Amber" parent="UltrasonicTheme.Car.Base">
+        <item name="colorPrimary">@color/pal_amber_accent</item>
+        <item name="colorSecondary">@color/pal_amber_accent</item>
+        <item name="colorPrimaryContainer">@color/pal_amber_accent_soft</item>
+        <item name="colorSecondaryContainer">@color/pal_amber_accent_soft</item>
+        <item name="colorSurface">@color/pal_amber_surface</item>
+        <item name="colorSurfaceVariant">@color/pal_amber_surface_alt</item>
+        <item name="colorSurfaceContainer">@color/pal_amber_surface_alt</item>
+        <item name="colorSurfaceContainerHigh">@color/pal_amber_surface_alt</item>
+        <item name="colorOutline">@color/pal_amber_outline</item>
+        <item name="android:colorBackground">@color/pal_amber_bg_top</item>
+        <item name="colorControlHighlight">@color/pal_amber_accent_soft</item>
+    </style>
+
+</resources>

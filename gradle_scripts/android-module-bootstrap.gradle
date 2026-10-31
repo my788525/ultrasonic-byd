@@ -1,0 +1,59 @@
+/**
+ * This module provides a base for for submodules which depend on the Android runtime
+ */
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply from: "${project.rootDir}/gradle_scripts/code_quality.gradle"
+apply plugin: 'com.google.devtools.ksp'
+
+android {
+    compileSdkVersion versions.compileSdk
+
+    defaultConfig {
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        minSdkVersion versions.minSdk
+        targetSdkVersion versions.targetSdk
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.java.srcDirs += "${projectDir}/src/main/kotlin"
+        test.java.srcDirs += "${projectDir}/src/test/kotlin"
+        test.java.srcDirs += "${projectDir}/src/integrationTest/kotlin"
+        test.resources.srcDirs += "${projectDir}/src/integrationTest/resources"
+    }
+
+    buildTypes {
+        debug {
+            minifyEnabled false
+            debuggable true
+        }
+        release {
+            minifyEnabled false
+        }
+    }
+
+    buildFeatures {
+        buildConfig = false
+        viewBinding true
+        dataBinding true
+    }
+}
+
+
+tasks.withType(Test) {
+    useJUnitPlatform()
+}
+
+dependencies {
+    api libs.kotlinStdlib
+
+    testImplementation libs.junit
+    testRuntimeOnly libs.junitVintage
+}
+
+

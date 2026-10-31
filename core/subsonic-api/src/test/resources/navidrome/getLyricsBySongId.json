@@ -1,0 +1,353 @@
+{
+ "subsonic-response": {
+  "status": "ok",
+  "version": "1.16.1",
+  "type": "navidrome",
+  "serverVersion": "0.61.2 (aa84e645)",
+  "openSubsonic": true,
+  "lyricsList": {
+   "structuredLyrics": [
+    {
+     "displayArtist": "Tule/Chris Linton",
+     "displayTitle": "Fearless, Pt. II",
+     "lang": "xxx",
+     "line": [
+      {
+       "start": 0,
+       "value": "Fearless Pt. II - Tule/Chris Linton"
+      },
+      {
+       "start": 5070,
+       "value": "Written by：Chris Linton"
+      },
+      {
+       "start": 10150,
+       "value": "Over the edge 在悬崖边缘"
+      },
+      {
+       "start": 11600,
+       "value": ""
+      },
+      {
+       "start": 12230,
+       "value": "Feel like I'm floating through the air 感觉自己仿佛在空中漂浮"
+      },
+      {
+       "start": 15480,
+       "value": ""
+      },
+      {
+       "start": 18630,
+       "value": "The pain I felt is paid for all is said and done 我理应承受 我的言行所造成的苦果"
+      },
+      {
+       "start": 22290,
+       "value": ""
+      },
+      {
+       "start": 24070,
+       "value": "Oh ohh"
+      },
+      {
+       "start": 24720,
+       "value": ""
+      },
+      {
+       "start": 26630,
+       "value": "I am restricted fixed upon the web 我行动受限 困在网络上"
+      },
+      {
+       "start": 30260,
+       "value": "I need to kick the habit 我要戒掉这个嗜好"
+      },
+      {
+       "start": 32430,
+       "value": "That my mind is breathing in 我的内心正在觉醒"
+      },
+      {
+       "start": 34330,
+       "value": ""
+      },
+      {
+       "start": 35140,
+       "value": "Break out I've got to see 我会看到内心爆发的瞬间"
+      },
+      {
+       "start": 37590,
+       "value": "Break out I've got to see 我会看到内心爆发的瞬间"
+      },
+      {
+       "start": 39440,
+       "value": "Spent all my life 用尽我的一生"
+      },
+      {
+       "start": 40990,
+       "value": "Holding all off it closely 紧紧地抓住"
+      },
+      {
+       "start": 43180,
+       "value": ""
+      },
+      {
+       "start": 44100,
+       "value": "I played it innocent 我是如此天真无邪 将之周旋"
+      },
+      {
+       "start": 45620,
+       "value": ""
+      },
+      {
+       "start": 46260,
+       "value": "A feel of discontent 内心涌上一种不满情绪"
+      },
+      {
+       "start": 47880,
+       "value": ""
+      },
+      {
+       "start": 48450,
+       "value": "I finally facing it all 我最终要面对现实"
+      },
+      {
+       "start": 50360,
+       "value": ""
+      },
+      {
+       "start": 51380,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 51950,
+       "value": ""
+      },
+      {
+       "start": 60400,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 61060,
+       "value": ""
+      },
+      {
+       "start": 69020,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 69610,
+       "value": ""
+      },
+      {
+       "start": 77720,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 78380,
+       "value": ""
+      },
+      {
+       "start": 82420,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 82950,
+       "value": ""
+      },
+      {
+       "start": 86820,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 87450,
+       "value": ""
+      },
+      {
+       "start": 88580,
+       "value": "Burning the bridge that keeps us 烧掉我们之间的阻碍"
+      },
+      {
+       "start": 91220,
+       "value": ""
+      },
+      {
+       "start": 92670,
+       "value": "I'm here and I'm feeling fearless 我就在这里 无惧无畏"
+      },
+      {
+       "start": 95540,
+       "value": ""
+      },
+      {
+       "start": 96470,
+       "value": "Exaggerated that's what you assume 你总是杞人忧天 夸大现实"
+      },
+      {
+       "start": 99570,
+       "value": ""
+      },
+      {
+       "start": 100840,
+       "value": "The stories over now 现在故事已经结束了"
+      },
+      {
+       "start": 102490,
+       "value": "I must conclude 我必须作出决定"
+      },
+      {
+       "start": 104160,
+       "value": ""
+      },
+      {
+       "start": 105150,
+       "value": "I am conflicted 我矛盾不已"
+      },
+      {
+       "start": 106990,
+       "value": "Watching where I step 望着我脚下的土地"
+      },
+      {
+       "start": 108780,
+       "value": "Still hanging in the balance 前途仍然一片茫然"
+      },
+      {
+       "start": 110970,
+       "value": "Not the life I want to live 这不是我想要的生活"
+      },
+      {
+       "start": 113000,
+       "value": "I want to take it all standing tall 我想要放轻松 站得更高"
+      },
+      {
+       "start": 115660,
+       "value": "Fear outweighed the person you are 但你在我的心中仍然举足轻重"
+      },
+      {
+       "start": 118340,
+       "value": ""
+      },
+      {
+       "start": 119940,
+       "value": "Oh ohh"
+      },
+      {
+       "start": 120710,
+       "value": ""
+      },
+      {
+       "start": 122380,
+       "value": "Break out I've got to see 我会看到内心爆发的瞬间"
+      },
+      {
+       "start": 124680,
+       "value": "Break out I've got to see 我会看到内心爆发的瞬间"
+      },
+      {
+       "start": 126670,
+       "value": "Spent all my life 用尽我的一生"
+      },
+      {
+       "start": 128260,
+       "value": "Holding all off it closely 紧紧地抓住"
+      },
+      {
+       "start": 130510,
+       "value": ""
+      },
+      {
+       "start": 131340,
+       "value": "I played it innocent 我是如此天真无邪 将之周旋"
+      },
+      {
+       "start": 132770,
+       "value": ""
+      },
+      {
+       "start": 133540,
+       "value": "A feel of discontent 内心涌上一种不满情绪"
+      },
+      {
+       "start": 134950,
+       "value": ""
+      },
+      {
+       "start": 135670,
+       "value": "I finally facing it all 我最终要面对现实"
+      },
+      {
+       "start": 137620,
+       "value": ""
+      },
+      {
+       "start": 138640,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 139290,
+       "value": ""
+      },
+      {
+       "start": 143230,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 143750,
+       "value": ""
+      },
+      {
+       "start": 147550,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 148190,
+       "value": ""
+      },
+      {
+       "start": 151960,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 152470,
+       "value": ""
+      },
+      {
+       "start": 156320,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 156790,
+       "value": ""
+      },
+      {
+       "start": 160570,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 161080,
+       "value": ""
+      },
+      {
+       "start": 165030,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 165400,
+       "value": ""
+      },
+      {
+       "start": 169470,
+       "value": "Fearless 无惧无畏"
+      },
+      {
+       "start": 169790,
+       "value": ""
+      },
+      {
+       "start": 173760,
+       "value": "Fearless 无惧无畏"
+      }
+     ],
+     "synced": true
+    }
+   ]
+  }
+ }
+}

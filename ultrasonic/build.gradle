@@ -1,0 +1,190 @@
+plugins {
+    alias libs.plugins.ksp
+}
+
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: "androidx.navigation.safeargs.kotlin"
+apply from: "../gradle_scripts/code_quality.gradle"
+
+android {
+    compileSdkVersion versions.compileSdk
+
+    defaultConfig {
+        applicationId "org.moire.ultrasonic"
+        versionCode 498
+        versionName "4.8.0-byd.18"
+
+        minSdkVersion versions.minSdk
+        targetSdkVersion versions.targetSdk
+        resourceConfigurations += ['cs', 'de', 'en', 'es', 'fr', 'gl', 'hu', 'it', 'ja', 'nb-rNO', 'nl', 'pl', 'pt', 'pt-rBR', 'ru', 'zh-rCN', 'zh-rTW']
+    }
+
+    bundle.language.enableSplit = false
+
+    // The signing key is nowhere in this repository: the path and the passwords come either
+    // from keystore.properties next to this file (a local file, never committed) or from the
+    // environment, which is how the release workflow on GitHub Actions provides them.
+    //
+    // The point is that a fork has to build without the key: it falls back to the debug key
+    // and says so in the log, instead of failing on a missing file.
+    signingConfigs {
+        create("byd") {
+            def keystoreProperties = new Properties()
+            def keystorePropertiesFile = rootProject.file("keystore.properties")
+            if (keystorePropertiesFile.exists()) {
+                keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+            }
+
+            def storeFilePath = System.getenv("BYD_KEYSTORE_FILE") ?:
+                    keystoreProperties.getProperty("storeFile")
+            def storePasswordValue = System.getenv("BYD_KEYSTORE_PASSWORD") ?:
+                    keystoreProperties.getProperty("storePassword")
+            def keyAliasValue = System.getenv("BYD_KEY_ALIAS") ?:
+                    keystoreProperties.getProperty("keyAlias")
+            def keyPasswordValue = System.getenv("BYD_KEY_PASSWORD") ?:
+                    keystoreProperties.getProperty("keyPassword")
+
+            if (storeFilePath && storePasswordValue && keyAliasValue && keyPasswordValue) {
+                storeFile file(storeFilePath)
+                storePassword storePasswordValue
+                keyAlias keyAliasValue
+                keyPassword keyPasswordValue
+            } else {
+                logger.warn(
+                        "No signing key configured (keystore.properties or BYD_KEYSTORE_* " +
+                                "missing); falling back to the debug key."
+                )
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.getByName("byd")
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'),
+                    'minify/proguard-main.pro',
+                    'minify/proguard-okhttp.pro',
+                    'minify/proguard-retrofit.pro',
+                    'minify/proguard-jackson.pro',
+                    'minify/proguard-kotlin-reflect.pro',
+                    'minify/proguard-kotlin.pro'
+        }
+        debug {
+            minifyEnabled false
+            multiDexEnabled true
+            testCoverageEnabled true
+            applicationIdSuffix '.debug'
+        }
+    }
+
+    sourceSets {
+        main.java.srcDirs += "${projectDir}/src/main/kotlin"
+        test.java.srcDirs += "${projectDir}/src/test/kotlin"
+        debug.java.srcDirs += "${projectDir}/src/debug/kotlin"
+    }
+
+    packagingOptions {
+        resources {
+            excludes += ['META-INF/LICENSE']
+        }
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        viewBinding true
+        dataBinding true
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    ksp {
+        arg("room.schemaLocation", "$rootDir/ultrasonic/schemas")
+    }
+
+    lint {
+        baseline = file("lint-baseline.xml")
+        abortOnError true
+        warningsAsErrors true
+        warning 'ImpliedQuantity'
+        disable 'IconMissingDensityFolder', 'VectorPath'
+        disable 'MissingTranslation', 'UnusedQuantity', 'MissingQuantity'
+        disable 'ObsoleteLintCustomCheck'
+        // We manage dependencies on Gitlab with RenovateBot
+        disable 'GradleDependency'
+        disable 'AndroidGradlePluginVersion'
+        textReport true
+        checkDependencies true
+    }
+    namespace 'org.moire.ultrasonic'
+
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+dependencies {
+    implementation project(':core:domain')
+    implementation project(':core:subsonic-api')
+
+    api(libs.picasso) {
+        exclude group: "com.android.support"
+    }
+
+    implementation libs.car
+    implementation libs.core
+    implementation libs.design
+    implementation libs.multidex
+    implementation libs.roomRuntime
+    implementation libs.roomKtx
+    implementation libs.viewModelKtx
+    implementation libs.constraintLayout
+    implementation libs.preferences
+    implementation libs.media3common
+    implementation libs.media3exoplayer
+    implementation libs.media3session
+    implementation libs.media3datasource
+    implementation libs.media3okhttp
+    implementation libs.swipeRefresh
+
+    implementation libs.navigationFragment
+    implementation libs.navigationUi
+    implementation libs.navigationFragmentKtx
+    implementation libs.navigationUiKtx
+    implementation libs.navigationFeature
+
+    implementation libs.kotlinStdlib
+    implementation libs.kotlinxCoroutines
+    implementation libs.kotlinxGuava
+    implementation libs.koinAndroid
+    implementation libs.okhttpLogging
+    implementation libs.fastScroll
+    implementation libs.colorPickerView
+    implementation libs.rxJava
+    implementation libs.rxAndroid
+    implementation libs.multiType
+
+    ksp libs.room
+
+    testImplementation libs.kotlinReflect
+    testImplementation libs.junit
+    testRuntimeOnly libs.junitVintage
+    testImplementation libs.kotlinJunit
+    testImplementation libs.kluent
+    testImplementation libs.mockito
+    testImplementation libs.mockitoKotlin
+    testImplementation libs.robolectric
+
+    implementation libs.timber
+}
+

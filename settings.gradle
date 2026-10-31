@@ -1,0 +1,3 @@
+include ':core:domain'
+include ':core:subsonic-api'
+include ':ultrasonic'

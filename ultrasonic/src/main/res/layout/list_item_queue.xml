@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One song in the queue.
+
+  The row carries a remove button of its own. On a head unit a swipe to delete is the least
+  reliable gesture there is, because the driver has to hit a moving target without looking
+  at it. A button is a fixed target.
+-->
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    a:layout_width="match_parent"
+    a:layout_height="64dp"
+    a:background="?attr/selectableItemBackground"
+    a:gravity="center_vertical"
+    a:orientation="horizontal">
+
+    <LinearLayout
+        a:layout_width="0dp"
+        a:layout_height="wrap_content"
+        a:layout_weight="1"
+        a:orientation="vertical">
+
+        <TextView
+            a:id="@+id/queue_title"
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:ellipsize="end"
+            a:maxLines="1"
+            a:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+            tools:text="Song title" />
+
+        <TextView
+            a:id="@+id/queue_artist"
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:alpha="0.7"
+            a:ellipsize="end"
+            a:maxLines="1"
+            a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            tools:text="Artist" />
+
+    </LinearLayout>
+
+    <ImageButton
+        a:id="@+id/queue_remove"
+        a:layout_width="56dp"
+        a:layout_height="56dp"
+        a:background="?attr/selectableItemBackgroundBorderless"
+        a:contentDescription="@string/queue_remove"
+        a:scaleType="fitCenter"
+        a:src="@drawable/ic_menu_close"
+        app:tint="?attr/colorControlNormal" />
+
+</LinearLayout>

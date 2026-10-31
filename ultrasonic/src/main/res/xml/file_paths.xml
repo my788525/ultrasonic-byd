@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The places an APK downloaded by the updater can be handed to the installer from.
+
+    Android 7 will not accept a file:// URI any more, so the installer is given a content://
+    URI built by FileProvider, and FileProvider only serves the paths listed here. Both the
+    external files directory and the internal one are listed, because the updater falls back
+    to the internal one when the car has no external storage mounted.
+-->
+<paths xmlns:a="http://schemas.android.com/apk/res/android">
+    <external-files-path name="update_external" path="update/" />
+    <files-path name="update_internal" path="update/" />
+</paths>
