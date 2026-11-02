@@ -1,14 +1,14 @@
 {
-  "versionCode": 498,
-  "versionName": "4.8.0-byd.18",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.18/NavMusic-4.8.0-byd.18.apk",
-  "sha256": "2fd7b867ea8cd8c6e3c9dec112da62631e77b42bfd4f0f44c13ab59f96bdb4f3",
-  "size": 11410876,
-  "publishedAt": "2026-10-31T06:06:56Z",
+  "versionCode": 499,
+  "versionName": "4.8.0-byd.19",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.19/NavMusic-4.8.0-byd.19.apk",
+  "sha256": "4073760bc163b82383ee5fb196bc638c0af8660d0907abbcd86f6f2b11e84151",
+  "size": 11418682,
+  "publishedAt": "2026-11-03T07:36:00Z",
   "changelog": [
-    "主页面隐藏悬浮窗：App 首页（home）不再显示悬浮窗，仅在其它界面显示；App 退到后台（如导航地图）时照常显示",
-    "未锁定点击进入 App：悬浮窗未锁定时轻点窗口本体即把 App 带到前台，控制按钮行为不变",
-    "文字颜色新增深灰 / 蓝 / 紫：适配高德地图白天灰白底、夜晚深蓝底，提升不同地图上的可读性",
-    "文字阴影改为可选：设置页新增开关（默认开启），在复杂地图上可关闭以避免阴影降低清晰度"
+    "切歌自动恢复播放：切到下一首歌或上一首时若处于暂停状态自动恢复播放，保持与播放键行为一致",
+    "悬浮窗改造：悬浮窗在 App 主页面（home）时隐藏，未锁定时轻点窗口本体进 App；新增深灰/蓝/紫文字色，文字阴影改为可选项",
+    "切歌信息即时刷新：悬浮窗标题/进度条/歌词在切歌后即时同步刷新，不再等待 500ms 轮询周期",
+    "360环影/倒车安全：挂入 R 挡或 360 环影倒车画面时自动隐藏悬浮窗并暂停音乐，退出倒车后自动恢复"
   ]
 }

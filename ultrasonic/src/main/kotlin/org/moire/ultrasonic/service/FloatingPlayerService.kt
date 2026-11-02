@@ -118,6 +118,13 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private var tier = TIER_COMPACT
     private var navMode = false
     private var locked = false
+    private var passThrough = false
+
+    /** True while the detail block (cover, title, artist) is shown and waiting to collapse. */
+    private var detailVisible = false
+
+    /** The time the song changed; the detail block collapses this many seconds after it. */
+    private var lastTrackChangeAt = 0L
 
     /**
      * Whether the view that is currently shown is the banner layout.
@@ -206,6 +213,14 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     }
 
     private val idleFadeRunnable = Runnable { fadeToIdle() }
+
+    /** Collapses the detail block into the lyric lines after the chosen number of seconds. */
+    private val collapseDetailRunnable = Runnable {
+        detailVisible = false
+        if (rootView != null) {
+            applyDetailVisibility()
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -319,11 +334,46 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         return START_STICKY
     }
 
+    /**
+     * Applies or lifts pass-through mode on the running window.
+     *
+     * In pass-through the window becomes pure display: every touch lands on the app below.
+     * The plate is kept fully transparent so even the background does not grab a tap. It can
+     * only be switched off in the settings, because no touch reaches the window any more.
+     */
+    fun applyPassThrough() {
+        passThrough = Settings.floatingPassThrough
+        if (rootView != null) {
+            applyPassThroughToParams()
+            applyLayout()
+            // A pass-through window does not answer a tap, so the idle fade is the only thing
+            // that can dim it; re-schedule so a settings change never leaves it stuck bright.
+            scheduleIdleFade()
+        }
+    }
+
+    /**
+     * Sets the window flags according to [passThrough].
+     *
+     * A normal window keeps FLAG_NOT_TOUCH_MODAL so touches outside it reach the map. A
+     * pass-through window adds FLAG_NOT_TOUCHABLE: the window stops receiving every touch and
+     * the whole area becomes transparent to the screen, so a tap lands on the app below.
+     */
+    private fun applyPassThroughToParams() {
+        val params = layoutParams ?: return
+        if (passThrough) {
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        } else {
+            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        }
+    }
+
     override fun onDestroy() {
         sleepTimerManager.removeListener(this)
         disposables.clear()
         handler.removeCallbacks(updateRunnable)
         handler.removeCallbacks(idleFadeRunnable)
+        handler.removeCallbacks(collapseDetailRunnable)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
         controller = null
@@ -369,12 +419,13 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
                     WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                 PixelFormat.TRANSLUCENT
             ).apply {
-                gravity = Gravity.TOP or Gravity.START
-                x = dp(DEFAULT_MARGIN_DP)
-                y = dp(DEFAULT_TOP_DP)
-            }
+            gravity = Gravity.TOP or Gravity.START
+            x = dp(DEFAULT_MARGIN_DP)
+            y = dp(DEFAULT_TOP_DP)
+            applyPassThroughToParams()
+        }
 
-            layoutParams = params
+        layoutParams = params
             try {
                 windowManager?.addView(rootView, params)
             } catch (all: Exception) {
@@ -506,7 +557,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             val now = System.currentTimeMillis()
             if (CarTransport.isDebounced(lastNextClickAt, now)) return@setOnClickListener
             lastNextClickAt = now
-            controller?.seekToNext()
+            seekNextAndKeepPlaying()
             wake()
         }
         view.findViewById<View>(R.id.floating_close).setOnClickListener {
@@ -580,6 +631,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
             CarTransport.PreviousAction.GO_TO_PREVIOUS -> {
                 player.seekToPreviousMediaItem()
+                keepPlaying()
             }
 
             CarTransport.PreviousAction.NONE -> {
@@ -588,6 +640,92 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             }
         }
         updateState()
+    }
+
+    /**
+     * Switches to the next song and makes sure it starts playing on its own.
+     *
+     * The window is the only control while navigating, so a skipped or errored track must never
+     * leave the music silent: the driver taps next and the new song has to come up by itself
+     * instead of waiting for a second tap on the play button.
+     */
+    private fun seekNextAndKeepPlaying() {
+        val player = controller ?: return
+        player.seekToNext()
+        keepPlaying()
+        updateState()
+    }
+
+    /**
+     * Restores playback when a track switch left the player ready but stopped.
+     *
+     * When the previous track ended in an error, the player keeps the error and turns off
+     * play-when-ready, so the new track sits there silent. Resetting both makes the new track
+     * start immediately. A track that is already playing is not touched.
+     */
+    private fun keepPlaying() {
+        val player = controller ?: return
+        if (player.isPlaying) return
+        if (player.playerError != null || !player.playWhenReady) {
+            player.prepare()
+            player.play()
+        }
+    }
+
+    /**
+     * Shows or hides the detail block (cover, title, artist) of the minimal and banner tiers.
+     *
+     * These tiers start a track switch with the song information on screen so the driver sees
+     * what just changed, and then the information fades away leaving only the lyrics. The
+     * collapse is timed by [collapseDetailRunnable]; while it is visible the lyric view is
+     * pushed aside, and after the time the lyric view takes over the space.
+     */
+    private fun applyDetailVisibility() {
+        // Only the minimal and the banner tiers have both a detail block and a lyric block.
+        if (tier != TIER_LYRICS_MIN && !isBanner(tier)) return
+        val root = rootView ?: return
+
+        if (detailVisible && !passThrough) {
+            // Show the song information and keep the lyric block out of the way while it is
+            // there; the height grows to fit the detail block.
+            headerView?.visibility = View.VISIBLE
+            titleView?.visibility = View.VISIBLE
+            artistView?.visibility = View.VISIBLE
+            albumArt?.visibility = View.VISIBLE
+            lyricsView?.visibility = View.GONE
+            lyricsMinView?.visibility = View.GONE
+        } else {
+            // Settle onto the lyrics alone. The detail views are hidden so the window height
+            // follows the number of lyric lines and the font size.
+            headerView?.visibility = View.GONE
+            titleView?.visibility = View.GONE
+            artistView?.visibility = View.GONE
+            albumArt?.visibility = View.GONE
+            lyricsView?.visibility = if (tier == TIER_LYRICS) View.VISIBLE else View.GONE
+            lyricsMinView?.visibility = if (tier == TIER_LYRICS_MIN || isBanner(tier)) View.VISIBLE else View.GONE
+        }
+        // The block that is shown now needs its layout re-measured.
+        applyLayout()
+    }
+
+    /**
+     * The number of lyric lines the window shows, 1 to 5, from the settings.
+     *
+     * The minimal and the banner tiers are wrapped in a vertical box that holds this many
+     * lines; the height of the window follows the number and the font size, so a driver who
+     * wants more lines simply gets a taller window.
+     */
+    private fun lyricLines(): Int = Settings.floatingLyricLines.coerceIn(1, 5)
+
+    /**
+     * Applies the lyric line count to the lyric views of the minimal and the banner tiers.
+     */
+    private fun applyLyricLineCount() {
+        val lines = lyricLines()
+        lyricsMinView?.maxLines = lines
+        lyricsMinView?.minLines = lines
+        lyricsView?.maxLines = lines + 1
+        lyricsView?.minLines = lines
     }
 
     /**
@@ -645,6 +783,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             }
         }
 
+        applyLyricLineCount()
+
         params.height = WindowManager.LayoutParams.WRAP_CONTENT
         params.alpha = if (navMode) NAV_ALPHA else 1f
 
@@ -694,6 +834,10 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         titleView?.isSingleLine = true
         root.isFocusable = false
         root.isFocusableInTouchMode = false
+
+        // The minimal and banner tiers decide between the detail block and the lyrics alone
+        // after every re-layout, so a change of the font size or the tier settles the block.
+        applyDetailVisibility()
     }
 
     /**
@@ -999,6 +1143,25 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             if (rootView == null) showOverlay()
         }
     }
+    /**
+     * Applies the reverse-camera safety gate to the overlay visibility.
+     *
+     * When the gate is active the overlay is removed even if the host wants it shown, and
+     * when the gate releases the overlay comes back if the host still wants it. The two
+     * visibility drivers are independent: the host-hides flag and the reverse-safety flag
+     * are combined with a logical AND of their "hide" contributions, so either one hiding
+     * the overlay keeps it off.
+     */
+    fun applyReverseSafetyVisibility() {
+        val hostHides = FloatingPlayerService.hostWantsHide
+        val reverseHides = FloatingPlayerService._reverseSafetyActive
+        if (reverseHides) {
+            if (rootView != null) removeOverlay()
+        } else {
+            if (!hostHides && rootView == null) showOverlay()
+        }
+    }
+
 
     // endregion
 
@@ -1223,6 +1386,19 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
                 val view = albumArt
                 if (view != null) loader.loadImage(view, track, true, 0)
             }
+            // A new song: show the detail block again, then let it collapse after the chosen
+            // seconds. This is what makes the half-width / minimal window start with the
+            // cover + title + artist and then settle onto the lyrics alone.
+            if (track != null && (tier == TIER_LYRICS_MIN || isBanner(tier))) {
+                detailVisible = true
+                lastTrackChangeAt = System.currentTimeMillis()
+                handler.removeCallbacks(collapseDetailRunnable)
+                val seconds = Settings.floatingDetailSeconds
+                if (seconds > 0) {
+                    handler.postDelayed(collapseDetailRunnable, seconds * 1000L)
+                }
+            }
+            applyDetailVisibility()
             ensureLyrics(track)
         }
 
@@ -1631,6 +1807,59 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         /** The live service instance, so a static helper can reach the running overlay. */
         @JvmStatic
         private var instance: FloatingPlayerService? = null
+
+        /** The backing field of the reverse-safety gate; the public accessors live on the setter. */
+        @JvmStatic
+        @Volatile
+        private var _reverseSafetyActive = false
+
+        /**
+         * The MediaController of the running service, or null when no service instance is up.
+         *
+         * The reverse-safety gate reaches the player through this static seam so it does not
+         * have to hold a service reference. The read is null-safe: a missing controller simply
+         * makes the gate skip the audio half, and the window half still works.
+         */
+        @JvmStatic
+        fun controller(): MediaController? = instance?.controller
+
+        /**
+         * Flips the reverse-safety gate on or off for the overlay.
+         *
+         * Called by the [ReverseSafetyManager] on the main thread: when the gate engages the
+         * overlay marks itself hidden-for-reverse, and when it releases the overlay clears the
+         * mark and re-shows. The static flag survives a service recreate, so a brief service
+         * restart during the reverse view keeps the window off.
+         */
+        @JvmStatic
+        fun setReverseSafetyActive(active: Boolean) {
+            _reverseSafetyActive = active
+            instance?.applyReverseSafetyVisibility()
+        }
+
+        /**
+         * Hides the overlay for the duration of the reverse view.
+         *
+         * The overlay reads the static flag and its own state; the call only forces an
+         * immediate visibility update. When the safety gate is off the overlay keeps showing.
+         */
+        @JvmStatic
+        fun hideForReverse() {
+            _reverseSafetyActive = true
+            instance?.applyReverseSafetyVisibility()
+        }
+
+        /**
+         * Brings the overlay back after the reverse view is gone.
+         *
+         * Only when the safety gate is still on, so a driver who switched the gate off while
+         * reversing keeps the overlay hidden until they reopen it on purpose.
+         */
+        @JvmStatic
+        fun showForReverse() {
+            _reverseSafetyActive = false
+            instance?.applyReverseSafetyVisibility()
+        }
 
         /** Tier order, from the smallest footprint to the largest. */
         const val TIER_TITLE = 0

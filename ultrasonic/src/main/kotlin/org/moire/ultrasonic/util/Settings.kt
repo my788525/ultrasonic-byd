@@ -108,6 +108,47 @@ object Settings {
         getKey(R.string.setting_key_floating_banner_panel_side), "left"
     )
 
+    /**
+     * How many lines of lyrics the half-width / minimal-lyrics floating window shows, 1 to 5.
+     *
+     * The height of the window follows this number and the lyrics font size, so a driver that
+     * wants to read ahead keeps the whole block short instead of covering the map.
+     */
+    @JvmStatic
+    var floatingLyricLines by IntSetting(getKey(R.string.setting_key_floating_lyric_lines), 2)
+
+    /**
+     * For how long the half-width and minimal-lyrics floating window shows the cover, title and
+     * artist before it collapses to the lyrics alone.
+     *
+     * The song information is only interesting for a moment after a switch; then the lyrics
+     * are what the driver wants to see. The window shows the detail block for this many seconds
+     * and then the text block fades to the lyric lines. 0 disables the collapse.
+     */
+    @JvmStatic
+    var floatingDetailSeconds by IntSetting(getKey(R.string.setting_key_floating_detail_seconds), 8)
+
+    /**
+     * Pass-through mode of the floating window.
+     *
+     * A locked window ignores taps, but the plate of the window still blocks the touches that
+     * land on it, so the map underneath cannot be reached. Pass-through lets every touch pass
+     * through the window to the app below: the window becomes pure display. It can only be
+     * switched off in the settings, because no tap can reach the window any more.
+     */
+    @JvmStatic
+    var floatingPassThrough by BooleanSetting(getKey(R.string.setting_key_floating_pass_through), false)
+
+    /**
+     * Hides the floating window and pauses the music while the 360 camera or the reverse gear is
+     * active, and brings both back when they are off again.
+     *
+     * This is a driving-safety feature: while the driver watches the surround view or the rear,
+     * a window over the screen and a song playing are both distractions. It is on by default.
+     */
+    @JvmStatic
+    var floatingReverseSafety by BooleanSetting(getKey(R.string.setting_key_floating_reverse_safety), true)
+
     /** Number of songs kept on disk ahead of the current one, 0 disables the preloading. */
     @JvmStatic
     var carPreload by StringIntSetting(getKey(R.string.setting_key_car_preload), 1)

@@ -700,6 +700,8 @@ class MediaPlayerManager(
     @Synchronized
     fun seekToPrevious() {
         controller?.seekToPrevious()
+        // A skipped or errored track must not leave the music stalled: keep playing the new one.
+        ensurePlaying()
     }
 
     @Synchronized
@@ -710,6 +712,28 @@ class MediaPlayerManager(
     @Synchronized
     fun seekToNext() {
         controller?.seekToNext()
+        // The driver asked for the next song, so it must start on its own even when the track
+        // that just played ended in an error. Without this the window stayed frozen in the
+        // error state until the play button was pressed again.
+        ensurePlaying()
+    }
+
+    /**
+     * Makes sure the music keeps playing after a switch of the current track.
+     *
+     * The switch can leave the player with the error of the old track still set and
+     * play-when-ready off, in which case the new track would sit there ready but silent. The
+     * driver has to see the music come back on its own instead of having to press play again.
+     * The audio focus of the car is re-requested through the same path a play button takes,
+     * so a lost focus is recovered as well.
+     */
+    private fun ensurePlaying() {
+        val controller = controller ?: return
+        if (isJukeboxEnabled) return
+        if (controller.playerError != null || !controller.playWhenReady) {
+            controller.prepare()
+            controller.play()
+        }
     }
 
     @Synchronized

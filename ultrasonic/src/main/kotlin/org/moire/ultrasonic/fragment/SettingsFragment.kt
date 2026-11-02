@@ -289,8 +289,14 @@ class SettingsFragment :
             getString(R.string.setting_key_floating_bg_opacity),
             getString(R.string.setting_key_floating_text_color),
             getString(R.string.setting_key_floating_text_shadow),
-            getString(R.string.setting_key_lyrics_font_size) -> {
+            getString(R.string.setting_key_lyrics_font_size),
+            getString(R.string.setting_key_floating_lyric_lines) -> {
                 applyFloatingAppearance()
+            }
+            getString(R.string.setting_key_floating_detail_seconds),
+            getString(R.string.setting_key_floating_pass_through) -> {
+                // Geometry and pass-through behaviour of the running window.
+                applyFloatingGeometry()
             }
             getString(R.string.setting_key_follow_night) -> {
                 // The night dimming is baked into the window background, so the UI is rebuilt

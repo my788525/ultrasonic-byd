@@ -83,6 +83,10 @@
     <string name="setting_key.lyrics_offset" translatable="false">lyricsOffsetMs</string>
     <string name="setting_key.lyrics_font_size" translatable="false">lyricsFontSizeSp</string>
     <string name="setting_key.floating_banner_panel_side" translatable="false">floatingBannerPanelSide</string>
+    <string name="setting_key.floating_lyric_lines" translatable="false">floatingLyricLines</string>
+    <string name="setting_key.floating_detail_seconds" translatable="false">floatingDetailSeconds</string>
+    <string name="setting_key.floating_pass_through" translatable="false">floatingPassThrough</string>
+    <string name="setting_key.floating_reverse_safety" translatable="false">floatingReverseSafety</string>
     <string name="setting_key.update_check_now" translatable="false">update.check_now</string>
     <string name="setting_key.update_check_on_start" translatable="false">update.check_on_start</string>
     <string name="setting_key.update_mirror_url" translatable="false">update.mirror_url</string>

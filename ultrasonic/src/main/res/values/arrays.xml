@@ -283,7 +283,6 @@
         <item>standard</item>
         <item>lyrics</item>
         <item>lyrics_min</item>
-        <item>banner_full</item>
         <item>banner_half</item>
     </string-array>
     <string-array name="floatingModeNames" translatable="false">
@@ -293,7 +292,6 @@
         <item>@string/floating_mode_standard_title</item>
         <item>@string/floating_mode_lyrics_title</item>
         <item>@string/floating_mode_lyrics_min_title</item>
-        <item>@string/floating_mode_banner_full_title</item>
         <item>@string/floating_mode_banner_half_title</item>
     </string-array>
     <!-- Side of the song/controls panel inside a banner floating window -->
