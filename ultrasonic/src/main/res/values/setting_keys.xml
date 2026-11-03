@@ -78,6 +78,7 @@
     <string name="setting_key.follow_night" translatable="false">ui.follow_night</string>
     <string name="setting_key.car_preload" translatable="false">playback.car_preload</string>
     <string name="setting_key.floating_bg_opacity" translatable="false">floatingBgOpacity</string>
+    <string name="setting_key.floating_idle_brightness" translatable="false">floatingIdleBrightness</string>
     <string name="setting_key.floating_text_color" translatable="false">floatingTextColor</string>
     <string name="setting_key.floating_text_shadow" translatable="false">floatingTextShadow</string>
     <string name="setting_key.lyrics_offset" translatable="false">lyricsOffsetMs</string>

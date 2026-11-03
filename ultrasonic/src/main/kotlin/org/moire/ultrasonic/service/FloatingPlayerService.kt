@@ -1341,9 +1341,17 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private fun fadeToIdle() {
         val root = rootView ?: return
         if (navMode) return
-        // Lyrics cannot be read at 45 %: the tiers that show them keep more contrast
+        // The driver can choose how dim the window goes when it fades after a few idle
+        // seconds. 100 keeps it at full brightness, lower values fade it more.
+        val base = Settings.floatingIdleBrightness.coerceIn(0, 100)
+        // Lyrics cannot be read when the window is very dim: the tiers that show them get an
+        // automatic boost so the words stay readable no matter how far the driver drops it.
         val lyricsTier = tier == TIER_LYRICS || tier == TIER_LYRICS_MIN || isBanner(tier)
-        val idle = if (lyricsTier) IDLE_ALPHA_TEXT else IDLE_ALPHA
+        val idle = if (lyricsTier) {
+            ((base + IDLE_LYRIC_BOOST) / 100f).coerceAtMost(1f)
+        } else {
+            base / 100f
+        }
         root.animate().alpha(idle).setDuration(FADE_MS).start()
     }
 
@@ -1927,8 +1935,10 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         private const val BACKGROUND_CORNER_DP = 16
         private const val SHADOW_RADIUS_DP = 3
 
-        private const val IDLE_ALPHA = 0.45f
-        private const val IDLE_ALPHA_TEXT = 0.72f
+
+        /** How many percent extra the lyric tiers get on top of the chosen idle brightness. */
+        private const val IDLE_LYRIC_BOOST = 27
+
         private const val NAV_ALPHA = 0.92f
 
         private const val WIDTH_TITLE_DP = 240

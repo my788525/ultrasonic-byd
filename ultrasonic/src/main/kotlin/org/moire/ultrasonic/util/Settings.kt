@@ -73,6 +73,16 @@ object Settings {
     @JvmStatic
     var floatingBgOpacity by IntSetting(getKey(R.string.setting_key_floating_bg_opacity), 90)
 
+    /**
+     * How dim the idle-faded floating window is, in percent of its full brightness. After a few
+     * seconds without a touch the window fades to this brightness so it stops drawing the eye;
+     * a tap wakes it back to full. 100 keeps it fully bright (no dimming), 0 would be invisible.
+     * Defaults to the previous hard-coded look: 45 % for the title-only tiers, which the lyric
+     * tiers scale up automatically so the lyrics stay readable.
+     */
+    @JvmStatic
+    var floatingIdleBrightness by IntSetting(getKey(R.string.setting_key_floating_idle_brightness), 45)
+
     /** The colour the text of the floating window uses: theme, white, amber or accent. */
     @JvmStatic
     var floatingTextColor by StringSetting(getKey(R.string.setting_key_floating_text_color), "theme")

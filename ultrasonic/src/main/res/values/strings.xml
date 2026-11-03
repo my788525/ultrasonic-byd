@@ -598,6 +598,9 @@
     <string name="floating_color_title">Text colour</string>
     <string name="floating_text_shadow_title">Text shadow</string>
     <string name="floating_text_shadow_summary">A dark shadow behind the text improves contrast over a busy map. Turn it off when the shadow makes the text look fuzzy.</string>
+    <string name="floating_idle_brightness_title">Idle brightness</string>
+    <string name="floating_idle_brightness_summary">How dim the window gets after a few seconds without a touch. 100 keeps it fully bright; lower values fade it more so it stops drawing the eye. Lyric tiers are scaled up automatically so lyrics stay readable.</string>
+    <string name="floating_idle_brightness_unit">%</string>
     <string name="floating_locked_toast">Floating window locked</string>
     <string name="floating_unlocked_toast">Floating window unlocked</string>
     <string name="network_recovery_waiting">Waiting for the network…</string>

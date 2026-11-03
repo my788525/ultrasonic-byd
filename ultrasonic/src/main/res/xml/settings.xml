@@ -392,6 +392,17 @@
             app:seekBarIncrement="5"
             app:showSeekBarValue="true"
             tools:ignore="UnusedAttribute" />
+        <SeekBarPreference
+            a:defaultValue="45"
+            a:key="@string/setting_key.floating_idle_brightness"
+            a:max="100"
+            a:summary="@string/floating_idle_brightness_summary"
+            a:title="@string/floating_idle_brightness_title"
+            app:iconSpaceReserved="false"
+            app:min="0"
+            app:seekBarIncrement="5"
+            app:showSeekBarValue="true"
+            tools:ignore="UnusedAttribute" />
         <ListPreference
             a:defaultValue="theme"
             a:entries="@array/floatingTextColorNames"

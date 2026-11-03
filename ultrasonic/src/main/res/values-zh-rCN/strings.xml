@@ -568,6 +568,9 @@
     <string name="floating_color_title">文字颜色</string>
     <string name="floating_text_shadow_title">文字阴影</string>
     <string name="floating_text_shadow_summary">文字后加一道深色阴影，在复杂的地图画面上更易辨认；若阴影反而让文字变糊，可关闭。</string>
+    <string name="floating_idle_brightness_title">空闲亮度</string>
+    <string name="floating_idle_brightness_summary">没触摸几秒后，悬浮窗自动变暗到多少。100 保持全亮不变暗；数值越低越暗、越不抢眼。显示歌词的层级会自动提高，保证歌词清晰可读。</string>
+    <string name="floating_idle_brightness_unit">%</string>
     <string name="floating_locked_toast">悬浮窗已锁定</string>
     <string name="floating_unlocked_toast">悬浮窗已解锁</string>
     <string name="network_recovery_waiting">正在等待网络…</string>

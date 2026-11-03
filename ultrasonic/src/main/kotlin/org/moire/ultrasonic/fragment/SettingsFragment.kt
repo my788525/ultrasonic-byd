@@ -289,6 +289,7 @@ class SettingsFragment :
             getString(R.string.setting_key_floating_bg_opacity),
             getString(R.string.setting_key_floating_text_color),
             getString(R.string.setting_key_floating_text_shadow),
+            getString(R.string.setting_key_floating_idle_brightness),
             getString(R.string.setting_key_lyrics_font_size),
             getString(R.string.setting_key_floating_lyric_lines) -> {
                 applyFloatingAppearance()
