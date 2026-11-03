@@ -699,9 +699,24 @@ class MediaPlayerManager(
 
     @Synchronized
     fun seekToPrevious() {
-        controller?.seekToPrevious()
-        // A skipped or errored track must not leave the music stalled: keep playing the new one.
-        ensurePlaying()
+        // Use explicit index arithmetic instead of Player.seekToPrevious().
+        // After STATE_ENDED or a playback error, the internal "current item" reference
+        // is unreliable, so seekToPrevious() can silently no-op. Going back one index
+        // and seeking to position 0 is deterministic and works in every state.
+        val controller = controller ?: return
+        val index = currentMediaItemIndex
+        if (index > 0) {
+            controller.seekTo(index - 1, 0L)
+            ensurePlaying()
+        } else if (index == 0) {
+            // Already at the first track: seek to the start of the current track instead
+            // of wrapping around (wrapping is ambiguous and surprising to a driver).
+            controller.seekTo(0, 0L)
+            ensurePlaying()
+        } else {
+            // No track selected yet — nothing to go back to.
+            Timber.w("seekToPrevious: no previous track available (index=$index)")
+        }
     }
 
     @Synchronized
