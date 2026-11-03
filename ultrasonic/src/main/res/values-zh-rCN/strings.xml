@@ -542,6 +542,8 @@
     <string name="floating_side_right">右侧（副驾位）</string>
     <string name="floating_lock_title">锁定悬浮窗</string>
     <string name="floating_lock_summary">锁定后点按不响应，避免行车时手划过导航画面误切歌；长按悬浮窗可锁定或解锁。</string>
+    <string name="floating_pass_through_title">穿透模式</string>
+    <string name="floating_pass_through_summary">锁定悬浮窗后，点按会穿过窗口落到下层应用（如导航地图），歌词继续显示，方便行车时操作下方界面；解锁悬浮窗或关闭此模式后窗口恢复可触摸。</string>
     <string name="floating_color_theme">跟随主题</string>
     <string name="floating_color_white">白色</string>
     <string name="floating_color_amber">琥珀黄</string>

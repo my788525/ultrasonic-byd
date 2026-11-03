@@ -588,7 +588,7 @@
     <string name="floating_detail_seconds_title">Seconds to show song info</string>
     <string name="floating_detail_seconds_summary">How long the cover, title and artist stay visible after a switch before the window collapses to the lyrics alone. 0 keeps them on.</string>
     <string name="floating_pass_through_title">Pass-through mode</string>
-    <string name="floating_pass_through_summary">Every touch goes through the window to the app below, so the map stays reachable. It can only be switched off in the settings, because a touch cannot reach the window any more.</string>
+    <string name="floating_pass_through_summary">When the floating window is locked, taps pass through to the app below (such as the navigation map), so the screen underneath stays usable while the lyrics keep showing. Unlock the window or turn this off to make it touchable again.</string>
     <string name="floating_reverse_safety_title">Hide and pause in 360 / reverse</string>
     <string name="floating_reverse_safety_summary">While the 360 camera or reverse gear is active the window is hidden and the music paused; it comes back and resumes when the camera is off and the gear is no longer R.</string>
     <string name="lyrics_font_size_title">Lyrics font size</string>

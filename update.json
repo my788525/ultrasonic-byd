@@ -1,14 +1,14 @@
 {
-  "versionCode": 503,
-  "versionName": "4.8.0-byd.21",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.21/NavMusic-4.8.0-byd.21.apk",
-  "sha256": "0409bf7fe657349f27b03f722feaec58e0961733f9f327de7ffedb9797481ba5",
-  "size": 11431082,
-  "publishedAt": "2026-11-03T16:30:07Z",
+  "versionCode": 504,
+  "versionName": "4.8.0-byd.22",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.22/NavMusic-4.8.0-byd.22.apk",
+  "sha256": "31af7cfd20bd6d2697f6cb4529008cc8f3e784f189c6fb3fea07d0455f0fd1d6",
+  "size": 11431693,
+  "publishedAt": "2026-11-03T23:44:18Z",
   "changelog": [
-    "新增：悬浮窗「空闲亮度」可自定义——设置页新增滑条（0-100，步进5，默认45），控制没触摸几秒后悬浮窗自动变暗的深浅；设 100 保持全亮不变暗",
-    "新增：显示歌词的层级自动叠加 27% 亮度补偿，保证歌词在低亮度下仍清晰可读",
-    "新增：空闲亮度设置即时生效，拖动滑条实时刷新正在显示的悬浮窗",
+    "新增：悬浮窗「穿透模式」可选（设置 → 悬浮窗 → 穿透模式）。开启后，锁定悬浮窗即可让点按穿过窗口落到下层应用（如导航地图），歌词继续显示，方便行车时操作下方界面",
+    "逻辑：穿透仅在悬浮窗锁定后生效，未锁定保持可拖动与正常操控；解锁或关闭此模式后窗口恢复可触摸",
+    "修复：此前设置页穿透开关未真正生效的问题，现已实时应用（切换开关、锁定/解锁均即时同步）",
     "中英双语文案"
   ]
 }

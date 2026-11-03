@@ -361,7 +361,13 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      */
     private fun applyPassThroughToParams() {
         val params = layoutParams ?: return
-        if (passThrough) {
+        // Pass-through only takes effect once the window is locked. A locked window already
+        // ignores its own taps, and adding FLAG_NOT_TOUCHABLE forwards them to the app below
+        // (the navigation map, a music app, …), so the screen underneath stays usable while
+        // the lyrics keep showing. An unlocked window stays fully touchable, so the driver can
+        // still drag and control it, and the long-press that locks/unlocks keeps working.
+        val pass = passThrough && locked
+        if (pass) {
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         } else {
             params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -910,6 +916,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         // changes. The cache has to be invalidated, or the old colours stay on screen.
         lyricIndex = -1
         updateFloatingLyrics(controller?.currentPosition ?: 0L)
+        // Keep the pass-through flag in step with the setting and the lock state whenever the
+        // window is repainted, so a change made while the window was closed applies on open.
+        applyPassThrough()
     }
 
     /**
@@ -1375,6 +1384,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         // Without this the lock would only take effect after the window was restarted.
         applyTier()
         wake()
+        // The pass-through flag follows the lock state, so locking or unlocking the window
+        // immediately starts or stops forwarding taps to the app below.
+        applyPassThrough()
     }
 
     // endregion
@@ -1830,6 +1842,17 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
          */
         @JvmStatic
         fun controller(): MediaController? = instance?.controller
+
+        /**
+         * Re-reads the pass-through setting and updates the running window's touch flags.
+         *
+         * Called from the settings screen when the pass-through switch changes. The flag only
+         * takes effect while the window is locked, so it is applied together with the lock.
+         */
+        @JvmStatic
+        fun applyPassThroughFromSettings() {
+            instance?.applyPassThrough()
+        }
 
         /**
          * Flips the reverse-safety gate on or off for the overlay.

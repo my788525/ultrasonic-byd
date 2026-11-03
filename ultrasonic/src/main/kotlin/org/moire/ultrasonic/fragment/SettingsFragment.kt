@@ -296,8 +296,10 @@ class SettingsFragment :
             }
             getString(R.string.setting_key_floating_detail_seconds),
             getString(R.string.setting_key_floating_pass_through) -> {
-                // Geometry and pass-through behaviour of the running window.
+                // Geometry of the running window, then re-apply pass-through so the touch
+                // flags follow the new setting immediately.
                 applyFloatingGeometry()
+                FloatingPlayerService.applyPassThroughFromSettings()
             }
             getString(R.string.setting_key_follow_night) -> {
                 // The night dimming is baked into the window background, so the UI is rebuilt

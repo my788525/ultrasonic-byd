@@ -381,6 +381,12 @@
             a:summary="@string/floating_lock_summary"
             a:title="@string/floating_lock_title"
             app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="false"
+            a:key="@string/setting_key.floating_pass_through"
+            a:summary="@string/floating_pass_through_summary"
+            a:title="@string/floating_pass_through_title"
+            app:iconSpaceReserved="false"/>
         <SeekBarPreference
             a:defaultValue="90"
             a:key="@string/setting_key.floating_bg_opacity"
