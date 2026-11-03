@@ -1,11 +1,14 @@
 {
   "versionCode": 503,
   "versionName": "4.8.0-byd.21",
-  "downloadUrl": "https://github.com/my788525/ultronic-byd/releases/download/v4.8.0-byd.21/NavMusic-4.8.0-byd.21.apk",
-  "sha256": "b733b326a6d99eb9b1ba5db9cbc663e6057212fc12b4c8c7e84b4aac5fc16757",
-  "size": 11429767,
-  "publishedAt": "2026-11-03T14:20:05Z",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.21/NavMusic-4.8.0-byd.21.apk",
+  "sha256": "0409bf7fe657349f27b03f722feaec58e0961733f9f327de7ffedb9797481ba5",
+  "size": 11431082,
+  "publishedAt": "2026-11-03T16:30:07Z",
   "changelog": [
-    "新增：悬浮窗「空闲亮度」可自定义——没触摸几秒后自动变暗的深浅可设，设 100 保持全亮不变暗；显示歌词的层级自动提高保证清晰可读"
+    "新增：悬浮窗「空闲亮度」可自定义——设置页新增滑条（0-100，步进5，默认45），控制没触摸几秒后悬浮窗自动变暗的深浅；设 100 保持全亮不变暗",
+    "新增：显示歌词的层级自动叠加 27% 亮度补偿，保证歌词在低亮度下仍清晰可读",
+    "新增：空闲亮度设置即时生效，拖动滑条实时刷新正在显示的悬浮窗",
+    "中英双语文案"
   ]
 }
