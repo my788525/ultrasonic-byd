@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Height of one music-library / pinned-playlist tile in the home grid. -->
+    <dimen name="home_grid_tile_height">92dp</dimen>
+    <!-- Gap between grid tiles (applied as a margin on each tile, so the visual gap is 2x). -->
+    <dimen name="home_grid_tile_gap">6dp</dimen>
+</resources>

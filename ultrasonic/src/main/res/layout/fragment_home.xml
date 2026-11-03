@@ -137,6 +137,33 @@
             </LinearLayout>
         </FrameLayout>
 
+        <!-- Frequently used playlists: pinned from the playlist screen. Tapping one continues
+             it where the driver left off. Hidden until at least one playlist is pinned. -->
+        <LinearLayout
+            a:id="@+id/home_pinned_container"
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:orientation="vertical"
+            a:visibility="gone">
+
+            <TextView
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="18dp"
+                a:layout_marginBottom="2dp"
+                a:letterSpacing="0.12"
+                a:text="@string/home_pinned_title"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="14sp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                a:id="@+id/home_pinned_grid"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="10dp"
+                a:nestedScrollingEnabled="false" />
+        </LinearLayout>
+
         <TextView
             a:layout_width="wrap_content"
             a:layout_height="wrap_content"
@@ -147,13 +174,11 @@
             a:textColor="@color/pal_text_secondary"
             a:textSize="14sp" />
 
-        <LinearLayout
+        <androidx.recyclerview.widget.RecyclerView
             a:id="@+id/home_grid"
             a:layout_width="match_parent"
-            a:layout_height="0dp"
+            a:layout_height="wrap_content"
             a:layout_marginTop="10dp"
-            a:layout_weight="1"
-            a:baselineAligned="false"
-            a:orientation="vertical" />
+            a:nestedScrollingEnabled="false" />
     </LinearLayout>
 </ScrollView>

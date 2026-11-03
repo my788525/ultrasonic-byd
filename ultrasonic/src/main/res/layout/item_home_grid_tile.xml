@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One tile of a home screen grid (music-library tiles and pinned playlists). The gradient
+     background and the accent are applied in code, because they depend on the selected palette.
+     A fixed height keeps the grid deterministic inside the scrolling home screen. -->
+<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    a:layout_width="match_parent"
+    a:layout_height="@dimen/home_grid_tile_height"
+    a:layout_margin="@dimen/home_grid_tile_gap"
+    a:clickable="true"
+    a:focusable="true"
+    a:gravity="center"
+    a:orientation="vertical"
+    a:paddingStart="10dp"
+    a:paddingTop="12dp"
+    a:paddingEnd="10dp"
+    a:paddingBottom="12dp">
+
+    <ImageView
+        a:id="@+id/home_tile_icon"
+        a:layout_width="26dp"
+        a:layout_height="26dp"
+        a:contentDescription="@null"
+        a:scaleType="fitCenter" />
+
+    <TextView
+        a:id="@+id/home_tile_label"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="10dp"
+        a:ellipsize="end"
+        a:gravity="center"
+        a:maxLines="1"
+        a:textColor="@color/pal_text_primary"
+        a:textSize="17sp" />
+</LinearLayout>

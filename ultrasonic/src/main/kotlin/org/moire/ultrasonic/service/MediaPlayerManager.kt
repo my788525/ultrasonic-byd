@@ -39,6 +39,7 @@ import org.moire.ultrasonic.data.RatingUpdate
 import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.service.MusicServiceFactory.getMusicService
 import org.moire.ultrasonic.util.DownloadUtil
+import org.moire.ultrasonic.util.PlaylistResumeStore
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.UiState
 import org.moire.ultrasonic.util.Util
@@ -58,6 +59,9 @@ private const val MAX_PLAYBACK_ERROR_RETRIES = 3
 /** Base backoff between auto-retries; it grows with the attempt number (1x, 2x, 3x). */
 private const val PLAYBACK_ERROR_RETRY_DELAY_MS = 1500L
 
+/** How often the active playlist's resume position is persisted while playing. */
+private const val RESUME_SAVE_INTERVAL_MS = 5000L
+
 /**
  * The Media Player Manager can forward commands to the Media3 controller as
  * well as switch between different player interfaces (local, remote, cast etc).
@@ -76,11 +80,38 @@ class MediaPlayerManager(
     private var autoPlayStart = false
 
     /**
+     * The id of the server playlist that the current queue was built from, or null when the
+     * queue is not a playlist (an album, a folder, random songs, ...). It lets us remember the
+     * last played position of each playlist so a pinned "frequently used" playlist on the home
+     * screen can be resumed where the driver left off.
+     */
+    var currentPlaylistId: String? = null
+        private set
+    private var currentPlaylistName: String? = null
+
+    /**
+     * True while the current player queue is the playlist identified by [currentPlaylistId].
+     * It is cleared whenever the queue is replaced by something that is not that playlist
+     * (shuffle-all, an album, a folder, ...), so the periodic resume saver never writes the
+     * position of the wrong queue under a playlist's id.
+     */
+    private var playlistBinding = false
+
+    /**
      * Counts the automatic retries of a failing song. It is reset as soon as the music plays
      * again or the track changes, so a permanently broken file is only retried a few times and
      * then left to the driver, while a song that recovers mid-buffer heals by itself.
      */
     private var playbackErrorRetries = 0
+
+    /** Slow timer that keeps the active playlist's resume position fresh while playing. */
+    private val resumeHandler = Handler(Looper.getMainLooper())
+    private val resumeRunnable = object : Runnable {
+        override fun run() {
+            savePlaylistResume()
+            resumeHandler.postDelayed(this, RESUME_SAVE_INTERVAL_MS)
+        }
+    }
 
     private val scrobbler = Scrobbler()
 
@@ -137,17 +168,19 @@ class MediaPlayerManager(
             publishPlaybackState()
         }
 
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            // A new song starts a fresh error budget; the previous one does not carry over.
-            playbackErrorRetries = 0
-            clearBookmark()
-            // TRANSITION_REASON_AUTO means that the previous track finished playing and a new one has started.
-            if (reason == MEDIA_ITEM_TRANSITION_REASON_AUTO && cachedMediaItem != null) {
-                scrobbler.scrobble(cachedMediaItem?.toTrack(), true)
-            }
-            cachedMediaItem = mediaItem
-            publishPlaybackState()
+    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+        // A new song starts a fresh error budget; the previous one does not carry over.
+        playbackErrorRetries = 0
+        clearBookmark()
+        // TRANSITION_REASON_AUTO means that the previous track finished playing and a new one has started.
+        if (reason == MEDIA_ITEM_TRANSITION_REASON_AUTO && cachedMediaItem != null) {
+            scrobbler.scrobble(cachedMediaItem?.toTrack(), true)
         }
+        cachedMediaItem = mediaItem
+        // A playlist changes track: remember where we are so it can be resumed later.
+        savePlaylistResume()
+        publishPlaybackState()
+    }
 
         /*
          * If the same item is contained in a playlist multiple times directly after each
@@ -306,6 +339,7 @@ class MediaPlayerManager(
         }
 
         created = true
+        resumeHandler.postDelayed(resumeRunnable, RESUME_SAVE_INTERVAL_MS)
         Timber.i("MediaPlayerController started")
     }
 
@@ -493,12 +527,19 @@ class MediaPlayerManager(
         songs: List<Track>,
         autoPlay: Boolean,
         shuffle: Boolean,
-        insertionMode: InsertionMode
+        insertionMode: InsertionMode,
+        playlistId: String? = null,
+        playlistName: String? = null
     ) {
         var insertAt = 0
 
         when (insertionMode) {
-            InsertionMode.CLEAR -> clear()
+            InsertionMode.CLEAR -> {
+                // A wholesale queue replacement is no longer "the playlist" unless the caller
+                // rebinds it below, so drop the binding first to avoid saving the wrong position.
+                playlistBinding = false
+                clear()
+            }
             InsertionMode.APPEND -> insertAt = mediaItemCount
             InsertionMode.AFTER_CURRENT -> {
                 // Must never be larger than the count of items (especially when empty)
@@ -537,20 +578,32 @@ class MediaPlayerManager(
                 play(0)
             }
         }
+
+        // If this add was for a server playlist, bind the queue to it so its resume position
+        // is tracked. CLEAR above already cleared any previous binding, so this sticks.
+        if (playlistId != null) {
+            currentPlaylistId = playlistId
+            currentPlaylistName = playlistName
+            playlistBinding = true
+        }
     }
 
     private suspend fun addToPlaylistAsync(
         songs: List<Track>,
         autoPlay: Boolean,
         shuffle: Boolean,
-        insertionMode: InsertionMode
+        insertionMode: InsertionMode,
+        playlistId: String? = null,
+        playlistName: String? = null
     ) {
         withContext(Dispatchers.Main) {
             addToPlaylist(
                 songs = songs,
                 autoPlay = autoPlay,
                 shuffle = shuffle,
-                insertionMode = insertionMode
+                insertionMode = insertionMode,
+                playlistId = playlistId,
+                playlistName = playlistName
             )
         }
     }
@@ -565,7 +618,9 @@ class MediaPlayerManager(
         isShare: Boolean = false,
         isDirectory: Boolean = true,
         shuffle: Boolean = false,
-        isArtist: Boolean = false
+        isArtist: Boolean = false,
+        playlistId: String? = null,
+        playlistName: String? = null
     ) {
 
         fragment.launchWithToast {
@@ -581,6 +636,8 @@ class MediaPlayerManager(
                 insertionMode = insertionMode,
                 autoPlay = (insertionMode == InsertionMode.CLEAR),
                 shuffle = shuffle,
+                playlistId = playlistId,
+                playlistName = playlistName
             )
 
             // In the two pane layout the player is already visible next to the list,
@@ -724,12 +781,32 @@ class MediaPlayerManager(
         return controller?.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS) == true
     }
 
+    /**
+     * Go to the next track using explicit index arithmetic instead of [Player.seekToNext].
+     *
+     * After a playback error the internal "current item" reference is unreliable and Media3
+     * disables [Player.COMMAND_SEEK_TO_NEXT], so a plain [Player.seekToNext] silently no-ops —
+     * the steering-wheel / on-screen next button then does nothing while the player is stuck on
+     * the error banner, even though the app's own next button (which routes through here too)
+     * appears to work. Seeking to the next index directly keeps working in every state, and
+     * [ensurePlaying] clears the old error and starts the new track on its own.
+     */
     @Synchronized
     fun seekToNext() {
-        controller?.seekToNext()
-        // The driver asked for the next song, so it must start on its own even when the track
-        // that just played ended in an error. Without this the window stayed frozen in the
-        // error state until the play button was pressed again.
+        val controller = controller ?: return
+        val index = currentMediaItemIndex
+        val count = controller.mediaItemCount
+
+        if (index < 0 || count <= 0) {
+            Timber.w("seekToNext: no playlist available (index=$index, count=$count)")
+            ensurePlaying()
+            return
+        }
+
+        // At the last track we don't wrap: keep the current one playing.
+        if (index < count - 1) {
+            controller.seekTo(index + 1, 0L)
+        }
         ensurePlaying()
     }
 
@@ -749,6 +826,78 @@ class MediaPlayerManager(
             controller.prepare()
             controller.play()
         }
+    }
+
+    /**
+     * Marks the playlist that the queue was built from. Called by the fragments that start a
+     * playlist (home pinned card, playlist detail). Knowing the active playlist lets the resume
+     * store remember the position of each playlist independently.
+     */
+    @Synchronized
+    fun setActivePlaylist(id: String?, name: String?) {
+        currentPlaylistId = id
+        currentPlaylistName = name
+        playlistBinding = id != null
+        if (id != null) {
+            // Remember that this playlist exists, starting at the beginning.
+            PlaylistResumeStore.save(id, name ?: "", 0, 0)
+        }
+    }
+
+    /**
+     * Continues a pinned "frequently used" playlist from the progress that was last saved for it.
+     *
+     * The whole queue is replaced by the playlist's tracks, the player seeks to the saved track
+     * and position, then starts playing. Unlike [setActivePlaylist] this does NOT reset the saved
+     * progress to zero — it restores exactly where the driver left off.
+     */
+    @Synchronized
+    fun resumePlaylistAt(
+        id: String,
+        name: String,
+        songs: List<Track>,
+        index: Int,
+        position: Int
+    ) {
+        if (songs.isEmpty()) {
+            Timber.w("resumePlaylistAt: no tracks for playlist %s", id)
+            return
+        }
+        addToPlaylist(
+            songs = songs,
+            autoPlay = false,
+            shuffle = false,
+            insertionMode = InsertionMode.CLEAR
+        )
+        // Bind AFTER the clear above, otherwise the binding would be dropped again.
+        currentPlaylistId = id
+        currentPlaylistName = name
+        playlistBinding = true
+
+        val safeIndex = index.coerceIn(0, songs.lastIndex)
+        seekTo(safeIndex, position)
+        prepare()
+        play()
+        PlaylistResumeStore.save(id, name, safeIndex, position)
+    }
+
+    /**
+     * Persists the current track index and position for the active playlist. Called on every
+     * track change and on a slow timer while playing, so a pinned playlist can be resumed.
+     * Does nothing unless the queue is currently bound to a playlist.
+     */
+    @Synchronized
+    private fun savePlaylistResume() {
+        if (!playlistBinding) return
+        val id = currentPlaylistId ?: return
+        val controller = controller ?: return
+        if (controller.currentMediaItem == null) return
+        PlaylistResumeStore.save(
+            id,
+            currentPlaylistName ?: "",
+            currentMediaItemIndex,
+            playerPosition
+        )
     }
 
     @Synchronized

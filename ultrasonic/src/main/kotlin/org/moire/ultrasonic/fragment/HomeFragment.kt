@@ -20,7 +20,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -29,7 +28,9 @@ import androidx.core.content.res.ResourcesCompat
 import androidx.core.widget.ImageViewCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import java.util.concurrent.TimeUnit
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,17 +47,26 @@ import org.moire.ultrasonic.service.MusicServiceFactory
 import org.moire.ultrasonic.subsonic.ImageLoaderProvider
 import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
+import org.moire.ultrasonic.util.DownloadUtil
+import org.moire.ultrasonic.util.HomePrefs
+import org.moire.ultrasonic.util.PinnedPlaylist
+import org.moire.ultrasonic.util.PlaylistResumeStore
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.Util
 import org.moire.ultrasonic.util.toTrack
 import timber.log.Timber
+import java.util.concurrent.TimeUnit
 
 /**
  * The start screen of the car UI.
  *
- * A head unit is operated while driving, so the home screen is not a list but a grid of eight
- * large tiles, plus one very large "continue playing" card on top. Nothing here is smaller than
+ * A head unit is operated while driving, so the home screen is not a list but a grid of large
+ * tiles, plus one very large "continue playing" card on top. Nothing here is smaller than
  * a 60 dp touch target, and every label is set in a size that can be read from the driver seat.
+ *
+ * Above the music library sits the "frequently used playlists" row: playlists the driver has
+ * pinned from the playlist screen. Tapping one continues it exactly where it was left off. The
+ * music-library tiles can be dragged to reorder them, and that order is remembered.
  *
  * It has to be a [ScopeFragment]: the media player manager lives in the NavigationActivity scope.
  */
@@ -82,6 +92,7 @@ class HomeFragment : ScopeFragment() {
     }
 
     private data class Tile(
+        val key: String,
         @DrawableRes val icon: Int,
         @StringRes val label: Int,
         val open: (HomeFragment) -> Unit
@@ -106,7 +117,8 @@ class HomeFragment : ScopeFragment() {
         playButton = view.findViewById(R.id.home_play)
 
         decorateContinueCard(view)
-        buildGrid(view)
+        setupPinnedGrid(view)
+        setupLibraryGrid(view)
 
         playButton?.setOnClickListener {
             mediaPlayerManager.togglePlayPause()
@@ -162,6 +174,8 @@ class HomeFragment : ScopeFragment() {
         currentCoverId = null
         updateNowPlaying()
         updateNavButtonTint()
+        // The pinned row may have changed while we were on the playlist screen.
+        view?.let { setupPinnedGrid(it) }
         handler.postDelayed(updateRunnable, UPDATE_INTERVAL_MS)
     }
 
@@ -261,60 +275,125 @@ class HomeFragment : ScopeFragment() {
         }
     }
 
-    private fun buildGrid(root: View) {
-        val context = requireContext()
-        val grid = root.findViewById<LinearLayout>(R.id.home_grid)
-        val columns = columns()
-
-        // In one column the rows have to size themselves, otherwise eight rows share the height
-        // of the screen and every one of them becomes a sliver
-        if (columns == PORTRAIT_COLUMNS) {
-            grid.layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
+    private fun setupPinnedGrid(root: View) {
+        val container = root.findViewById<ViewGroup>(R.id.home_pinned_container)
+        val recycler = root.findViewById<RecyclerView>(R.id.home_pinned_grid)
+        val pinned = HomePrefs.getPinnedPlaylists()
+        if (pinned.isEmpty()) {
+            container.visibility = View.GONE
+            return
         }
+        container.visibility = View.VISIBLE
+        recycler.layoutManager = GridLayoutManager(requireContext(), columns())
+        recycler.isNestedScrollingEnabled = false
+        recycler.layoutParams = recycler.layoutParams.apply {
+            height = gridHeightPx(pinned.size, columns())
+        }
+        recycler.adapter = PinnedPlaylistAdapter(pinned) { resumePinnedPlaylist(it) }
+    }
 
-        var index = 0
-        tiles().chunked(columns).forEach { chunk ->
-            val row = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                isBaselineAligned = false
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    if (columns == PORTRAIT_COLUMNS) {
-                        CarTheme.dp(context, PORTRAIT_ROW_HEIGHT_DP).toInt()
-                    } else {
-                        0
-                    },
-                    if (columns == PORTRAIT_COLUMNS) 0f else 1f
-                ).apply {
-                    topMargin = if (grid.childCount == 0) 0
-                    else CarTheme.dp(context, TILE_GAP_DP).toInt()
+    private fun setupLibraryGrid(root: View) {
+        val recycler = root.findViewById<RecyclerView>(R.id.home_grid)
+        val cols = columns()
+        recycler.layoutManager = GridLayoutManager(requireContext(), cols)
+        recycler.isNestedScrollingEnabled = false
+        val ordered = orderedTiles().toMutableList()
+        recycler.layoutParams = recycler.layoutParams.apply {
+            height = gridHeightPx(ordered.size, cols)
+        }
+        val adapter = HomeTileAdapter(ordered, this)
+        recycler.adapter = adapter
+
+        // Drag to reorder the music-library tiles; the new order is persisted on drop.
+        val callback = object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN or
+                ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT,
+            0
+        ) {
+            override fun onMove(
+                rv: RecyclerView,
+                vh: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val from = vh.bindingAdapterPosition
+                val to = target.bindingAdapterPosition
+                if (from < 0 || to < 0) return false
+                adapter.move(from, to)
+                return true
+            }
+
+            override fun onSwiped(vh: RecyclerView.ViewHolder, direction: Int) {}
+
+            override fun clearView(rv: RecyclerView, vh: RecyclerView.ViewHolder) {
+                super.clearView(rv, vh)
+                HomePrefs.setTileOrder(adapter.keys())
+            }
+        }
+        ItemTouchHelper(callback).attachToRecyclerView(recycler)
+    }
+
+    private fun gridHeightPx(itemCount: Int, columns: Int): Int {
+        if (itemCount <= 0) return 0
+        val tileH = resources.getDimensionPixelSize(R.dimen.home_grid_tile_height)
+        val gap = resources.getDimensionPixelSize(R.dimen.home_grid_tile_gap)
+        val rows = (itemCount + columns - 1) / columns
+        return rows * (tileH + 2 * gap)
+    }
+
+    /** Continues a pinned playlist from the progress last saved for it. */
+    private fun resumePinnedPlaylist(playlist: PinnedPlaylist) {
+        val progress = PlaylistResumeStore.get(playlist.id)
+        lifecycleScope.launch {
+            val songs = withContext(Dispatchers.IO) {
+                try {
+                    DownloadUtil.getTracksFromServerAsync(
+                        isArtist = false,
+                        id = playlist.id,
+                        isDirectory = false,
+                        name = playlist.name,
+                        isShare = false
+                    )
+                } catch (all: Exception) {
+                    Timber.w(all, "Could not load pinned playlist %s", playlist.id)
+                    emptyList<Track>()
                 }
             }
 
-            chunk.forEachIndexed { column, tile ->
-                row.addView(createTile(row, tile, column, columns))
+            if (songs.isEmpty()) {
+                Util.toast(R.string.home_idle_hint, context = context)
+                return@launch
             }
 
-            // Keep the last row aligned with the rows above it
-            repeat(columns - chunk.size) {
-                row.addView(View(context), LinearLayout.LayoutParams(0, 0, 1f))
-            }
-
-            grid.addView(row)
-            index += chunk.size
+            mediaPlayerManager.resumePlaylistAt(
+                id = playlist.id,
+                name = playlist.name,
+                songs = songs,
+                index = progress?.index ?: 0,
+                position = progress?.position ?: 0
+            )
+            Util.toast(
+                getString(R.string.home_resume_playlist, playlist.name),
+                context = context
+            )
         }
+    }
 
-        Timber.d("Home grid built with %d columns, %d tiles", columns, index)
+    private fun orderedTiles(): List<Tile> {
+        val all = tiles()
+        val saved = HomePrefs.getTileOrder()
+        if (saved.isEmpty()) return all
+        val byKey = all.associateBy { it.key }
+        val ordered = saved.mapNotNull { byKey[it] }.toMutableList()
+        // Append any tiles that were added after the saved order was written.
+        all.forEach { if (!saved.contains(it.key)) ordered.add(it) }
+        return ordered
     }
 
     private fun tiles(): List<Tile> = listOf(
-        Tile(R.drawable.ic_artist, R.string.main_artists_title) {
+        Tile("artists", R.drawable.ic_artist, R.string.main_artists_title) {
             it.findNavController().navigate(NavigationGraphDirections.toArtistList())
         },
-        Tile(R.drawable.ic_home_album, R.string.main_albums_title) {
+        Tile("albums", R.drawable.ic_home_album, R.string.main_albums_title) {
             it.findNavController().navigate(
                 NavigationGraphDirections.toAlbumList(
                     AlbumListType.NEWEST,
@@ -322,25 +401,25 @@ class HomeFragment : ScopeFragment() {
                 )
             )
         },
-        Tile(R.drawable.ic_home_song, R.string.main_songs_title) {
+        Tile("songs", R.drawable.ic_home_song, R.string.main_songs_title) {
             it.findNavController().navigate(NavigationGraphDirections.toTrackCollection())
         },
-        Tile(R.drawable.ic_menu_playlists, R.string.main_playlists_title) {
+        Tile("playlists", R.drawable.ic_menu_playlists, R.string.main_playlists_title) {
             it.findNavController().navigate(NavigationGraphDirections.toPlaylistFragment())
         },
-        Tile(R.drawable.ic_home_folder, R.string.main_folders_title) {
+        Tile("folders", R.drawable.ic_home_folder, R.string.main_folders_title) {
             it.findNavController().navigate(R.id.folderFragment)
         },
-        Tile(R.drawable.ic_home_genre, R.string.main_genres_title) {
+        Tile("genres", R.drawable.ic_home_genre, R.string.main_genres_title) {
             it.findNavController().navigate(NavigationGraphDirections.toGenreList())
         },
-        Tile(R.drawable.ic_menu_download, R.string.menu_downloads) {
+        Tile("downloads", R.drawable.ic_menu_download, R.string.menu_downloads) {
             it.findNavController().navigate(R.id.downloadsFragment)
         },
         // The three tiles below are the way to start music without typing anything. On a
         // head unit the search is the slowest possible way to pick a song, because the
         // driver has to spell it out on a keyboard he cannot look at.
-        Tile(R.drawable.ic_home_recent, R.string.home_recent_title) {
+        Tile("recent", R.drawable.ic_home_recent, R.string.home_recent_title) {
             it.findNavController().navigate(
                 NavigationGraphDirections.toAlbumList(
                     AlbumListType.RECENT,
@@ -348,7 +427,7 @@ class HomeFragment : ScopeFragment() {
                 )
             )
         },
-        Tile(R.drawable.ic_home_starred, R.string.home_starred_title) {
+        Tile("starred", R.drawable.ic_home_starred, R.string.home_starred_title) {
             // The favourites live on the server. In offline mode they cannot be read, so
             // the tile leads to the local library instead of to an empty list.
             if (ActiveServerProvider.isOffline()) {
@@ -359,7 +438,7 @@ class HomeFragment : ScopeFragment() {
                 ))
             }
         },
-        Tile(R.drawable.ic_home_radio, R.string.home_radio_title) {
+        Tile("radio", R.drawable.ic_home_radio, R.string.home_radio_title) {
             it.findNavController().navigate(NavigationGraphDirections.toGenreList())
         },
         // One tap toggles the offline library. While driving the network is not guaranteed,
@@ -367,6 +446,7 @@ class HomeFragment : ScopeFragment() {
         // car" and "play from the server". The tile remembers the server it came from, so
         // leaving offline mode lands on the same library again.
         Tile(
+            "offline",
             R.drawable.ic_home_offline,
             if (ActiveServerProvider.isOffline()) R.string.home_online_title
             else R.string.home_offline_title
@@ -384,65 +464,101 @@ class HomeFragment : ScopeFragment() {
                 it.activeServerProvider.setActiveServerById(ActiveServerProvider.OFFLINE_DB_ID)
             }
         },
-        Tile(R.drawable.ic_menu_settings, R.string.menu_settings) {
+        Tile("settings", R.drawable.ic_menu_settings, R.string.menu_settings) {
             it.findNavController().navigate(R.id.settingsFragment)
         }
     )
 
-    private fun createTile(parent: ViewGroup, tile: Tile, index: Int, columns: Int): View {
+    private fun styleTile(view: View, tile: Tile, index: Int) {
         val context = requireContext()
         val palette = CarPalette.current()
         val accent = CarTheme.accent(context, palette)
 
-        val view = layoutInflater.inflate(R.layout.item_home_tile, parent, false)
-        val params = (view.layoutParams as LinearLayout.LayoutParams).apply {
-            width = 0
-            height = LinearLayout.LayoutParams.MATCH_PARENT
-            weight = 1f
-            marginStart = if (index == 0) 0 else CarTheme.dp(context, TILE_GAP_DP).toInt()
-        }
-        view.layoutParams = params
-
         val background = CarTheme.tileBackground(context, index, palette)
-        view.background = android.graphics.drawable.RippleDrawable(
-            android.content.res.ColorStateList.valueOf(CarTheme.withAlpha(accent, PRESS_ALPHA)),
+        view.background = RippleDrawable(
+            ColorStateList.valueOf(CarTheme.withAlpha(accent, PRESS_ALPHA)),
             background,
             background
         )
 
         val icon = view.findViewById<ImageView>(R.id.home_tile_icon)
         icon.setImageDrawable(ResourcesCompat.getDrawable(context.resources, tile.icon, null))
-        ImageViewCompat.setImageTintList(icon, android.content.res.ColorStateList.valueOf(accent))
+        ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(accent))
 
         val label = view.findViewById<TextView>(R.id.home_tile_label)
         label.setText(tile.label)
 
-        // Stacked tiles in one column would waste the width, so they lay out like a row there
-        if (columns == PORTRAIT_COLUMNS) {
-            (view as LinearLayout).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.CENTER_VERTICAL
-                setPaddingRelative(
-                    CarTheme.dp(context, 20f).toInt(),
-                    0,
-                    CarTheme.dp(context, 20f).toInt(),
-                    0
-                )
-            }
-            icon.layoutParams = icon.layoutParams.apply {
-                width = CarTheme.dp(context, 20f).toInt()
-                height = CarTheme.dp(context, 20f).toInt()
-            }
-            label.layoutParams = (label.layoutParams as LinearLayout.LayoutParams).apply {
-                width = LinearLayout.LayoutParams.MATCH_PARENT
-                marginStart = CarTheme.dp(context, 20f).toInt()
-                topMargin = 0
-            }
-            label.gravity = android.view.Gravity.START
+        view.setOnClickListener { tile.open(this) }
+    }
+
+    private class HomeTileAdapter(
+        private val items: MutableList<Tile>,
+        private val fragment: HomeFragment
+    ) : RecyclerView.Adapter<HomeTileAdapter.VH>() {
+
+        class VH(val view: View) : RecyclerView.ViewHolder(view)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_home_grid_tile, parent, false)
+            return VH(view)
         }
 
-        view.setOnClickListener { tile.open(this) }
-        return view
+        override fun getItemCount(): Int = items.size
+
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            fragment.styleTile(holder.view, items[position], position)
+        }
+
+        fun move(from: Int, to: Int) {
+            if (from == to) return
+            val tile = items.removeAt(from)
+            items.add(to, tile)
+            notifyItemMoved(from, to)
+        }
+
+        fun keys(): List<String> = items.map { it.key }
+    }
+
+    private class PinnedPlaylistAdapter(
+        private val items: List<PinnedPlaylist>,
+        private val onClick: (PinnedPlaylist) -> Unit
+    ) : RecyclerView.Adapter<PinnedPlaylistAdapter.VH>() {
+
+        class VH(val view: View) : RecyclerView.ViewHolder(view)
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_home_grid_tile, parent, false)
+            return VH(view)
+        }
+
+        override fun getItemCount(): Int = items.size
+
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            val playlist = items[position]
+            val context = holder.view.context
+            val palette = CarPalette.current()
+            val accent = CarTheme.accent(context, palette)
+
+            val background = CarTheme.tileBackground(context, position, palette)
+            holder.view.background = RippleDrawable(
+                ColorStateList.valueOf(CarTheme.withAlpha(accent, PRESS_ALPHA)),
+                background,
+                background
+            )
+
+            val icon = holder.view.findViewById<ImageView>(R.id.home_tile_icon)
+            icon.setImageDrawable(
+                ResourcesCompat.getDrawable(context.resources, R.drawable.ic_menu_playlists, null)
+            )
+            ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(accent))
+
+            val label = holder.view.findViewById<TextView>(R.id.home_tile_label)
+            label.text = playlist.name
+
+            holder.view.setOnClickListener { onClick(playlist) }
+        }
     }
 
     // endregion
@@ -529,7 +645,6 @@ class HomeFragment : ScopeFragment() {
         private const val PORTRAIT_COLUMNS = 1
         private const val PORTRAIT_CARD_HEIGHT_DP = 104f
         private const val PORTRAIT_COVER_DP = 78f
-        private const val PORTRAIT_ROW_HEIGHT_DP = 96f
 
         private const val TILE_GAP_DP = 12f
         private const val PRESS_ALPHA = 0x40

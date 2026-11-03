@@ -801,7 +801,22 @@ class NavigationActivity : ScopeActivity() {
 
     // TODO: Why is this needed? Shouldn't it just work by default?
     override fun onSupportNavigateUp(): Boolean {
-        return findNavController(R.id.nav_host_fragment).navigateUp(appBarConfiguration)
+        val navController = findNavController(R.id.nav_host_fragment)
+
+        // When the driver is inside a playlist and taps the top-left button, go straight back to
+        // Home instead of just popping to the playlists list. The playlist detail is reached from
+        // several places, so popping would not reliably land on Home.
+        if (navController.currentDestination?.id == R.id.trackCollectionFragment) {
+            val playlistId = navController.currentBackStackEntry?.arguments?.getString("playlistId")
+            if (!playlistId.isNullOrEmpty()) {
+                if (!navController.popBackStack(R.id.homeFragment, false)) {
+                    navController.navigate(R.id.homeFragment)
+                }
+                return true
+            }
+        }
+
+        return navController.navigateUp(appBarConfiguration)
     }
 
     override fun onNewIntent(intent: Intent?) {

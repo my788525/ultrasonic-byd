@@ -1,0 +1,117 @@
+/*
+ * HomePrefs.kt
+ *
+ * Persistence for the customised car home screen: the order of the music library tiles and the
+ * list of "frequently used" playlists that are pinned above the library. Also keeps a small
+ * per-playlist resume position so a pinned playlist can be continued where it was left off.
+ */
+
+package org.moire.ultrasonic.util
+
+import android.content.Context
+import android.content.SharedPreferences
+import org.moire.ultrasonic.app.UApp
+
+/**
+ * A playlist the driver has pinned to the home screen.
+ *
+ * @param id   server playlist id (stable across sessions)
+ * @param name playlist name, cached at pin time so the tile can render without a network call
+ */
+data class PinnedPlaylist(val id: String, val name: String)
+
+/**
+ * Saved playback position for a playlist.
+ *
+ * @param name   cached playlist name
+ * @param index  zero based index of the track that was playing
+ * @param position  playback position inside that track, in milliseconds
+ */
+data class PlaylistProgress(val name: String, val index: Int, val position: Int)
+
+object HomePrefs {
+
+    private const val FILE = "home_prefs"
+    private const val KEY_TILE_ORDER = "tile_order"
+    private const val KEY_PINNED = "pinned_playlists"
+
+    private fun prefs(): SharedPreferences =
+        UApp.applicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    /** Returns the saved order of the music-library tiles, or an empty list on first run. */
+    fun getTileOrder(): List<String> {
+        val raw = prefs().getString(KEY_TILE_ORDER, null) ?: return emptyList()
+        if (raw.isBlank()) return emptyList()
+        return raw.split(",").filter { it.isNotBlank() }
+    }
+
+    /** Persists the order of the music-library tiles (a list of stable tile keys). */
+    fun setTileOrder(order: List<String>) {
+        prefs().edit().putString(KEY_TILE_ORDER, order.joinToString(",")).apply()
+    }
+
+    /** The playlists pinned to the home screen, in display order. */
+    fun getPinnedPlaylists(): List<PinnedPlaylist> {
+        val raw = prefs().getString(KEY_PINNED, null) ?: return emptyList()
+        if (raw.isBlank()) return emptyList()
+        return raw.split(";").mapNotNull { entry ->
+            val parts = entry.split("\u0001")
+            if (parts.size >= 2 && parts[0].isNotBlank()) {
+                PinnedPlaylist(parts[0], parts.getOrElse(1) { "" })
+            } else {
+                null
+            }
+        }
+    }
+
+    fun setPinnedPlaylists(list: List<PinnedPlaylist>) {
+        val raw = list.joinToString(";") { "${it.id}\u0001${it.name}" }
+        prefs().edit().putString(KEY_PINNED, raw).apply()
+    }
+
+    fun isPinned(id: String): Boolean = getPinnedPlaylists().any { it.id == id }
+
+    /**
+     * Adds the playlist if it is not pinned, removes it otherwise. Returns the new pinned state.
+     */
+    fun togglePinned(playlist: PinnedPlaylist): Boolean {
+        val current = getPinnedPlaylists().toMutableList()
+        val idx = current.indexOfFirst { it.id == playlist.id }
+        val nowPinned: Boolean
+        if (idx >= 0) {
+            current.removeAt(idx)
+            nowPinned = false
+        } else {
+            current.add(playlist)
+            nowPinned = true
+        }
+        setPinnedPlaylists(current)
+        return nowPinned
+    }
+}
+
+object PlaylistResumeStore {
+
+    private const val FILE = "playlist_resume"
+    private const val KEY_PREFIX = "resume_"
+
+    private fun prefs(): SharedPreferences =
+        UApp.applicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+    /** Reads the saved resume position for a playlist, or null when none exists. */
+    fun get(id: String): PlaylistProgress? {
+        val raw = prefs().getString(KEY_PREFIX + id, null) ?: return null
+        val parts = raw.split("|")
+        if (parts.size < 3) return null
+        return PlaylistProgress(
+            name = parts[0],
+            index = parts[1].toIntOrNull() ?: 0,
+            position = parts[2].toIntOrNull() ?: 0
+        )
+    }
+
+    /** Saves (or overwrites) the resume position for a playlist. */
+    fun save(id: String, name: String, index: Int, position: Int) {
+        prefs().edit().putString(KEY_PREFIX + id, "$name|$index|$position").apply()
+    }
+}
