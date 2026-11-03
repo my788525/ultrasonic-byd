@@ -227,10 +227,11 @@ class NavigationActivity : ScopeActivity() {
             Timber.d("Navigated to $dest")
 
             currentFragmentId = destination.id
-            // The floating window is hidden on the home page only; on every other screen it stays
-            // visible. When the app is backgrounded (paused) the window must show over other apps,
-            // which onPause handles, so here we only react to the home page itself.
-            FloatingPlayerService.setHostHidden(this, destination.id == R.id.homeFragment)
+            // While the app is in the foreground the floating window must never cover its own
+            // screens — settings, home, player, or any other fragment. When the app is
+            // backgrounded (paused) the window re-appears over the navigation map, which
+            // onPause handles.
+            FloatingPlayerService.setHostHidden(this, true)
             // Handle the hiding of the NowPlaying fragment when the Player is active
             if (currentFragmentId == R.id.playerFragment) {
                 hideNowPlaying()
@@ -653,13 +654,11 @@ class NavigationActivity : ScopeActivity() {
         // Lifecycle support's constructor registers some event receivers so it should be created early
         lifecycleSupport.onCreate(Settings.resumeOnStart)
 
-        // The floating window is a setting now, so it comes back with the app after a restart.
-        // The home page hides it: record that wish first, then (re)build the window, which honours
-        // it. Read the *current* destination, not the cached id, because on a cold start the
-        // destination listener has not fired yet and the cached id would still be the default.
-        val currentDest = findNavController(R.id.nav_host_fragment).currentDestination?.id
-        val onHome = currentDest == R.id.homeFragment
-        FloatingPlayerService.setHostHidden(this, onHome)
+        // The floating window is hidden while the app is in the foreground, regardless of which
+        // fragment is showing. It re-appears over the navigation map only when the app goes
+        // to the background (onPause). On a cold start the destination listener has not fired
+        // yet, so this call records the hide before applyFromSettings rebuilds the window.
+        FloatingPlayerService.setHostHidden(this, true)
         if (Settings.navFloating || FloatingPlayerService.tierForKey(Settings.floatingMode) != null) {
             FloatingPlayerService.applyFromSettings(this)
         }
