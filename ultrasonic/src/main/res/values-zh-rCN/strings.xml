@@ -521,12 +521,7 @@
     <string name="home_library">音乐库</string>
     <string name="home_play_all_shuffled">随机播放全部</string>
     <string name="home_play_pause">播放或暂停</string>
-    <string name="home_pinned_title">常用播放列表</string>
     <string name="home_playlists_title">我的歌单</string>
-    <string name="pin_to_home">添加到首页</string>
-    <string name="unpin_from_home">从首页移除</string>
-    <string name="pin_added_toast">已添加到首页</string>
-    <string name="pin_removed_toast">已从首页移除</string>
     <string name="home_resume_playlist">继续播放：%s</string>
     <string name="home_playlist_playing">正在播放：%s</string>
 

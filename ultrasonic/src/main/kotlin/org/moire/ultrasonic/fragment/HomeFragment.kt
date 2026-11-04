@@ -291,20 +291,33 @@ class HomeFragment : ScopeFragment() {
         recycler.adapter = adapter
 
         fun render(list: List<PinnedPlaylist>) {
-            if (list.isEmpty()) {
+            val ranked = rankedTopPlaylists(list)
+            if (ranked.isEmpty()) {
                 container.visibility = View.GONE
                 return
             }
             container.visibility = View.VISIBLE
             recycler.layoutParams = recycler.layoutParams.apply {
-                height = gridHeightPx(list.size, columns())
+                height = gridHeightPx(ranked.size, columns())
             }
-            adapter.submit(list)
+            adapter.submit(ranked)
         }
 
         // Instant render from cache, then refresh from the server in the background.
         render(HomePrefs.getCachedPlaylists())
         loadHomePlaylists(::render)
+    }
+
+    /**
+     * Picks the home playlists: the most-played ones first, capped at 8. Ties keep the order they
+     * arrived in (server order for the live list, cached order for the instant render).
+     */
+    private fun rankedTopPlaylists(list: List<PinnedPlaylist>): List<PinnedPlaylist> {
+        val counts = HomePrefs.getAllPlayCounts()
+        return list.sortedWith(
+            compareByDescending<PinnedPlaylist> { counts[it.id] ?: 0 }
+                .thenBy { list.indexOf(it) }
+        ).take(8)
     }
 
     private fun setupLibraryGrid(root: View) {
@@ -370,18 +383,13 @@ class HomeFragment : ScopeFragment() {
 
             val mapped = loaded.orEmpty().map { PinnedPlaylist(it.id, it.name) }
             if (mapped.isNotEmpty()) HomePrefs.setCachedPlaylists(mapped)
-
-            // Float the pinned playlists to the front, keeping their pinned order.
-            val pinnedOrder = HomePrefs.getPinnedPlaylists()
-            val pinnedIds = pinnedOrder.map { it.id }.toSet()
-            val pinned = pinnedOrder.filter { mapped.any { p -> p.id == it.id } }
-            val rest = mapped.filter { it.id !in pinnedIds }
-            onResult(pinned + rest)
+            onResult(mapped)
         }
     }
 
     /** Starts a playlist immediately, continuing from the saved position when one exists. */
     private fun playHomePlaylist(playlist: PinnedPlaylist) {
+        HomePrefs.incrementPlayCount(playlist.id)
         val progress = PlaylistResumeStore.get(playlist.id)
         lifecycleScope.launch {
             val songs = withContext(Dispatchers.IO) {

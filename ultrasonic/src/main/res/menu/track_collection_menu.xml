@@ -16,10 +16,4 @@
         app:showAsAction="ifRoom"
         a:title="@string/common.play_shuffled"/>
 
-    <item
-        a:id="@+id/pin_to_home"
-        a:icon="@drawable/ic_menu_playlists"
-        app:showAsAction="ifRoom"
-        a:title="@string/pin_to_home"/>
-
 </menu>

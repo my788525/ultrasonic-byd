@@ -543,12 +543,7 @@
     <string name="home_library">Music library</string>
     <string name="home_play_all_shuffled">Shuffle all</string>
     <string name="home_play_pause">Play or pause</string>
-    <string name="home_pinned_title">Frequently used playlists</string>
     <string name="home_playlists_title">My playlists</string>
-    <string name="pin_to_home">Pin to Home</string>
-    <string name="unpin_from_home">Unpin from Home</string>
-    <string name="pin_added_toast">Added to Home</string>
-    <string name="pin_removed_toast">Removed from Home</string>
     <string name="home_resume_playlist">Continue: %s</string>
     <string name="home_playlist_playing">Playing: %s</string>
 

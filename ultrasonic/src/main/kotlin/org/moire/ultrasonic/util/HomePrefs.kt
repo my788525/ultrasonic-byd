@@ -1,9 +1,9 @@
 /*
  * HomePrefs.kt
  *
- * Persistence for the customised car home screen: the order of the music library tiles and the
- * list of "frequently used" playlists that are pinned above the library. Also keeps a small
- * per-playlist resume position so a pinned playlist can be continued where it was left off.
+ * Persistence for the customised car home screen: the order of the music library tiles, a cached
+ * copy of the server playlist list, a per-playlist resume position, and a local play count used to
+ * surface the driver's most-played playlists on the home screen.
  */
 
 package org.moire.ultrasonic.util
@@ -13,10 +13,10 @@ import android.content.SharedPreferences
 import org.moire.ultrasonic.app.UApp
 
 /**
- * A playlist the driver has pinned to the home screen.
+ * A playlist shown on the home screen.
  *
  * @param id   server playlist id (stable across sessions)
- * @param name playlist name, cached at pin time so the tile can render without a network call
+ * @param name playlist name, cached so the tile can render without a network call
  */
 data class PinnedPlaylist(val id: String, val name: String)
 
@@ -33,8 +33,8 @@ object HomePrefs {
 
     private const val FILE = "home_prefs"
     private const val KEY_TILE_ORDER = "tile_order"
-    private const val KEY_PINNED = "pinned_playlists"
     private const val KEY_CACHED = "cached_playlists"
+    private const val KEY_PLAY_COUNT = "playlist_play_count"
 
     private fun prefs(): SharedPreferences =
         UApp.applicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -51,25 +51,6 @@ object HomePrefs {
         prefs().edit().putString(KEY_TILE_ORDER, order.joinToString(",")).apply()
     }
 
-    /** The playlists pinned to the home screen, in display order. */
-    fun getPinnedPlaylists(): List<PinnedPlaylist> {
-        val raw = prefs().getString(KEY_PINNED, null) ?: return emptyList()
-        if (raw.isBlank()) return emptyList()
-        return raw.split(";").mapNotNull { entry ->
-            val parts = entry.split("\u0001")
-            if (parts.size >= 2 && parts[0].isNotBlank()) {
-                PinnedPlaylist(parts[0], parts.getOrElse(1) { "" })
-            } else {
-                null
-            }
-        }
-    }
-
-    fun setPinnedPlaylists(list: List<PinnedPlaylist>) {
-        val raw = list.joinToString(";") { "${it.id}\u0001${it.name}" }
-        prefs().edit().putString(KEY_PINNED, raw).apply()
-    }
-
     /**
      * A cached copy of the server playlist list (id + name only), so the home screen can show
      * the driver's playlists instantly without waiting for the network. Refreshed in the
@@ -79,7 +60,7 @@ object HomePrefs {
         val raw = prefs().getString(KEY_CACHED, null) ?: return emptyList()
         if (raw.isBlank()) return emptyList()
         return raw.split(";").mapNotNull { entry ->
-            val parts = entry.split("\u0001")
+            val parts = entry.split("\\u0001")
             if (parts.size >= 2 && parts[0].isNotBlank()) {
                 PinnedPlaylist(parts[0], parts[1])
             } else {
@@ -89,28 +70,35 @@ object HomePrefs {
     }
 
     fun setCachedPlaylists(list: List<PinnedPlaylist>) {
-        val raw = list.joinToString(";") { "${it.id}\u0001${it.name}" }
+        val raw = list.joinToString(";") { "${it.id}\\u0001${it.name}" }
         prefs().edit().putString(KEY_CACHED, raw).apply()
     }
 
-    fun isPinned(id: String): Boolean = getPinnedPlaylists().any { it.id == id }
+    /** Reads the local play count for a playlist (how many times it was launched from home). */
+    fun getPlayCount(id: String): Int = getAllPlayCounts()[id] ?: 0
 
-    /**
-     * Adds the playlist if it is not pinned, removes it otherwise. Returns the new pinned state.
-     */
-    fun togglePinned(playlist: PinnedPlaylist): Boolean {
-        val current = getPinnedPlaylists().toMutableList()
-        val idx = current.indexOfFirst { it.id == playlist.id }
-        val nowPinned: Boolean
-        if (idx >= 0) {
-            current.removeAt(idx)
-            nowPinned = false
-        } else {
-            current.add(playlist)
-            nowPinned = true
+    /** A map of every known playlist id to its local play count. */
+    fun getAllPlayCounts(): Map<String, Int> {
+        val raw = prefs().getString(KEY_PLAY_COUNT, null) ?: return emptyMap()
+        if (raw.isBlank()) return emptyMap()
+        val map = mutableMapOf<String, Int>()
+        raw.split(";").forEach { entry ->
+            val parts = entry.split("\\u0001")
+            if (parts.size >= 2 && parts[0].isNotBlank()) {
+                map[parts[0]] = parts[1].toIntOrNull() ?: 0
+            }
         }
-        setPinnedPlaylists(current)
-        return nowPinned
+        return map
+    }
+
+    /** Records one more home launch for the playlist and returns the new total. */
+    fun incrementPlayCount(id: String): Int {
+        val next = getPlayCount(id) + 1
+        val map = getAllPlayCounts().toMutableMap()
+        map[id] = next
+        val raw = map.entries.joinToString(";") { "${it.key}\\u0001${it.value}" }
+        prefs().edit().putString(KEY_PLAY_COUNT, raw).apply()
+        return next
     }
 }
 

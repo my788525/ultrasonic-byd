@@ -14,8 +14,4 @@
         android:id="@+id/playlist_row_download"
         android:title="@string/common.download" />
 
-    <item
-        android:id="@+id/pin_to_home"
-        android:title="@string/pin_to_home" />
-
 </menu>

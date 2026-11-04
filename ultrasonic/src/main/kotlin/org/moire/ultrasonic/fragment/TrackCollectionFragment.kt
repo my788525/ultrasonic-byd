@@ -52,8 +52,6 @@ import org.moire.ultrasonic.util.ConfirmationDialog
 import org.moire.ultrasonic.util.ContextMenuUtil
 import org.moire.ultrasonic.util.DownloadAction
 import org.moire.ultrasonic.util.DownloadUtil
-import org.moire.ultrasonic.util.HomePrefs
-import org.moire.ultrasonic.util.PinnedPlaylist
 import org.moire.ultrasonic.util.EntryByDiscAndTrackComparator
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.Util.navigateToCurrent
@@ -270,19 +268,6 @@ open class TrackCollectionFragment(
             }
 
             menu.findItem(R.id.select_album_play_shuffled)?.isVisible = playAllButtonVisible
-
-            // The "pin to home" action only makes sense for a server playlist.
-            val pinItem = menu.findItem(R.id.pin_to_home)
-            val playlistId = navArgs.playlistId
-            if (pinItem != null && playlistId != null) {
-                pinItem.isVisible = true
-                val pinned = HomePrefs.isPinned(playlistId)
-                pinItem.setTitle(
-                    if (pinned) R.string.unpin_from_home else R.string.pin_to_home
-                )
-            } else {
-                pinItem?.isVisible = false
-            }
         }
 
         override fun onCreateMenu(menu: Menu, inflater: MenuInflater) {
@@ -295,19 +280,6 @@ open class TrackCollectionFragment(
                 return true
             } else if (item.itemId == R.id.select_album_play_shuffled) {
                 playAll(shuffle = true)
-                return true
-            } else if (item.itemId == R.id.pin_to_home) {
-                val playlistId = navArgs.playlistId
-                val playlistName = navArgs.playlistName
-                if (playlistId != null && playlistName != null) {
-                    val nowPinned = HomePrefs.togglePinned(PinnedPlaylist(playlistId, playlistName))
-                    toast(
-                        if (nowPinned) R.string.pin_added_toast else R.string.pin_removed_toast,
-                        context = requireContext()
-                    )
-                    // Flip the label immediately.
-                    requireActivity().invalidateOptionsMenu()
-                }
                 return true
             }
             return false

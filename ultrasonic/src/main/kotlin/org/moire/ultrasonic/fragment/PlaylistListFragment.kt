@@ -31,8 +31,6 @@ import org.moire.ultrasonic.domain.Playlist
 import org.moire.ultrasonic.service.MusicServiceFactory
 import org.moire.ultrasonic.util.DownloadAction
 import org.moire.ultrasonic.util.DownloadUtil
-import org.moire.ultrasonic.util.HomePrefs
-import org.moire.ultrasonic.util.PinnedPlaylist
 import org.moire.ultrasonic.util.Util
 import timber.log.Timber
 
@@ -137,9 +135,6 @@ class PlaylistListFragment : Fragment() {
     private fun showRowMenu(anchor: View, playlist: Playlist) {
         val popup = PopupMenu(requireContext(), anchor)
         popup.inflate(R.menu.playlist_row_menu)
-        popup.menu.findItem(R.id.pin_to_home)?.setTitle(
-            if (HomePrefs.isPinned(playlist.id)) R.string.unpin_from_home else R.string.pin_to_home
-        )
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 R.id.playlist_row_open -> {
@@ -162,16 +157,6 @@ class PlaylistListFragment : Fragment() {
                         name = playlist.name,
                         isShare = false,
                         isDirectory = false
-                    )
-                    true
-                }
-                R.id.pin_to_home -> {
-                    val nowPinned = HomePrefs.togglePinned(
-                        PinnedPlaylist(playlist.id, playlist.name)
-                    )
-                    Util.toast(
-                        if (nowPinned) R.string.pin_added_toast else R.string.pin_removed_toast,
-                        context = requireContext()
                     )
                     true
                 }

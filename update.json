@@ -1,14 +1,14 @@
 {
-  "versionCode": 507,
-  "versionName": "4.8.0-byd.25",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.25/NavMusic-4.8.0-byd.25.apk",
-  "sha256": "f9aea536668ae9ebf44861a4e6ba11852f7e4a0ce841ec837c993816b9f5e137",
-  "size": 11434319,
-  "publishedAt": "2026-11-04T14:15:54Z",
+  "versionCode": 508,
+  "versionName": "4.8.0-byd.26",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.26/NavMusic-4.8.0-byd.26.apk",
+  "sha256": "6adc746cb8a7142cacfb46cc6a7ea91aeb3af0c293c16abe4b680e54774124f4",
+  "size": 11433237,
+  "publishedAt": "2026-11-04T14:35:55Z",
   "changelog": [
-    "修复：首页「播放列表」区此前被隐藏在 obscure 的固定手势背后（未固定则整块不显示），导致用户看不到歌单",
-    "新增：首页歌曲信息下方、音乐库上方新增「我的歌单」栏，直接展示用户服务器歌单（本地缓存即时渲染 + 后台刷新，弱网/离线也可见）",
-    "新增：歌单卡片点击即播放，若歌单有已保存进度则自动续播；长按菜单仍可「添加到首页」将歌单置顶",
-    "版本 bump 至 4.8.0-byd.25 (versionCode 507)"
+    "调整：首页「我的歌单」栏改为仅展示最常播放的 8 个歌单（按本地播放计数降序，并列时保留服务器顺序），最多 8 个",
+    "新增：每次从首页点击播放歌单即累加本地播放计数，作为「最常播放」排序依据（无需服务端支持，离线也生效）",
+    "移除：已废弃的「固定到首页/取消固定」长按菜单与歌单详情页入口——首页现在纯按播放热度自动取前 8，固定入口不再影响展示",
+    "版本 bump 至 4.8.0-byd.26 (versionCode 508)"
   ]
 }
