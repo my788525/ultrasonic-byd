@@ -1,18 +1,16 @@
 {
-  "versionCode": 509,
-  "versionName": "4.8.0-byd.27",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.27/NavMusic-4.8.0-byd.27.apk",
-  "sha256": "5556fdac695e24417f837f71b3c69e1805667a6f60efe56fc3ca8a1a2be41d7f",
-  "size": 11435628,
-  "publishedAt": "2026-11-04T22:56:29Z",
+  "versionCode": 510,
+  "versionName": "4.8.0-byd.28",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.28/NavMusic-4.8.0-byd.28.apk",
+  "sha256": "96c749b360c271a5e1df654962987c24ddf74ea4920289ec3b9de8fdda2a7f2f",
+  "size": 11435713,
+  "publishedAt": "2026-11-04T23:07:50Z",
   "changelog": [
-    "性能：首页歌单后台刷新加 10 分钟缓存新鲜度窗口，开屏不再每次都打网络，减少冗余请求与二次渲染闪烁",
-    "流畅度：歌单网格改用 ListAdapter + DiffUtil（基于歌单 id 稳定），缓存→服务器两次渲染不再整体闪烁",
-    "流畅度：歌单网格去掉手算高度，改用 wrap_content 自适应，减少强制重测量；首次显示加 220ms 淡入动画",
-    "体验：点击播放歌单后立即按新播放计数重排首页，刚播的歌单即时上移",
-    "体验：歌单卡片支持封面图（取 Subsonic Playlist.coverArt 并本地缓存），无封面时回退播放列表图标",
-    "体验：续播卡片副标题显示进度「第 N 首 · mm:ss」",
-    "体验：首页歌单区底部加「查看全部歌单」入口，一键跳转到播放列表页",
-    "版本 bump 至 4.8.0-byd.27 (versionCode 509)"
+    "性能：封面图显示路径新增磁盘写回——从服务器拉取的封面立即落盘到 FileUtil.getAlbumArtFile(stableKey)",
+    "性能：App 重启或 Picasso 内存缓存淘汰后，二次加载封面直接命中磁盘，不再重复联网拉取，省流提速",
+    "性能：封面图内存缓存（Picasso LruCache，既有）与新增磁盘缓存构成完整内存+磁盘双层缓存，列表滚动/重排与冷启动均不再重复下载",
+    "体验：歌单/专辑封面离线可用——磁盘缓存命中时即使断网也能显示已缓存封面",
+    "健壮性：磁盘写回异常仅记日志不中断加载；文件已存在则跳过 I/O，并发写入安全",
+    "版本 bump 至 4.8.0-byd.28 (versionCode 510)"
   ]
 }

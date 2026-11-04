@@ -8,13 +8,17 @@ import com.squareup.picasso.Picasso.LoadedFrom.NETWORK
 import com.squareup.picasso.Request
 import com.squareup.picasso.RequestHandler
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
+import java.io.OutputStream
+import okio.Buffer
 import okio.source
 import org.moire.ultrasonic.api.subsonic.SubsonicAPIClient
 import org.moire.ultrasonic.util.FileUtil
 import org.moire.ultrasonic.util.FileUtil.SUFFIX_LARGE
 import org.moire.ultrasonic.util.FileUtil.SUFFIX_SMALL
 import org.moire.ultrasonic.util.Util
+import org.moire.ultrasonic.util.Util.safeClose
 import timber.log.Timber
 
 /**
@@ -58,11 +62,45 @@ class CoverArtRequestHandler(private val client: SubsonicAPIClient) : RequestHan
 
         // Handle the response
         if (!response.hasError() && response.stream != null) {
-            return Result(response.stream!!.source(), NETWORK)
+            // Buffer the bytes so we can both persist them to the on-disk cache and
+            // still hand a Source back to Picasso for decoding into the memory cache.
+            val bytes = response.stream!!.readBytes()
+
+            // Persist to disk: subsequent loads (after an app restart or once Picasso's
+            // memory cache evicts this entry) now hit DISK instead of re-downloading.
+            // Keyed by stableKey, which is exactly what getAlbumArtBitmapFromDisk looks up.
+            writeAlbumArtToDisk(key, bytes)
+
+            return Result(Buffer().write(bytes), NETWORK)
         }
 
         // Throw an error if still not successful
         throw IOException("${response.apiError}")
+    }
+
+    /**
+     * Persist a freshly downloaded cover to the on-disk cache so it survives app
+     * restarts and Picasso memory-cache eviction. Mirrors the read path in
+     * [getAlbumArtBitmapFromDisk], which looks the file up by the same [stableKey].
+     */
+    private fun writeAlbumArtToDisk(stableKey: String, bytes: ByteArray) {
+        if (stableKey.isBlank() || bytes.isEmpty()) return
+        try {
+            val file = File(FileUtil.getAlbumArtFile(stableKey))
+            // Already cached on disk (e.g. written by a concurrent fetch) — skip I/O.
+            if (file.exists()) return
+            FileUtil.ensureAlbumArtDirectory()
+            var output: OutputStream? = null
+            try {
+                output = FileOutputStream(file)
+                output.write(bytes)
+            } finally {
+                output.safeClose()
+            }
+        } catch (all: Exception) {
+            // Never let a cache write failure break image loading.
+            Timber.w(all, "Failed to persist cover art to disk cache: %s", stableKey)
+        }
     }
 
     private fun getAlbumArtBitmapFromDisk(
