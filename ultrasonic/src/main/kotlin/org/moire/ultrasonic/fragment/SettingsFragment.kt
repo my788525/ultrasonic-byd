@@ -148,7 +148,13 @@ class SettingsFragment :
                     if (userAsked) toast(R.string.update_up_to_date, context = fragmentContext)
                 }
                 info.versionCode == Settings.updateSkipVersionCode -> {
-                    if (userAsked) toast(R.string.update_up_to_date, context = fragmentContext)
+                    if (userAsked) {
+                        // The driver asked by hand, so re-offer even a version he skipped before.
+                        offeredUpdate = info
+                        showUpdateDialog(info)
+                    } else {
+                        toast(R.string.update_up_to_date, context = fragmentContext)
+                    }
                 }
                 else -> {
                     offeredUpdate = info

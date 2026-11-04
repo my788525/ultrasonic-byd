@@ -42,6 +42,20 @@
             a:textSize="17sp"
             tools:text="Song title" />
 
+        <!-- Artist line: the banner previously showed only the title, so the driver could not
+             tell who performs the song at a glance. This mirrors the minimal tier, which already
+             shows song name + artist above the controls. -->
+        <TextView
+            a:id="@+id/floating_artist"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:layout_marginTop="1dp"
+            a:ellipsize="end"
+            a:singleLine="true"
+            a:textColor="#B3FFFFFF"
+            a:textSize="13sp"
+            tools:text="Artist" />
+
         <LinearLayout
             a:id="@+id/floating_controls"
             a:layout_width="wrap_content"

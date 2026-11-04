@@ -1,14 +1,13 @@
 {
-  "versionCode": 505,
-  "versionName": "4.8.0-byd.23",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.23/NavMusic-4.8.0-byd.23.apk",
-  "sha256": "11fe258456700960e9baca04f0ef18c37e72cf05d99d01c958fdb467d09976ee",
-  "size": 11432038,
-  "publishedAt": "2026-11-04T00:08:05Z",
+  "versionCode": 506,
+  "versionName": "4.8.0-byd.24",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.24/NavMusic-4.8.0-byd.24.apk",
+  "sha256": "7293249048fed18c743306a896e50f2be5533375038d0b8cb509e4b8ef3676f1",
+  "size": 11432048,
+  "publishedAt": "2026-11-04T00:26:43Z",
   "changelog": [
-    "新增：播放列表列表页长按菜单「固定到首页」选项（此前仅有详情页右上角菜单）；长按歌单即可固定/取消固定，已固定的歌单菜单项显示「取消固定」",
-    "首页「常用歌单」栏保持可用（位于歌曲信息下方、音乐库上方，一行 4 卡片）：点击卡片即自动续播该歌单上次的播放进度",
-    "进入播放列表详情后，左上角返回按钮回到首页（而非功能列表）",
-    "中英双语文案；版本 bump 至 4.8.0-byd.23 (versionCode 505)"
+    "修复：自动更新即使之前点了「忽略此版本」，手动点击「检查更新」时也会重新检测并提示可下载更新；开机静默检查仍尊重忽略，避免每次启动打扰",
+    "新增：半宽横幅悬浮窗增加歌手信息行（歌名 / 歌手 / 歌词 三行），行车时一眼看清当前曲目与演唱者",
+    "中英双语文案；版本 bump 至 4.8.0-byd.24 (versionCode 506)"
   ]
 }
