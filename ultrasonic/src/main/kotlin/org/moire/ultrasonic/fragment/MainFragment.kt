@@ -142,6 +142,13 @@ class MainFragment : ScopeFragment(), KoinScopeComponent {
         return fragmentManager.findFragmentByTag("f$position")
             ?: musicCollectionAdapter.fragmentMap[position]?.get()
     }
+
+    /** Jumps the bottom pager to the Playlists tab (used by the home screen "view all" link). */
+    fun showPlaylistsTab() {
+        if (::viewPager.isInitialized) {
+            viewPager.setCurrentItem(MusicCollectionAdapter.PLAYLISTS_TAB, true)
+        }
+    }
 }
 
 private fun FilterButtonBar.configureWithCapabilitiesFromFragment(frag: Fragment?) {
@@ -238,7 +245,7 @@ class MusicCollectionAdapter(fragment: Fragment, initialType: LayoutType = Layou
          * Order of the tabs: Artists, Albums, Songs, Folders, Genres, Playlists
          */
         private const val FOLDER_TAB = 3
-        private const val PLAYLISTS_TAB = 5
+        internal const val PLAYLISTS_TAB = 5
         private const val TAB_COUNT_ONLINE = 6
     }
 }

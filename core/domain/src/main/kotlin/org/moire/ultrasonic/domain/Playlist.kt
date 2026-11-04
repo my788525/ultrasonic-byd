@@ -9,7 +9,8 @@ data class Playlist @JvmOverloads constructor(
     val comment: String = "",
     val songCount: String = "",
     val created: String = "",
-    val public: Boolean? = null
+    val public: Boolean? = null,
+    val coverArt: String = ""
 ) : Serializable, GenericEntry() {
     companion object {
         private const val serialVersionUID = -4160515427075433798L

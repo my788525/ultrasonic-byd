@@ -164,6 +164,20 @@
                 a:layout_height="wrap_content"
                 a:layout_marginTop="10dp"
                 a:nestedScrollingEnabled="false" />
+
+            <TextView
+                a:id="@+id/home_playlists_view_all"
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:layout_gravity="end"
+                a:layout_marginTop="10dp"
+                a:background="?attr/selectableItemBackgroundBorderless"
+                a:clickable="true"
+                a:focusable="true"
+                a:letterSpacing="0.04"
+                a:text="@string/home_view_all_playlists"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="14sp" />
         </LinearLayout>
 
         <TextView

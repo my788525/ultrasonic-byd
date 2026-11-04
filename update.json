@@ -1,14 +1,18 @@
 {
-  "versionCode": 508,
-  "versionName": "4.8.0-byd.26",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.26/NavMusic-4.8.0-byd.26.apk",
-  "sha256": "6adc746cb8a7142cacfb46cc6a7ea91aeb3af0c293c16abe4b680e54774124f4",
-  "size": 11433237,
-  "publishedAt": "2026-11-04T14:35:55Z",
+  "versionCode": 509,
+  "versionName": "4.8.0-byd.27",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.27/NavMusic-4.8.0-byd.27.apk",
+  "sha256": "5556fdac695e24417f837f71b3c69e1805667a6f60efe56fc3ca8a1a2be41d7f",
+  "size": 11435628,
+  "publishedAt": "2026-11-04T22:56:29Z",
   "changelog": [
-    "调整：首页「我的歌单」栏改为仅展示最常播放的 8 个歌单（按本地播放计数降序，并列时保留服务器顺序），最多 8 个",
-    "新增：每次从首页点击播放歌单即累加本地播放计数，作为「最常播放」排序依据（无需服务端支持，离线也生效）",
-    "移除：已废弃的「固定到首页/取消固定」长按菜单与歌单详情页入口——首页现在纯按播放热度自动取前 8，固定入口不再影响展示",
-    "版本 bump 至 4.8.0-byd.26 (versionCode 508)"
+    "性能：首页歌单后台刷新加 10 分钟缓存新鲜度窗口，开屏不再每次都打网络，减少冗余请求与二次渲染闪烁",
+    "流畅度：歌单网格改用 ListAdapter + DiffUtil（基于歌单 id 稳定），缓存→服务器两次渲染不再整体闪烁",
+    "流畅度：歌单网格去掉手算高度，改用 wrap_content 自适应，减少强制重测量；首次显示加 220ms 淡入动画",
+    "体验：点击播放歌单后立即按新播放计数重排首页，刚播的歌单即时上移",
+    "体验：歌单卡片支持封面图（取 Subsonic Playlist.coverArt 并本地缓存），无封面时回退播放列表图标",
+    "体验：续播卡片副标题显示进度「第 N 首 · mm:ss」",
+    "体验：首页歌单区底部加「查看全部歌单」入口，一键跳转到播放列表页",
+    "版本 bump 至 4.8.0-byd.27 (versionCode 509)"
   ]
 }

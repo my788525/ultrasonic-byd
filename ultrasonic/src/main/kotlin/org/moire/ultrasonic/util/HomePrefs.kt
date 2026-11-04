@@ -2,8 +2,9 @@
  * HomePrefs.kt
  *
  * Persistence for the customised car home screen: the order of the music library tiles, a cached
- * copy of the server playlist list, a per-playlist resume position, and a local play count used to
- * surface the driver's most-played playlists on the home screen.
+ * copy of the server playlist list, a per-playlist resume position, a local play count used to
+ * surface the driver's most-played playlists on the home screen, and the timestamp of the last
+ * playlist refresh (so the home screen can skip redundant network calls).
  */
 
 package org.moire.ultrasonic.util
@@ -15,17 +16,18 @@ import org.moire.ultrasonic.app.UApp
 /**
  * A playlist shown on the home screen.
  *
- * @param id   server playlist id (stable across sessions)
- * @param name playlist name, cached so the tile can render without a network call
+ * @param id       server playlist id (stable across sessions)
+ * @param name     playlist name, cached so the tile can render without a network call
+ * @param coverArt server cover-art id, cached so the tile can show a cover offline
  */
-data class PinnedPlaylist(val id: String, val name: String)
+data class PinnedPlaylist(val id: String, val name: String, val coverArt: String = "")
 
 /**
  * Saved playback position for a playlist.
  *
- * @param name   cached playlist name
- * @param index  zero based index of the track that was playing
- * @param position  playback position inside that track, in milliseconds
+ * @param name     cached playlist name
+ * @param index    zero based index of the track that was playing
+ * @param position playback position inside that track, in milliseconds
  */
 data class PlaylistProgress(val name: String, val index: Int, val position: Int)
 
@@ -35,6 +37,7 @@ object HomePrefs {
     private const val KEY_TILE_ORDER = "tile_order"
     private const val KEY_CACHED = "cached_playlists"
     private const val KEY_PLAY_COUNT = "playlist_play_count"
+    private const val KEY_PLAYLIST_FETCH_TIME = "playlist_fetch_time"
 
     private fun prefs(): SharedPreferences =
         UApp.applicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -52,9 +55,9 @@ object HomePrefs {
     }
 
     /**
-     * A cached copy of the server playlist list (id + name only), so the home screen can show
-     * the driver's playlists instantly without waiting for the network. Refreshed in the
-     * background whenever the home screen is opened.
+     * A cached copy of the server playlist list (id + name + coverArt), so the home screen can
+     * show the driver's playlists instantly without waiting for the network. Refreshed in the
+     * background whenever the home screen is opened (subject to a freshness window).
      */
     fun getCachedPlaylists(): List<PinnedPlaylist> {
         val raw = prefs().getString(KEY_CACHED, null) ?: return emptyList()
@@ -62,7 +65,7 @@ object HomePrefs {
         return raw.split(";").mapNotNull { entry ->
             val parts = entry.split("\\u0001")
             if (parts.size >= 2 && parts[0].isNotBlank()) {
-                PinnedPlaylist(parts[0], parts[1])
+                PinnedPlaylist(parts[0], parts[1], parts.getOrElse(2) { "" })
             } else {
                 null
             }
@@ -70,8 +73,15 @@ object HomePrefs {
     }
 
     fun setCachedPlaylists(list: List<PinnedPlaylist>) {
-        val raw = list.joinToString(";") { "${it.id}\\u0001${it.name}" }
+        val raw = list.joinToString(";") { "${it.id}\\u0001${it.name}\\u0001${it.coverArt}" }
         prefs().edit().putString(KEY_CACHED, raw).apply()
+    }
+
+    /** Wall-clock time (ms) of the last successful server playlist refresh, or 0 if unknown. */
+    fun getPlaylistFetchTime(): Long = prefs().getLong(KEY_PLAYLIST_FETCH_TIME, 0L)
+
+    fun setPlaylistFetchTime(timeMs: Long) {
+        prefs().edit().putLong(KEY_PLAYLIST_FETCH_TIME, timeMs).apply()
     }
 
     /** Reads the local play count for a playlist (how many times it was launched from home). */

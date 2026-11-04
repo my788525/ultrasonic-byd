@@ -522,6 +522,7 @@
     <string name="home_play_all_shuffled">随机播放全部</string>
     <string name="home_play_pause">播放或暂停</string>
     <string name="home_playlists_title">我的歌单</string>
+    <string name="home_view_all_playlists">查看全部歌单</string>
     <string name="home_resume_playlist">继续播放：%s</string>
     <string name="home_playlist_playing">正在播放：%s</string>
 

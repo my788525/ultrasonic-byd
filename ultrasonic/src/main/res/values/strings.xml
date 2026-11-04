@@ -544,6 +544,7 @@
     <string name="home_play_all_shuffled">Shuffle all</string>
     <string name="home_play_pause">Play or pause</string>
     <string name="home_playlists_title">My playlists</string>
+    <string name="home_view_all_playlists">View all playlists</string>
     <string name="home_resume_playlist">Continue: %s</string>
     <string name="home_playlist_playing">Playing: %s</string>
 
