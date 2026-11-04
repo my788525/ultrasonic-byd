@@ -1,13 +1,14 @@
 {
-  "versionCode": 506,
-  "versionName": "4.8.0-byd.24",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.24/NavMusic-4.8.0-byd.24.apk",
-  "sha256": "7293249048fed18c743306a896e50f2be5533375038d0b8cb509e4b8ef3676f1",
-  "size": 11432048,
-  "publishedAt": "2026-11-04T00:26:43Z",
+  "versionCode": 507,
+  "versionName": "4.8.0-byd.25",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.25/NavMusic-4.8.0-byd.25.apk",
+  "sha256": "f9aea536668ae9ebf44861a4e6ba11852f7e4a0ce841ec837c993816b9f5e137",
+  "size": 11434319,
+  "publishedAt": "2026-11-04T14:15:54Z",
   "changelog": [
-    "修复：自动更新即使之前点了「忽略此版本」，手动点击「检查更新」时也会重新检测并提示可下载更新；开机静默检查仍尊重忽略，避免每次启动打扰",
-    "新增：半宽横幅悬浮窗增加歌手信息行（歌名 / 歌手 / 歌词 三行），行车时一眼看清当前曲目与演唱者",
-    "中英双语文案；版本 bump 至 4.8.0-byd.24 (versionCode 506)"
+    "修复：首页「播放列表」区此前被隐藏在 obscure 的固定手势背后（未固定则整块不显示），导致用户看不到歌单",
+    "新增：首页歌曲信息下方、音乐库上方新增「我的歌单」栏，直接展示用户服务器歌单（本地缓存即时渲染 + 后台刷新，弱网/离线也可见）",
+    "新增：歌单卡片点击即播放，若歌单有已保存进度则自动续播；长按菜单仍可「添加到首页」将歌单置顶",
+    "版本 bump 至 4.8.0-byd.25 (versionCode 507)"
   ]
 }

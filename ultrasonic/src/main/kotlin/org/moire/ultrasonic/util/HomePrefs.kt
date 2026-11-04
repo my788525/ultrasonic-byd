@@ -34,6 +34,7 @@ object HomePrefs {
     private const val FILE = "home_prefs"
     private const val KEY_TILE_ORDER = "tile_order"
     private const val KEY_PINNED = "pinned_playlists"
+    private const val KEY_CACHED = "cached_playlists"
 
     private fun prefs(): SharedPreferences =
         UApp.applicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -67,6 +68,29 @@ object HomePrefs {
     fun setPinnedPlaylists(list: List<PinnedPlaylist>) {
         val raw = list.joinToString(";") { "${it.id}\u0001${it.name}" }
         prefs().edit().putString(KEY_PINNED, raw).apply()
+    }
+
+    /**
+     * A cached copy of the server playlist list (id + name only), so the home screen can show
+     * the driver's playlists instantly without waiting for the network. Refreshed in the
+     * background whenever the home screen is opened.
+     */
+    fun getCachedPlaylists(): List<PinnedPlaylist> {
+        val raw = prefs().getString(KEY_CACHED, null) ?: return emptyList()
+        if (raw.isBlank()) return emptyList()
+        return raw.split(";").mapNotNull { entry ->
+            val parts = entry.split("\u0001")
+            if (parts.size >= 2 && parts[0].isNotBlank()) {
+                PinnedPlaylist(parts[0], parts[1])
+            } else {
+                null
+            }
+        }
+    }
+
+    fun setCachedPlaylists(list: List<PinnedPlaylist>) {
+        val raw = list.joinToString(";") { "${it.id}\u0001${it.name}" }
+        prefs().edit().putString(KEY_CACHED, raw).apply()
     }
 
     fun isPinned(id: String): Boolean = getPinnedPlaylists().any { it.id == id }

@@ -64,9 +64,11 @@ import java.util.concurrent.TimeUnit
  * tiles, plus one very large "continue playing" card on top. Nothing here is smaller than
  * a 60 dp touch target, and every label is set in a size that can be read from the driver seat.
  *
- * Above the music library sits the "frequently used playlists" row: playlists the driver has
- * pinned from the playlist screen. Tapping one continues it exactly where it was left off. The
- * music-library tiles can be dragged to reorder them, and that order is remembered.
+ * Above the music library sits the "my playlists" row: the driver's playlists from the server,
+ * shown straight on the home screen so a playlist is only ever one tap away. Tapping one starts
+ * it immediately and continues where it was left off when a position is saved. Pinned playlists
+ * are floated to the front. The music-library tiles can be dragged to reorder them, and that
+ * order is remembered.
  *
  * It has to be a [ScopeFragment]: the media player manager lives in the NavigationActivity scope.
  */
@@ -117,7 +119,7 @@ class HomeFragment : ScopeFragment() {
         playButton = view.findViewById(R.id.home_play)
 
         decorateContinueCard(view)
-        setupPinnedGrid(view)
+        setupPlaylistGrid(view)
         setupLibraryGrid(view)
 
         playButton?.setOnClickListener {
@@ -174,8 +176,8 @@ class HomeFragment : ScopeFragment() {
         currentCoverId = null
         updateNowPlaying()
         updateNavButtonTint()
-        // The pinned row may have changed while we were on the playlist screen.
-        view?.let { setupPinnedGrid(it) }
+        // The playlist row may have changed while we were on the playlist screen.
+        view?.let { setupPlaylistGrid(it) }
         handler.postDelayed(updateRunnable, UPDATE_INTERVAL_MS)
     }
 
@@ -275,21 +277,34 @@ class HomeFragment : ScopeFragment() {
         }
     }
 
-    private fun setupPinnedGrid(root: View) {
-        val container = root.findViewById<ViewGroup>(R.id.home_pinned_container)
-        val recycler = root.findViewById<RecyclerView>(R.id.home_pinned_grid)
-        val pinned = HomePrefs.getPinnedPlaylists()
-        if (pinned.isEmpty()) {
-            container.visibility = View.GONE
-            return
-        }
-        container.visibility = View.VISIBLE
+    /**
+     * Shows the driver's playlists on the home screen, right above the music library, so a
+     * playlist is only ever one tap away. The cached list renders instantly, then a background
+     * refresh keeps it current. Pinned playlists are floated to the front.
+     */
+    private fun setupPlaylistGrid(root: View) {
+        val container = root.findViewById<ViewGroup>(R.id.home_playlists_container)
+        val recycler = root.findViewById<RecyclerView>(R.id.home_playlists_grid)
         recycler.layoutManager = GridLayoutManager(requireContext(), columns())
         recycler.isNestedScrollingEnabled = false
-        recycler.layoutParams = recycler.layoutParams.apply {
-            height = gridHeightPx(pinned.size, columns())
+        val adapter = HomePlaylistAdapter { playHomePlaylist(it) }
+        recycler.adapter = adapter
+
+        fun render(list: List<PinnedPlaylist>) {
+            if (list.isEmpty()) {
+                container.visibility = View.GONE
+                return
+            }
+            container.visibility = View.VISIBLE
+            recycler.layoutParams = recycler.layoutParams.apply {
+                height = gridHeightPx(list.size, columns())
+            }
+            adapter.submit(list)
         }
-        recycler.adapter = PinnedPlaylistAdapter(pinned) { resumePinnedPlaylist(it) }
+
+        // Instant render from cache, then refresh from the server in the background.
+        render(HomePrefs.getCachedPlaylists())
+        loadHomePlaylists(::render)
     }
 
     private fun setupLibraryGrid(root: View) {
@@ -340,8 +355,33 @@ class HomeFragment : ScopeFragment() {
         return rows * (tileH + 2 * gap)
     }
 
-    /** Continues a pinned playlist from the progress last saved for it. */
-    private fun resumePinnedPlaylist(playlist: PinnedPlaylist) {
+    /** Loads the driver's playlists from the server, caches them, and reports them ordered. */
+    private fun loadHomePlaylists(onResult: (List<PinnedPlaylist>) -> Unit) {
+        lifecycleScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                try {
+                    MusicServiceFactory.getMusicService().getPlaylists(false)
+                } catch (all: Exception) {
+                    Timber.w(all, "Could not load the home playlists")
+                    null
+                }
+            }
+            if (!isAdded) return@launch
+
+            val mapped = loaded.orEmpty().map { PinnedPlaylist(it.id, it.name) }
+            if (mapped.isNotEmpty()) HomePrefs.setCachedPlaylists(mapped)
+
+            // Float the pinned playlists to the front, keeping their pinned order.
+            val pinnedOrder = HomePrefs.getPinnedPlaylists()
+            val pinnedIds = pinnedOrder.map { it.id }.toSet()
+            val pinned = pinnedOrder.filter { mapped.any { p -> p.id == it.id } }
+            val rest = mapped.filter { it.id !in pinnedIds }
+            onResult(pinned + rest)
+        }
+    }
+
+    /** Starts a playlist immediately, continuing from the saved position when one exists. */
+    private fun playHomePlaylist(playlist: PinnedPlaylist) {
         val progress = PlaylistResumeStore.get(playlist.id)
         lifecycleScope.launch {
             val songs = withContext(Dispatchers.IO) {
@@ -354,7 +394,7 @@ class HomeFragment : ScopeFragment() {
                         isShare = false
                     )
                 } catch (all: Exception) {
-                    Timber.w(all, "Could not load pinned playlist %s", playlist.id)
+                    Timber.w(all, "Could not load playlist %s", playlist.id)
                     emptyList<Track>()
                 }
             }
@@ -372,7 +412,7 @@ class HomeFragment : ScopeFragment() {
                 position = progress?.position ?: 0
             )
             Util.toast(
-                getString(R.string.home_resume_playlist, playlist.name),
+                getString(R.string.home_playlist_playing, playlist.name),
                 context = context
             )
         }
@@ -520,10 +560,11 @@ class HomeFragment : ScopeFragment() {
         fun keys(): List<String> = items.map { it.key }
     }
 
-    private class PinnedPlaylistAdapter(
-        private val items: List<PinnedPlaylist>,
+    private class HomePlaylistAdapter(
         private val onClick: (PinnedPlaylist) -> Unit
-    ) : RecyclerView.Adapter<PinnedPlaylistAdapter.VH>() {
+    ) : RecyclerView.Adapter<HomePlaylistAdapter.VH>() {
+
+        private val items = mutableListOf<PinnedPlaylist>()
 
         class VH(val view: View) : RecyclerView.ViewHolder(view)
 
@@ -534,6 +575,12 @@ class HomeFragment : ScopeFragment() {
         }
 
         override fun getItemCount(): Int = items.size
+
+        fun submit(list: List<PinnedPlaylist>) {
+            items.clear()
+            items.addAll(list)
+            notifyDataSetChanged()
+        }
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val playlist = items[position]
