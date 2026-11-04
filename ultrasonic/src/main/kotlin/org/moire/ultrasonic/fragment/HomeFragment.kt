@@ -619,7 +619,7 @@ class HomeFragment : ScopeFragment() {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PlaylistVH {
             val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_home_grid_tile, parent, false)
+                .inflate(R.layout.item_home_playlist_tile, parent, false)
             return PlaylistVH(view)
         }
 
@@ -645,7 +645,7 @@ class HomeFragment : ScopeFragment() {
         }
 
         private fun bindPlaylistIcon(icon: ImageView, playlist: PinnedPlaylist, accent: Int) {
-            val sizeDp = if (playlist.coverArt.isNotEmpty()) 48f else 26f
+            val sizeDp = if (playlist.coverArt.isNotEmpty()) 84f else 56f
             (icon.layoutParams as? ViewGroup.LayoutParams)?.let {
                 it.width = CarTheme.dp(icon.context, sizeDp).toInt()
                 it.height = CarTheme.dp(icon.context, sizeDp).toInt()

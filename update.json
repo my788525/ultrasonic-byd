@@ -1,16 +1,15 @@
 {
-  "versionCode": 510,
-  "versionName": "4.8.0-byd.28",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.28/NavMusic-4.8.0-byd.28.apk",
-  "sha256": "96c749b360c271a5e1df654962987c24ddf74ea4920289ec3b9de8fdda2a7f2f",
-  "size": 11435713,
-  "publishedAt": "2026-11-04T23:07:50Z",
+  "versionCode": 511,
+  "versionName": "4.8.0-byd.29",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.29/NavMusic-4.8.0-byd.29.apk",
+  "sha256": "973f4c83050dae3e6bf0d7543e74c3550361215a1078ed0c6feb692e3aca53d2",
+  "size": 11437294,
+  "publishedAt": "2026-11-04T23:19:04Z",
   "changelog": [
-    "性能：封面图显示路径新增磁盘写回——从服务器拉取的封面立即落盘到 FileUtil.getAlbumArtFile(stableKey)",
-    "性能：App 重启或 Picasso 内存缓存淘汰后，二次加载封面直接命中磁盘，不再重复联网拉取，省流提速",
-    "性能：封面图内存缓存（Picasso LruCache，既有）与新增磁盘缓存构成完整内存+磁盘双层缓存，列表滚动/重排与冷启动均不再重复下载",
-    "体验：歌单/专辑封面离线可用——磁盘缓存命中时即使断网也能显示已缓存封面",
-    "健壮性：磁盘写回异常仅记日志不中断加载；文件已存在则跳过 I/O，并发写入安全",
-    "版本 bump 至 4.8.0-byd.28 (versionCode 510)"
+    "修复：首页\"我的歌单\"卡片文字被封面遮挡/裁剪不可见（原 tile 固定 92dp 高度装不下 48dp 封面+文字，文字被裁掉）",
+    "修复：歌单卡片改用专属布局 item_home_playlist_tile——封面 84dp 方形 + 歌单名两行 ellipsize 显示，长歌单名不再被截断到看不见",
+    "体验：封面无图时回退图标放大到 56dp，保持视觉一致；歌单卡片与圆角 tile 背景协调",
+    "健壮性：歌单网格沿用独立布局，不影响音乐库磁贴（仍 92dp）的高度与排版",
+    "版本 bump 至 4.8.0-byd.29 (versionCode 511)"
   ]
 }
