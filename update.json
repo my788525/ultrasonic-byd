@@ -1,14 +1,14 @@
 {
-  "versionCode": 504,
-  "versionName": "4.8.0-byd.22",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.22/NavMusic-4.8.0-byd.22.apk",
-  "sha256": "31af7cfd20bd6d2697f6cb4529008cc8f3e784f189c6fb3fea07d0455f0fd1d6",
-  "size": 11431693,
-  "publishedAt": "2026-11-03T23:44:18Z",
+  "versionCode": 505,
+  "versionName": "4.8.0-byd.23",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.23/NavMusic-4.8.0-byd.23.apk",
+  "sha256": "11fe258456700960e9baca04f0ef18c37e72cf05d99d01c958fdb467d09976ee",
+  "size": 11432038,
+  "publishedAt": "2026-11-04T00:08:05Z",
   "changelog": [
-    "新增：悬浮窗「穿透模式」可选（设置 → 悬浮窗 → 穿透模式）。开启后，锁定悬浮窗即可让点按穿过窗口落到下层应用（如导航地图），歌词继续显示，方便行车时操作下方界面",
-    "逻辑：穿透仅在悬浮窗锁定后生效，未锁定保持可拖动与正常操控；解锁或关闭此模式后窗口恢复可触摸",
-    "修复：此前设置页穿透开关未真正生效的问题，现已实时应用（切换开关、锁定/解锁均即时同步）",
-    "中英双语文案"
+    "新增：播放列表列表页长按菜单「固定到首页」选项（此前仅有详情页右上角菜单）；长按歌单即可固定/取消固定，已固定的歌单菜单项显示「取消固定」",
+    "首页「常用歌单」栏保持可用（位于歌曲信息下方、音乐库上方，一行 4 卡片）：点击卡片即自动续播该歌单上次的播放进度",
+    "进入播放列表详情后，左上角返回按钮回到首页（而非功能列表）",
+    "中英双语文案；版本 bump 至 4.8.0-byd.23 (versionCode 505)"
   ]
 }
