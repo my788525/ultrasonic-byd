@@ -1,15 +1,15 @@
 {
-  "versionCode": 514,
-  "versionName": "4.8.0-byd.32",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.32/NavMusic-4.8.0-byd.32.apk",
-  "sha256": "fe5e84b8d4da706ec31efab204b0b2157de410a6b5cec57b9e662a3d528c71f0",
-  "size": 11440055,
-  "publishedAt": "2026-11-05T08:46:04Z",
+  "versionCode": 515,
+  "versionName": "4.8.0-byd.33",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.33/NavMusic-4.8.0-byd.33.apk",
+  "sha256": "1ee989fd031e4591e4a032e6e6881cd2880a7bb1911d82bda140630d488e049a",
+  "size": 11443096,
+  "publishedAt": "2026-11-05T09:06:18Z",
   "changelog": [
-    "UI打磨：首页入口磁贴改用圆角强调色芯片包裹图标，现代感更强",
-    "UI打磨：首页「继续播放」大卡由 66dp 提升至 96dp、封面 46→62dp，并新增底部播放进度条（司机一眼看到进度）",
-    "UI打磨：播放面板随机/循环按钮激活态改用强调色高亮（与睡眠定时一致），司机一眼识别开关状态",
-    "UI打磨：列表封面已统一圆角（MaterialCardView / ShapeableImageView），无需额外改动",
-    "版本 bump 至 4.8.0-byd.32 (versionCode 514)"
+    "播放页视觉重做：全屏封面改为居中圆角卡片（26dp 圆角 + 投影），四周露出主色渐变晕染",
+    "播放页晕染：背景以封面主色生成模糊铺底 + 径向光晕 + 底部暗渐变，封面越鲜明氛围越强",
+    "封面主色实时提取（降采样取平均色，低饱和自动提色），每首歌自动换氛围，无需手动配色",
+    "无封面时自动回落为深色底，封面加载前不发白",
+    "版本 bump 至 4.8.0-byd.33 (versionCode 515)"
   ]
 }
