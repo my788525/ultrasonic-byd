@@ -1,15 +1,16 @@
 {
-  "versionCode": 515,
-  "versionName": "4.8.0-byd.33",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.33/NavMusic-4.8.0-byd.33.apk",
-  "sha256": "1ee989fd031e4591e4a032e6e6881cd2880a7bb1911d82bda140630d488e049a",
-  "size": 11443096,
-  "publishedAt": "2026-11-05T09:06:18Z",
+  "versionCode": 516,
+  "versionName": "4.8.0-byd.34",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.34/NavMusic-4.8.0-byd.34.apk",
+  "sha256": "56f9d61f05751c73ab39c09a367b9ac2016ddf82394559e335fbc379f1b486e6",
+  "size": 11456462,
+  "publishedAt": "2026-11-05T11:17:00Z",
   "changelog": [
-    "播放页视觉重做：全屏封面改为居中圆角卡片（26dp 圆角 + 投影），四周露出主色渐变晕染",
-    "播放页晕染：背景以封面主色生成模糊铺底 + 径向光晕 + 底部暗渐变，封面越鲜明氛围越强",
-    "封面主色实时提取（降采样取平均色，低饱和自动提色），每首歌自动换氛围，无需手动配色",
-    "无封面时自动回落为深色底，封面加载前不发白",
-    "版本 bump 至 4.8.0-byd.33 (versionCode 515)"
+    "音效增强全家桶：在图形均衡器基础上新增重低音（BassBoost）、3D 环绕（Virtualizer）、响度增强（LoudnessEnhancer）三种原生音效",
+    "新增「音效」面板：主开关、车载预设（关闭/标准/重低音/人声突出/环绕现场/驾驶模式）、重低音/3D环绕/响度三档滑块、高级均衡器入口",
+    "播放面板控制行新增常驻「音效」按钮，车机一键直达，无需进入全屏页溢出菜单",
+    "各音效按设备能力探测（try/catch）：车机不支持某效果时自动隐藏对应控件并优雅降级为仅均衡器，绝不崩溃",
+    "主开关真正静音全部效果（保存期望强度，关闭时不覆盖用户设置）",
+    "版本 bump 至 4.8.0-byd.34 (versionCode 516)"
   ]
 }
