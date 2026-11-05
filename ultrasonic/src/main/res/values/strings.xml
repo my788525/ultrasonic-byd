@@ -544,7 +544,6 @@
     <string name="home_play_all_shuffled">Shuffle all</string>
     <string name="home_play_pause">Play or pause</string>
     <string name="home_playlists_title">My playlists</string>
-    <string name="home_view_all_playlists">View all playlists</string>
     <string name="home_resume_playlist">Continue: %s</string>
     <string name="home_playlist_playing">Playing: %s</string>
     <string name="home_playlist_count_all">All</string>
@@ -665,4 +664,10 @@
     <string name="home_playlist_pin_reset">Automatic</string>
     <string name="home_playlist_pin_empty">No playlists loaded yet. Open the home screen once first.</string>
     <string name="home_playlist_pin_saved">Home playlists updated</string>
+    <string name="floating_only_in_nav_title">Show only over the navigation map</string>
+    <string name="floating_only_in_nav_summary">Hide the floating window on the launcher, the 360 surround view and the reversing camera. Only Amap / Gaode Map counts as navigation.</string>
+    <string name="floating_usage_access_title">Usage access permission</string>
+    <string name="floating_usage_access_summary">Tap to grant usage access so the app can tell which window is on top.</string>
+    <string name="floating_usage_access_granted">Granted - the floating window only appears over the navigation map.</string>
+    <string name="floating_usage_access_needed">Grant usage access to keep the floating window off the camera view</string>
 </resources>

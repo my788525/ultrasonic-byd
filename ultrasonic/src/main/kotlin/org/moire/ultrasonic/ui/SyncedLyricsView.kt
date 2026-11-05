@@ -9,11 +9,11 @@ package org.moire.ultrasonic.ui
 
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
-import android.util.TypedValue
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
+import android.util.TypedValue
 import android.view.View
 import android.widget.ScrollView
 import android.widget.TextView
@@ -27,8 +27,9 @@ import timber.log.Timber
  * Shows lyrics that follow the song.
  *
  * Servers with LRC lyrics return timed lines; those are highlighted line by line and scrolled so
- * that the current line stays in the middle of the view. Servers that only return plain text are
- * shown as before, without any scrolling, because there is nothing to synchronise to.
+ * that the current line stays slightly above the middle of the view. Servers that only return
+ * plain text are shown as before, without any scrolling, because there is nothing to synchronise
+ * to.
  *
  * The same helper drives the lyrics page of the player, the right hand pane and the floating
  * window, so all three behave identically.
@@ -43,6 +44,9 @@ class SyncedLyricsView(
     private var currentIndex = -1
     private var accentColor = 0
     private var currentTrackId: String? = null
+
+    /** The padding the layout started with, restored when there are no timed lyrics to centre. */
+    private var originalPaddingBottom = -1
 
     val hasTimedLyrics: Boolean
         get() = lines.isNotEmpty()
@@ -62,6 +66,7 @@ class SyncedLyricsView(
         lines = emptyList()
         lineStarts = IntArray(0)
         currentIndex = -1
+        restorePaddingIfNeeded()
         textView.text = text
         scroll?.scrollTo(0, 0)
     }
@@ -93,6 +98,7 @@ class SyncedLyricsView(
             lines = emptyList()
             lineStarts = IntArray(0)
             currentIndex = -1
+            restorePaddingIfNeeded()
             textView.text = raw.orEmpty()
             scroll?.scrollTo(0, 0)
             return
@@ -167,7 +173,13 @@ class SyncedLyricsView(
             override fun run() {
                 val layout = textView.layout
                 if (layout != null && layout.lineCount > 0 && textView.width > 0) {
-                    scrollToLine(index)
+                    if (ensureTrailingSpace()) {
+                        // Adding bottom padding changes the text layout, so give it one more
+                        // frame before reading the line positions.
+                        textView.postOnAnimation { scrollToLine(index) }
+                    } else {
+                        scrollToLine(index)
+                    }
                 } else {
                     textView.postOnAnimation(this)
                 }
@@ -176,17 +188,53 @@ class SyncedLyricsView(
         textView.postOnAnimation(attempt)
     }
 
+    /**
+     * Reserves enough room below the last line for it to still reach the highlight anchor.
+     * Without this the last lines of a song stay glued to the bottom of the pane, behind the
+     * lyric-offset controls, because a ScrollView cannot scroll past its content.
+     *
+     * @return true when the padding changed and the layout needs another frame to settle.
+     */
+    private fun ensureTrailingSpace(): Boolean {
+        val target = scroll ?: return false
+        val viewport = target.height
+        if (viewport <= 0) return false
+        if (originalPaddingBottom < 0) originalPaddingBottom = textView.paddingBottom
+        val needed = (viewport * (1f - CURRENT_LINE_ANCHOR)).toInt()
+        if (textView.paddingBottom >= needed) return false
+        textView.setPadding(
+            textView.paddingLeft, textView.paddingTop, textView.paddingRight, needed
+        )
+        return true
+    }
+
+    private fun restorePaddingIfNeeded() {
+        if (originalPaddingBottom >= 0 && textView.paddingBottom != originalPaddingBottom) {
+            textView.setPadding(
+                textView.paddingLeft, textView.paddingTop, textView.paddingRight,
+                originalPaddingBottom
+            )
+        }
+    }
+
     private fun scrollToLine(index: Int) {
         val target = scroll ?: return
         val layout = textView.layout ?: return
+        if (index !in lineStarts.indices) return
 
-        // Every lyric line is one line of text, so the line of the layout is the index of the
-        // lyric. The text may be wrapped on a narrow screen, which makes the layout have more
-        // lines than the lyrics, so the index is only used when it fits.
-        val textLine = if (index < layout.lineCount) index else return
+        // One lyric can wrap into several TextView layout lines: bilingual lyrics on the car
+        // pane almost always do. Using the lyric index directly as a layout line index used to
+        // scroll far too little, leaving the highlighted line at the very bottom of the screen.
+        // The character offset of the lyric maps it to the real layout line.
+        val charOffset = lineStarts[index]
+            .coerceAtMost(layout.getLineEnd(layout.lineCount - 1))
+        val textLine = layout.getLineForOffset(charOffset)
 
         val lineCenter = (layout.getLineTop(textLine) + layout.getLineBottom(textLine)) / 2
-        val offset = (lineCenter - target.height / 2).coerceAtLeast(0)
+        // Slightly above the vertical centre: the pane has the lyric-offset and transport
+        // controls along its bottom edge, so a centred line would sit right behind them.
+        val anchor = (target.height * CURRENT_LINE_ANCHOR).toInt()
+        val offset = (contentOffsetY(target) + lineCenter - anchor).coerceAtLeast(0)
 
         when (target) {
             is ScrollView -> target.smoothScrollTo(0, offset)
@@ -195,8 +243,27 @@ class SyncedLyricsView(
         }
     }
 
+    /**
+     * The lyric TextView is not always the only child of the scroll container: the full lyrics
+     * page puts the artist and title above it. Translate the TextView's own layout coordinates
+     * into the scroll container's content coordinates before computing the scroll offset.
+     */
+    private fun contentOffsetY(target: View): Int {
+        var view: View = textView
+        var total = 0
+        var guard = 0
+        while (view !== target && view.parent is View && guard++ < 10) {
+            total += view.top
+            view = view.parent as View
+        }
+        return total
+    }
+
     companion object {
         private const val HIGHLIGHT_SCALE = 1.12f
+
+        /** Where the current line sits inside the viewport: 0.5 = centre, 0.38 = slightly above. */
+        private const val CURRENT_LINE_ANCHOR = 0.38f
 
         /** Convenience factory which also remembers the track the lyrics belong to. */
         fun attach(scroll: View?, textView: TextView, accentColor: Int): SyncedLyricsView =

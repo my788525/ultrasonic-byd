@@ -54,6 +54,7 @@ import org.moire.ultrasonic.subsonic.ImageLoaderProvider
 import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.util.DownloadUtil
+import org.moire.ultrasonic.util.ForegroundAppMonitor
 import org.moire.ultrasonic.util.HomePrefs
 import org.moire.ultrasonic.util.PinnedPlaylist
 import org.moire.ultrasonic.util.PlaylistResumeStore
@@ -175,6 +176,16 @@ class HomeFragment : ScopeFragment() {
             return
         }
 
+        // The navigation-only gate needs "usage access" to name the app on top. Offer the
+        // system page once, without blocking the toggle: the window still works, it just
+        // cannot hide itself over the camera view until the permission is granted.
+        if (enabled && Settings.floatingOnlyInNav &&
+            !ForegroundAppMonitor.hasUsageAccess(ctx)
+        ) {
+            Util.toast(R.string.floating_usage_access_needed, context = ctx)
+            ForegroundAppMonitor.openUsageAccessSettings(ctx)
+        }
+
         FloatingPlayerService.setNavigationMode(ctx, enabled)
         Util.toast(
             if (enabled) R.string.nav_floating_on else R.string.nav_floating_off,
@@ -206,6 +217,20 @@ class HomeFragment : ScopeFragment() {
     override fun onPause() {
         handler.removeCallbacks(updateRunnable)
         super.onPause()
+    }
+
+    override fun onDestroyView() {
+        // The next onViewCreated binds brand new views. Clearing the change guards makes the
+        // first tick repaint the play button and the cover instead of assuming the old views
+        // still show the right state.
+        cover = null
+        titleView = null
+        artistView = null
+        playButton = null
+        progressView = null
+        lastPlayingState = null
+        currentCoverId = null
+        super.onDestroyView()
     }
 
     // region palette
@@ -302,7 +327,11 @@ class HomeFragment : ScopeFragment() {
         val recycler = root.findViewById<RecyclerView>(R.id.home_playlists_grid)
         val rows = playlistRows()
 
-        if (playlistRowsCached != rows) {
+        // Leaving for the playlist screen destroys the Fragment view but keeps this Fragment
+        // (and its adapter). The RecyclerView we get back is a brand new one, so the layout
+        // manager, adapter and scroll guard must be re-attached on every view rebuild.
+        // Checking only "adapter == null" used to leave the new grid empty on return.
+        if (recycler.layoutManager == null || playlistRowsCached != rows) {
             recycler.layoutManager = GridLayoutManager(
                 requireContext(), rows, RecyclerView.HORIZONTAL, false
             )
@@ -318,12 +347,10 @@ class HomeFragment : ScopeFragment() {
 
         if (homePlaylistAdapter == null) {
             homePlaylistAdapter = HomePlaylistAdapter { playHomePlaylist(it) }
+        }
+        if (recycler.adapter !== homePlaylistAdapter) {
             recycler.adapter = homePlaylistAdapter
             attachHorizontalScrollGuard(recycler)
-        }
-
-        root.findViewById<View?>(R.id.home_playlists_view_all)?.setOnClickListener {
-            jumpToPlaylistsTab()
         }
 
         // Instant render from cache, then a throttled background refresh from the server.
@@ -386,18 +413,6 @@ class HomeFragment : ScopeFragment() {
         }
     }
 
-    /** Switches the hosting ViewPager to the Playlists tab. */
-    private fun jumpToPlaylistsTab() {
-        var parent = parentFragment
-        while (parent != null) {
-            if (parent is MainFragment) {
-                (parent as MainFragment).showPlaylistsTab()
-                return
-            }
-            parent = parent.parentFragment
-        }
-    }
-
     /**
      * Orders the home playlists without ever truncating: playlists pinned in Settings come
      * first, then the most-played ones, then the rest in server order. The count setting only
@@ -415,7 +430,10 @@ class HomeFragment : ScopeFragment() {
                 .thenBy { order[it.id] ?: Int.MAX_VALUE }
         )
         if (pinned.isEmpty()) return byPlays
-        val front = list.filter { pinned.contains(it.id) }
+        // Pinned playlists keep the play-count order among themselves. Otherwise a custom
+        // selection would freeze the first tiles forever and tapping one would never reorder
+        // the home screen, which is exactly what the driver notices.
+        val front = byPlays.filter { pinned.contains(it.id) }
         return front + byPlays.filterNot { pinned.contains(it.id) }
     }
 
@@ -720,6 +738,21 @@ class HomeFragment : ScopeFragment() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PlaylistVH {
             val view = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_home_playlist_tile, parent, false)
+            // One "page" of the sideways grid holds exactly `columns()` cards, so the setting
+            // (4 / 8 / 12 / 16) really equals the number of playlists on the first screen.
+            // A hard-coded 148dp tile only fit three per row on the car panel, which made
+            // "8" show just 6 playlists and looked much larger than the old grid.
+            val cols = columns().coerceAtLeast(1)
+            val gap = parent.resources.getDimensionPixelSize(R.dimen.home_grid_tile_gap)
+            val available = parent.width - parent.paddingLeft - parent.paddingRight
+            if (available > 0) {
+                val tileWidth = (available / cols) - (2 * gap)
+                val minWidth = CarTheme.dp(parent.context, 100f).toInt()
+                (view.layoutParams as? RecyclerView.LayoutParams)?.let {
+                    it.width = tileWidth.coerceAtLeast(minWidth)
+                    view.layoutParams = it
+                }
+            }
             return PlaylistVH(view)
         }
 
@@ -745,7 +778,7 @@ class HomeFragment : ScopeFragment() {
         }
 
         private fun bindPlaylistIcon(icon: ImageView, playlist: PinnedPlaylist, accent: Int) {
-            val sizeDp = if (playlist.coverArt.isNotEmpty()) 84f else 56f
+            val sizeDp = if (playlist.coverArt.isNotEmpty()) 64f else 48f
             val sizePx = CarTheme.dp(icon.context, sizeDp).toInt()
             // Reassigning layoutParams on every bind forces a measure pass; only do it when the
             // recycled view actually needs a different icon size.

@@ -3,11 +3,11 @@
     <!-- Height of one music-library tile in the home grid. -->
     <dimen name="home_grid_tile_height">104dp</dimen>
     <!-- Height of one playlist tile in the home "My Playlists" grid. Taller than the library
-         tile because it carries a 92dp cover plus up to two lines of the playlist name. -->
-    <dimen name="home_playlist_tile_height">156dp</dimen>
-    <!-- Fixed width of one playlist tile. The home playlist grid scrolls horizontally, so a
-         match_parent width would make a single card fill the whole screen. -->
-    <dimen name="home_playlist_tile_width">148dp</dimen>
+         tile because it carries a 64dp cover plus up to two lines of the playlist name. -->
+    <dimen name="home_playlist_tile_height">144dp</dimen>
+    <!-- Fallback width of one playlist tile. The real width is computed at bind time as
+         (available width / columns) so the chosen count matches the first screen exactly. -->
+    <dimen name="home_playlist_tile_width">108dp</dimen>
     <!-- Gap between grid tiles (applied as a margin on each tile, so the visual gap is 2x). -->
     <dimen name="home_grid_tile_gap">6dp</dimen>
 </resources>

@@ -57,6 +57,7 @@ import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.util.CarTransport
 import org.moire.ultrasonic.util.FloatingAppearance
+import org.moire.ultrasonic.util.ForegroundAppMonitor
 import org.moire.ultrasonic.util.LyricsParser
 import org.moire.ultrasonic.util.ReverseSafetyManager
 import org.moire.ultrasonic.activity.NavigationActivity
@@ -220,6 +221,21 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         }
     }
 
+    /**
+     * True while the app on top of the screen is not the navigation map. Together with the host
+     * flag and the reverse-safety gate this decides whether the overlay may exist at all.
+     */
+    @Volatile
+    private var navOnlyHide = false
+
+    /** Watches the foreground app so the window disappears over the 360/reversing camera. */
+    private val foregroundRunnable = object : Runnable {
+        override fun run() {
+            checkForegroundApp()
+            handler.postDelayed(this, FOREGROUND_CHECK_INTERVAL_MS)
+        }
+    }
+
     private val idleFadeRunnable = Runnable { fadeToIdle() }
 
     /** Collapses the detail block into the lyric lines after the chosen number of seconds. */
@@ -238,6 +254,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForeground(NOTIFICATION_ID, buildNotification())
         connectController()
+        // Watch which app is on top from the very first frame. This runs once immediately and
+        // then every 1.2 s, so a camera view taking the screen removes the window promptly.
+        handler.post(foregroundRunnable)
 
         // The sleep timer owns its own countdown in a separate manager, so it survives even
         // when the floating window is rebuilt. A timer that was running when the process died
@@ -387,6 +406,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         reverseSafetyManager.stop()
         disposables.clear()
         handler.removeCallbacks(updateRunnable)
+        handler.removeCallbacks(foregroundRunnable)
         handler.removeCallbacks(idleFadeRunnable)
         handler.removeCallbacks(collapseDetailRunnable)
         controllerFuture?.let { MediaController.releaseFuture(it) }
@@ -400,10 +420,10 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     // region window
 
     private fun showOverlay() {
-        // The host (the app's home page, for instance) asked not to see the window. Skip the
-        // creation entirely; the view is removed again in applyHostVisibility() when the host
-        // changes its mind, so we never leave a stale window on screen.
-        if (FloatingPlayerService.hostWantsHide) return
+        // Any of the three gates can veto the window: the app's own screens, the reverse/360
+        // safety gate, and the navigation-only gate. Skip creation entirely; applyOverlayVisibility
+        // removes the view again as soon as one of them asks for it.
+        if (shouldHideOverlay()) return
         if (rootView == null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
                 !android.provider.Settings.canDrawOverlays(this)
@@ -1157,30 +1177,51 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      * still owns a touch hit-region over the map; it is removed from the window manager entirely
      * and rebuilt on demand, which is cheap and leaves the map fully interactive.
      */
-    private fun applyHostVisibility() {
-        if (FloatingPlayerService.hostWantsHide) {
+    /**
+     * All three gates that can veto the window, combined with a logical OR:
+     *  - the host app is on one of its own screens;
+     *  - the BYD reverse / 360 safety gate is engaged;
+     *  - "navigation apps only" is on and the app on top is not Amap.
+     */
+    private fun shouldHideOverlay(): Boolean =
+        FloatingPlayerService.hostWantsHide ||
+            FloatingPlayerService._reverseSafetyActive ||
+            (Settings.floatingOnlyInNav && navOnlyHide)
+
+    /** The single place that shows or removes the overlay view. */
+    private fun applyOverlayVisibility() {
+        if (shouldHideOverlay()) {
             if (rootView != null) removeOverlay()
-        } else {
-            if (rootView == null) showOverlay()
+        } else if (rootView == null) {
+            showOverlay()
         }
     }
+
     /**
-     * Applies the reverse-camera safety gate to the overlay visibility.
+     * Reads the app the driver is looking at and updates the navigation-only gate.
      *
-     * When the gate is active the overlay is removed even if the host wants it shown, and
-     * when the gate releases the overlay comes back if the host still wants it. The two
-     * visibility drivers are independent: the host-hides flag and the reverse-safety flag
-     * are combined with a logical AND of their "hide" contributions, so either one hiding
-     * the overlay keeps it off.
+     * The floating player belongs over the map, not over the launcher, the 360 surround view
+     * or the reversing camera. On head units where the foreground app cannot be named at all,
+     * the gate stays open (window visible) rather than silently disabling the feature; the BYD
+     * reverse-safety gate is still active as a second line of defence.
      */
-    fun applyReverseSafetyVisibility() {
-        val hostHides = FloatingPlayerService.hostWantsHide
-        val reverseHides = FloatingPlayerService._reverseSafetyActive
-        if (reverseHides) {
-            if (rootView != null) removeOverlay()
+    fun checkForegroundApp() {
+        val hide = if (!Settings.floatingOnlyInNav) {
+            false
         } else {
-            if (!hostHides && rootView == null) showOverlay()
+            val pkg = ForegroundAppMonitor.foregroundPackage(this)
+            pkg != null && !ForegroundAppMonitor.isNavigationApp(pkg)
         }
+        if (hide != navOnlyHide) {
+            navOnlyHide = hide
+            Timber.d("Navigation-only gate: hide=%s", hide)
+            applyOverlayVisibility()
+        }
+    }
+
+    /** Called by the static reverse-safety accessors; the three gates are evaluated together. */
+    fun applyReverseSafetyVisibility() {
+        applyOverlayVisibility()
     }
 
 
@@ -1934,6 +1975,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         private const val NOTIFICATION_ID = 4711
         private const val OVERLAY_FAILURE_FILE = "floating-failure.txt"
         private const val UPDATE_INTERVAL_MS = 500L
+        /** How often the app on top of the screen is checked for the navigation-only gate. */
+        private const val FOREGROUND_CHECK_INTERVAL_MS = 1200L
         private const val IDLE_TIMEOUT_MS = 3000L
         private const val FADE_MS = 220L
         private const val LONG_PRESS_MS = 700L
@@ -2057,7 +2100,10 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         @JvmStatic
         fun setHostHidden(context: Context, hidden: Boolean) {
             hostWantsHide = hidden
-            instance?.applyHostVisibility()
+            // Going to the background is exactly when the window would come back, so check
+            // what is on top right away instead of waiting for the next poll.
+            if (!hidden) instance?.checkForegroundApp()
+            instance?.applyOverlayVisibility()
         }
 
         /**

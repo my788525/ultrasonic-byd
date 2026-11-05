@@ -159,6 +159,17 @@ object Settings {
     @JvmStatic
     var floatingReverseSafety by BooleanSetting(getKey(R.string.setting_key_floating_reverse_safety), true)
 
+    /**
+     * Shows the floating window only over the navigation map (Amap / Gaode). The launcher, the
+     * 360 surround view, the reversing camera and every other app keep the screen clear.
+     *
+     * This needs the "usage access" permission to name the foreground app; the settings screen
+     * offers a one-tap shortcut to grant it. It is on by default because a window over a camera
+     * view is a driving-safety problem.
+     */
+    @JvmStatic
+    var floatingOnlyInNav by BooleanSetting(getKey(R.string.setting_key_floating_only_in_nav), true)
+
     /** How many of the most-played playlists show on the home screen; -1 means every playlist. */
     @JvmStatic
     var homePlaylistCount by StringIntSetting(getKey(R.string.setting_key_home_playlist_count), 8)
