@@ -1,18 +1,15 @@
 {
-  "versionCode": 513,
-  "versionName": "4.8.0-byd.31",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.31/NavMusic-4.8.0-byd.31.apk",
-  "sha256": "8f878d9e56c4c2bd079a25b9a3e2b9b3fe4c9496fa6b8d8090b77d268979b923",
-  "size": 11439172,
-  "publishedAt": "2026-11-05T08:16:30Z",
+  "versionCode": 514,
+  "versionName": "4.8.0-byd.32",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.32/NavMusic-4.8.0-byd.32.apk",
+  "sha256": "fe5e84b8d4da706ec31efab204b0b2157de410a6b5cec57b9e662a3d528c71f0",
+  "size": 11440055,
+  "publishedAt": "2026-11-05T08:46:04Z",
   "changelog": [
-    "修正：倒车/360 浮窗未隐藏与未暂停 —— 弃用无效广播方案，改为反射接入比亚迪开放平台设备类",
-    "倒车检测：android.hardware.bydauto.gearbox.BYDAutoGearboxDevice.getInstance().getGearboxAutoModeType() == R（常量 GEARBOX_AUTO_MODE_R，按名反射读取，非硬编码）",
-    "360检测：android.hardware.bydauto.panorama.BYDAutoPanoramaDevice.getInstance().getPanoWorkState() != 0（全景打开状态）",
-    "轮询：后台 HandlerThread 每 800ms 读取挡位/全景，仅在状态变化时通知 gate；读取全部 try-catch，IPC/权限失败安全降级为非倒车",
-    "兼容：开发机/模拟器/非 BYD 设备无 android.hardware.bydauto.* 类时 ClassNotFound → 安全降级，浮窗与音乐不受影响",
-    "新增清单权限 android.permission.BYDAUTO_GEARBOX_GET / BYDAUTO_PANORAMA_GET（非 BYD 设备系统自动忽略未知权限）",
-    "验证：腾势X / 2021款比亚迪唐 DiLink 属开放平台体系，需 OTA 后在真车实测确认触发；附诊断日志便于校准",
-    "版本 bump 至 4.8.0-byd.31 (versionCode 513)"
+    "UI打磨：首页入口磁贴改用圆角强调色芯片包裹图标，现代感更强",
+    "UI打磨：首页「继续播放」大卡由 66dp 提升至 96dp、封面 46→62dp，并新增底部播放进度条（司机一眼看到进度）",
+    "UI打磨：播放面板随机/循环按钮激活态改用强调色高亮（与睡眠定时一致），司机一眼识别开关状态",
+    "UI打磨：列表封面已统一圆角（MaterialCardView / ShapeableImageView），无需额外改动",
+    "版本 bump 至 4.8.0-byd.32 (versionCode 514)"
   ]
 }
