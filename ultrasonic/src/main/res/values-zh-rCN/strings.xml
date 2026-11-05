@@ -632,4 +632,19 @@
     <string name="update_notification_title">有新版本 %1$s</string>
     <string name="update_notification_text">到「设置」里下载并安装</string>
     <string name="update_no_changelog">这个版本没有发布更新说明</string>
+    <!-- Sound effects / audio enhancement -->
+    <string name="fx_title">音效增强</string>
+    <string name="fx_master">音效增强总开关</string>
+    <string name="fx_presets_label">预设</string>
+    <string name="fx_bass">重低音</string>
+    <string name="fx_surround">3D环绕</string>
+    <string name="fx_loudness">响度</string>
+    <string name="fx_unavailable_note">本车机未提供部分音效，已自动隐藏对应项。</string>
+    <string name="fx_advanced">高级均衡器</string>
+    <string name="fx_preset_off">关闭</string>
+    <string name="fx_preset_default">标准</string>
+    <string name="fx_preset_bass">重低音</string>
+    <string name="fx_preset_vocal">人声突出</string>
+    <string name="fx_preset_surround">环绕现场</string>
+    <string name="fx_preset_driving">驾驶模式</string>
 </resources>

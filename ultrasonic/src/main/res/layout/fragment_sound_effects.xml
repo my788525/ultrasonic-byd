@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Sound-effects panel for the car head unit.
+
+  Big, glanceable controls: one master switch, a row of preset chips, and three sliders
+  (bass / 3D surround / loudness). The graphic equalizer lives in the separate
+  "advanced" screen. Controls for effects the device does not expose are hidden.
+-->
+<ScrollView xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    a:layout_width="match_parent"
+    a:layout_height="match_parent"
+    a:fillViewport="true">
+
+    <LinearLayout
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:orientation="vertical"
+        a:paddingStart="20dp"
+        a:paddingEnd="20dp"
+        a:paddingTop="14dp"
+        a:paddingBottom="20dp">
+
+        <!-- Master switch -->
+        <LinearLayout
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:gravity="center_vertical"
+            a:orientation="horizontal"
+            a:paddingTop="4dp"
+            a:paddingBottom="12dp">
+
+            <TextView
+                a:layout_width="0dp"
+                a:layout_height="wrap_content"
+                a:layout_weight="1"
+                a:text="@string/fx_master"
+                a:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
+
+            <com.google.android.material.switchmaterial.SwitchMaterial
+                a:id="@+id/fx_master"
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <!-- Preset chips -->
+        <TextView
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:layout_marginTop="4dp"
+            a:layout_marginBottom="6dp"
+            a:text="@string/fx_presets_label"
+            a:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+            a:textColor="?attr/colorAccent" />
+
+        <HorizontalScrollView
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:scrollbars="none">
+
+            <LinearLayout
+                a:id="@+id/fx_presets"
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:orientation="horizontal" />
+        </HorizontalScrollView>
+
+        <!-- Bass boost -->
+        <LinearLayout
+            a:id="@+id/fx_bass_row"
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:orientation="vertical"
+            a:paddingTop="14dp">
+
+            <LinearLayout
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:gravity="center_vertical"
+                a:orientation="horizontal">
+
+                <TextView
+                    a:layout_width="0dp"
+                    a:layout_height="wrap_content"
+                    a:layout_weight="1"
+                    a:text="@string/fx_bass"
+                    a:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+
+                <TextView
+                    a:id="@+id/fx_bass_value"
+                    a:layout_width="wrap_content"
+                    a:layout_height="wrap_content"
+                    a:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    a:textColor="?attr/colorAccent" />
+            </LinearLayout>
+
+            <SeekBar
+                a:id="@+id/fx_bass"
+                a:layout_width="match_parent"
+                a:layout_height="40dp"
+                a:layout_marginTop="4dp"
+                a:max="1000" />
+        </LinearLayout>
+
+        <!-- 3D / surround -->
+        <LinearLayout
+            a:id="@+id/fx_virtualizer_row"
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:orientation="vertical"
+            a:paddingTop="14dp">
+
+            <LinearLayout
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:gravity="center_vertical"
+                a:orientation="horizontal">
+
+                <TextView
+                    a:layout_width="0dp"
+                    a:layout_height="wrap_content"
+                    a:layout_weight="1"
+                    a:text="@string/fx_surround"
+                    a:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+
+                <TextView
+                    a:id="@+id/fx_virtualizer_value"
+                    a:layout_width="wrap_content"
+                    a:layout_height="wrap_content"
+                    a:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    a:textColor="?attr/colorAccent" />
+            </LinearLayout>
+
+            <SeekBar
+                a:id="@+id/fx_virtualizer"
+                a:layout_width="match_parent"
+                a:layout_height="40dp"
+                a:layout_marginTop="4dp"
+                a:max="1000" />
+        </LinearLayout>
+
+        <!-- Loudness -->
+        <LinearLayout
+            a:id="@+id/fx_loudness_row"
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:orientation="vertical"
+            a:paddingTop="14dp">
+
+            <LinearLayout
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:gravity="center_vertical"
+                a:orientation="horizontal">
+
+                <TextView
+                    a:layout_width="0dp"
+                    a:layout_height="wrap_content"
+                    a:layout_weight="1"
+                    a:text="@string/fx_loudness"
+                    a:textAppearance="@style/TextAppearance.Material3.BodyLarge" />
+
+                <TextView
+                    a:id="@+id/fx_loudness_value"
+                    a:layout_width="wrap_content"
+                    a:layout_height="wrap_content"
+                    a:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+                    a:textColor="?attr/colorAccent" />
+            </LinearLayout>
+
+            <SeekBar
+                a:id="@+id/fx_loudness"
+                a:layout_width="match_parent"
+                a:layout_height="40dp"
+                a:layout_marginTop="4dp"
+                a:max="1000" />
+        </LinearLayout>
+
+        <!-- Shown when one or more effects are missing on the device -->
+        <TextView
+            a:id="@+id/fx_unavailable"
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:layout_marginTop="16dp"
+            a:text="@string/fx_unavailable_note"
+            a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            a:textColor="@android:color/darker_gray"
+            a:visibility="gone" />
+
+        <!-- Link to the full graphic equalizer -->
+        <com.google.android.material.button.MaterialButton
+            a:id="@+id/fx_advanced"
+            a:layout_width="match_parent"
+            a:layout_height="wrap_content"
+            a:layout_marginTop="18dp"
+            a:text="@string/fx_advanced" />
+
+    </LinearLayout>
+</ScrollView>

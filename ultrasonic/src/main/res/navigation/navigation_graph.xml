@@ -301,4 +301,17 @@
             android:defaultValue="-1"
             app:argType="integer" />
     </fragment>
+
+    <fragment
+        android:id="@+id/soundEffectsFragment"
+        android:name="org.moire.ultrasonic.fragment.SoundEffectsFragment" />
+
+    <!-- Global actions so any screen (including the player pane, which lives outside the
+         NavHost) can open the sound-effects panel and the advanced equalizer. -->
+    <action
+        android:id="@+id/action_global_soundEffects"
+        app:destination="@id/soundEffectsFragment" />
+    <action
+        android:id="@+id/action_global_equalizer"
+        app:destination="@id/equalizerFragment" />
 </navigation>

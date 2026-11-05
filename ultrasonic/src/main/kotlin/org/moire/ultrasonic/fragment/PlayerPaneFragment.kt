@@ -22,6 +22,7 @@ import androidx.core.widget.ImageViewCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.Navigation
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -184,6 +185,17 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         sleepButton?.setOnClickListener {
             sleepTimerManager.cycle()
             showSleepToast()
+        }
+
+        // Sound enhancement panel. The pane is hosted outside the NavHost, so navigation has
+        // to go through the activity's NavController.
+        view.findViewById<ImageButton>(R.id.pane_effects)?.setOnClickListener {
+            try {
+                Navigation.findNavController(requireActivity(), R.id.nav_host_fragment)
+                    .navigate(R.id.action_global_soundEffects)
+            } catch (all: Throwable) {
+                Timber.w(all, "Could not open the sound-effects panel.")
+            }
         }
 
         // Same distance as a swipe on the bar, but as a single big target

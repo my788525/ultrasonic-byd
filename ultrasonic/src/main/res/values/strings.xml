@@ -658,4 +658,19 @@
     <string name="update_notification_title">Version %1$s is available</string>
     <string name="update_notification_text">Open Settings to download and install it</string>
     <string name="update_no_changelog">No changelog was published for this version</string>
+    <!-- Sound effects / audio enhancement -->
+    <string name="fx_title">Sound Effects</string>
+    <string name="fx_master">Sound enhancement</string>
+    <string name="fx_presets_label">Preset</string>
+    <string name="fx_bass">Bass boost</string>
+    <string name="fx_surround">3D surround</string>
+    <string name="fx_loudness">Loudness</string>
+    <string name="fx_unavailable_note">Some effects are not available on this device.</string>
+    <string name="fx_advanced">Advanced equalizer</string>
+    <string name="fx_preset_off">Off</string>
+    <string name="fx_preset_default">Default</string>
+    <string name="fx_preset_bass">Bass</string>
+    <string name="fx_preset_vocal">Vocal</string>
+    <string name="fx_preset_surround">Surround</string>
+    <string name="fx_preset_driving">Driving</string>
 </resources>

@@ -257,6 +257,18 @@
             a:scaleType="fitCenter"
             a:src="@drawable/ic_sleep" />
 
+        <!-- Sound enhancement: opens the bass / surround / loudness panel. Visible while
+             driving so the driver can tune the cabin sound without leaving the player. -->
+        <ImageButton
+            a:id="@+id/pane_effects"
+            a:layout_width="44dp"
+            a:layout_height="44dp"
+            a:layout_marginStart="6dp"
+            a:background="?attr/selectableItemBackgroundBorderless"
+            a:contentDescription="@string/fx_title"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_sound_effects" />
+
     </LinearLayout>
 
 </LinearLayout>
