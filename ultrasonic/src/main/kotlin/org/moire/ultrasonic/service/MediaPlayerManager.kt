@@ -17,6 +17,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+import androidx.media3.common.Player.REPEAT_MODE_ALL
 import androidx.media3.common.Player.REPEAT_MODE_OFF
 import androidx.media3.common.Rating
 import androidx.media3.common.StarRating
@@ -585,6 +586,14 @@ class MediaPlayerManager(
             currentPlaylistId = playlistId
             currentPlaylistName = playlistName
             playlistBinding = true
+            // A playlist plays straight through and then loops back to its first track, so the
+            // driver is never left with a dead "next" once the last song ends. Only flip the
+            // mode when it is OFF, leaving an explicit Repeat-One choice untouched.
+            if (insertionMode == InsertionMode.CLEAR &&
+                (controller?.repeatMode ?: REPEAT_MODE_OFF) == REPEAT_MODE_OFF
+            ) {
+                controller?.repeatMode = REPEAT_MODE_ALL
+            }
         }
     }
 

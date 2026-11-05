@@ -547,6 +547,9 @@
     <string name="home_view_all_playlists">View all playlists</string>
     <string name="home_resume_playlist">Continue: %s</string>
     <string name="home_playlist_playing">Playing: %s</string>
+    <string name="home_playlist_count_all">All</string>
+    <string name="home_playlist_count_title">Playlists shown on home</string>
+    <string name="home_playlist_count_summary">How many of your most-played playlists appear on the home screen. Choose All to show every playlist.</string>
 
     <!-- Car UI: floating window -->
     <string name="settings_floating_title">Floating window</string>

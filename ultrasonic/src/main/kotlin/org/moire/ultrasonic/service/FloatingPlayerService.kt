@@ -58,6 +58,7 @@ import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.util.CarTransport
 import org.moire.ultrasonic.util.FloatingAppearance
 import org.moire.ultrasonic.util.LyricsParser
+import org.moire.ultrasonic.util.ReverseSafetyManager
 import org.moire.ultrasonic.activity.NavigationActivity
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.SleepTimerManager
@@ -119,6 +120,13 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private var navMode = false
     private var locked = false
     private var passThrough = false
+
+    /**
+     * The reverse-camera / 360 safety gate. It watches the car and, when the gearbox is in R or
+     * the panorama view is up, hides this window and pauses the music. It is wired here so it runs
+     * exactly while the floating window exists, and never on a device without the car service.
+     */
+    private val reverseSafetyManager = ReverseSafetyManager()
 
     /** True while the detail block (cover, title, artist) is shown and waiting to collapse. */
     private var detailVisible = false
@@ -376,6 +384,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
     override fun onDestroy() {
         sleepTimerManager.removeListener(this)
+        reverseSafetyManager.stop()
         disposables.clear()
         handler.removeCallbacks(updateRunnable)
         handler.removeCallbacks(idleFadeRunnable)
@@ -450,6 +459,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         handler.removeCallbacks(updateRunnable)
         handler.post(updateRunnable)
         scheduleIdleFade()
+        // The window is up: start (or keep) the reverse/360 safety gate so the camera view
+        // hides it and pauses the music. start() is idempotent, so re-shows are harmless.
+        reverseSafetyManager.start()
     }
 
     /**

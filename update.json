@@ -1,15 +1,16 @@
 {
-  "versionCode": 511,
-  "versionName": "4.8.0-byd.29",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.29/NavMusic-4.8.0-byd.29.apk",
-  "sha256": "973f4c83050dae3e6bf0d7543e74c3550361215a1078ed0c6feb692e3aca53d2",
-  "size": 11437294,
-  "publishedAt": "2026-11-04T23:19:04Z",
+  "versionCode": 512,
+  "versionName": "4.8.0-byd.30",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.30/NavMusic-4.8.0-byd.30.apk",
+  "sha256": "58ca4891a61330aec39ae1add2912e798fa6cdf351703ead19b9e3fd6a0d32d1",
+  "size": 11438956,
+  "publishedAt": "2026-11-05T00:14:51Z",
   "changelog": [
-    "修复：首页\"我的歌单\"卡片文字被封面遮挡/裁剪不可见（原 tile 固定 92dp 高度装不下 48dp 封面+文字，文字被裁掉）",
-    "修复：歌单卡片改用专属布局 item_home_playlist_tile——封面 84dp 方形 + 歌单名两行 ellipsize 显示，长歌单名不再被截断到看不见",
-    "体验：封面无图时回退图标放大到 56dp，保持视觉一致；歌单卡片与圆角 tile 背景协调",
-    "健壮性：歌单网格沿用独立布局，不影响音乐库磁贴（仍 92dp）的高度与排版",
-    "版本 bump 至 4.8.0-byd.29 (versionCode 511)"
+    "新增：首页\"我的歌单\"可显示数量设置项（设置→首页），默认 8，可选 4 / 8 / 12 / 16 / 全部",
+    "修复：歌单播放到最后一首后，按\"下一首\"自动循环回第一首（开始播放歌单时自动设为列表循环 REPEAT_MODE_ALL）",
+    "新增：点击首页歌单播放后，自动打开该歌单的曲目列表页，显示播放进度与歌单内其他歌曲",
+    "修复：倒车或调起全景 360 时浮窗未隐藏/未暂停 —— 重写倒车信号源为广播监听（BYD 倒车/全景广播），并在浮窗创建时启动、销毁时停止 ReverseSafetyManager",
+    "兼容性：无车机广播时安全降级（默认非倒车状态，浮窗正常显示），不影响非 BYD 设备",
+    "版本 bump 至 4.8.0-byd.30 (versionCode 512)"
   ]
 }

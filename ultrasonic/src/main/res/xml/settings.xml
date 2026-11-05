@@ -457,6 +457,18 @@
             app:iconSpaceReserved="false"/>
     </PreferenceCategory>
     <PreferenceCategory
+        a:title="@string/home_playlist_count_title"
+        app:iconSpaceReserved="false">
+        <ListPreference
+            a:defaultValue="8"
+            a:entries="@array/homePlaylistCountNames"
+            a:entryValues="@array/homePlaylistCountValues"
+            a:key="@string/setting_key.home_playlist_count"
+            a:summary="@string/home_playlist_count_summary"
+            a:title="@string/home_playlist_count_title"
+            app:iconSpaceReserved="false"/>
+    </PreferenceCategory>
+    <PreferenceCategory
         a:title="@string/settings.debug.title"
         app:iconSpaceReserved="false">
         <CheckBoxPreference

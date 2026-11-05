@@ -7,10 +7,13 @@
 
 package org.moire.ultrasonic.util
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.Looper
+import androidx.core.content.ContextCompat
 import org.koin.core.component.KoinComponent
 import org.moire.ultrasonic.app.UApp
 import org.moire.ultrasonic.service.FloatingPlayerService
@@ -207,7 +210,24 @@ class BydReverseSignalSource : ReverseSignalSource {
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
     private var lastState = false
-    private var pollRunnable: Runnable? = null
+    private var registered = false
+
+    /**
+     * The broadcast receiver for the car's gearbox and panorama (360) state.
+     *
+     * The car publishes its reverse / 360 state as broadcast intents; the receiver turns each
+     * one into a reverse-or-not decision and tells the listeners only when the state changes.
+     */
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent == null) return
+            val reversing = BydCarState.isReverseIntent(intent)
+            if (reversing != lastState) {
+                lastState = reversing
+                for (l in listeners) handler.post { l.onReverseChanged(lastState) }
+            }
+        }
+    }
 
     override fun addListener(listener: ReverseSignalListener) {
         if (!listeners.contains(listener)) listeners.add(listener)
@@ -220,147 +240,98 @@ class BydReverseSignalSource : ReverseSignalSource {
     override fun start() {
         if (running) return
         running = true
-        val r = startPolling()
-        handler.postDelayed(r, 0L)
-    }
-
-    private fun startPolling(): Runnable {
-        val poller = object : Runnable {
-            override fun run() {
-                if (!running) return
-                val reversing = readReverseState()
-                if (reversing != lastState) {
-                    lastState = reversing
-                    for (l in listeners) {
-                        handler.post { l.onReverseChanged(lastState) }
-                    }
-                }
-                handler.postDelayed(this, POLL_INTERVAL_MS)
-            }
+        val context = UApp.instance ?: return
+        val filter = IntentFilter().apply {
+            BydCarState.gearboxActions.forEach { addAction(it) }
+            BydCarState.panoramaActions.forEach { addAction(it) }
         }
-        pollRunnable = poller
-        return poller
+        try {
+            // RECEIVER_NOT_EXPORTED: the app only listens to the car's own broadcasts, never
+            // to those from other apps, so exporting would be both unnecessary and unsafe.
+            ContextCompat.registerReceiver(
+                context,
+                receiver,
+                filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+            registered = true
+        } catch (all: Throwable) {
+            Timber.w(all, "Could not register the BYD reverse receiver")
+            registered = false
+        }
+        // Seed the listeners with the current (non-reversing) state so the gate starts
+        // disengaged even before the first broadcast arrives. A sticky broadcast, if the car
+        // sends one, is delivered immediately on registration and updates it right away.
+        for (l in listeners) handler.post { l.onReverseChanged(lastState) }
     }
 
     override fun stop() {
         running = false
-        pollRunnable?.let { handler.removeCallbacks(it) }
-        pollRunnable = null
+        val context = UApp.instance
+        if (registered && context != null) {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (all: Throwable) {
+                Timber.w(all, "Could not unregister the BYD reverse receiver")
+            }
+        }
+        registered = false
     }
 
     override fun onReverseChanged(reversing: Boolean) {
         // The source itself does not react; the manager's listener does.
     }
-
-    /**
-     * Reads the reverse state of the car.
-     *
-     * The state is true when the gearbox reports reverse, or when the reverse panorama is
-     * up. When the car service is not present both reads are null, which is "not
-     * reversing", so the gate stays open on any device.
-     */
-    private fun readReverseState(): Boolean {
-        val gearbox = BydCarState.readGearboxMode()
-        val panorama = BydCarState.readPanoramaMode()
-        val gearboxReverse = gearbox == GEARBOX_MODE_REVERSE
-        val panoramaActive = panorama == PANORAMA_MODE_REVERSE
-        return gearboxReverse || panoramaActive
-    }
-
-    companion object {
-        /** How often the car is asked for its reverse state, in milliseconds. */
-        private const val POLL_INTERVAL_MS = 1_000L
-
-        /** The value of the gearbox mode when the car is in reverse. */
-        private const val GEARBOX_MODE_REVERSE = 3
-
-        /** The value of the panorama mode when the reverse view is shown. */
-        private const val PANORAMA_MODE_REVERSE = 2
-    }
 }
 
 /**
- * A guarded, reflection-only reader of the BYD car state.
+ * A guarded reader of the BYD car state, kept in one place so a single on-device check can
+ * confirm or correct the vendor broadcast names.
  *
- * The open API jar of the car is not part of this build, so the state is read through a
- * small seam that never throws. The seam is the single place that knows the vendor names
- * of the two services; when the names differ on a given vehicle the read returns null
- * and the gate is open, which is the safe direction for the driver.
+ * The BYD open API jar is not part of this build, so the state is read from broadcast intents
+ * the car emits. The action names and mode values are vendor strings that vary between BYD
+ * firmware versions; they live here so the one thing to verify on a given head unit is these
+ * constants. When none of the broadcasts match, [isReverseIntent] returns false and the gate
+ * stays open — the safe direction for the driver.
  */
 object BydCarState {
 
-    /** The action of the gearbox service, as published by the car. */
-    private const val INTENT_GEARBOX = "com.byd.auto.GEARBOX_STATE"
-    /** The extra the gearbox puts its mode into. */
-    private const val EXTRA_GEARBOX_MODE = "gearbox_mode"
+    /** Broadcast actions the gearbox publishes its state under. */
+    val gearboxActions = listOf(
+        "com.byd.auto.GEARBOX_STATE"
+    )
 
-    /** The action of the panorama service, as published by the car. */
-    private const val INTENT_PANORAMA = "com.byd.auto.PANORAMA_STATE"
-    /** The extra the panorama puts its mode into. */
-    private const val EXTRA_PANORAMA_MODE = "panorama_mode"
+    /** Broadcast actions the 360 / panorama camera publishes its state under. */
+    val panoramaActions = listOf(
+        "com.byd.auto.PANORAMA_STATE",
+        "com.byd.auto.avm.AVM_STATE"
+    )
+
+    /** Extra the gearbox puts its mode into. */
+    const val EXTRA_GEARBOX_MODE = "gearbox_mode"
+
+    /** Extra the panorama / 360 puts its mode into. */
+    const val EXTRA_PANORAMA_MODE = "panorama_mode"
+
+    /** Gearbox mode value meaning reverse. */
+    const val GEARBOX_MODE_REVERSE = 3
+
+    /** Panorama / 360 mode value meaning the reverse camera view is up. */
+    const val PANORAMA_MODE_REVERSE = 2
 
     /**
-     * The gearbox mode of the car, or null when the service is not available.
+     * Decides whether a car-state broadcast means "reversing or 360 up".
      *
-     * The value travels in an intent that the car broadcasts; the read is one-way and
-     * cheap. When the action does not resolve on this device the result is null.
+     * Returns false for any broadcast this app does not recognise, so a device that never
+     * fires these intents simply never engages the gate.
      */
-    fun readGearboxMode(): Int? = readIntServiceValue(INTENT_GEARBOX, EXTRA_GEARBOX_MODE)
-
-    /**
-     * The panorama mode of the car, or null when the service is not available.
-     */
-    fun readPanoramaMode(): Int? = readIntServiceValue(INTENT_PANORAMA, EXTRA_PANORAMA_MODE)
-
-    /**
-     * Reads one integer extra out of a car state intent, without a hard reference to the
-     * vendor class. Any failure is a null, which the caller reads as "not set".
-     */
-    private fun readIntServiceValue(intentAction: String, extraKey: String): Int? {
-        return try {
-            val context = UApp.instance ?: return null
-            val intent = Intent(intentAction)
-            context.safeServiceIntent(intent)?.getIntExtra(extraKey, 0)
-        } catch (all: Throwable) {
-            Timber.w(all, "Could not read the car service %s", intentAction)
-            null
-        }
-    }
-
-    /**
-     * Resolves the car state intent to a service-bound intent that carries the value.
-     *
-     * The service is a system service resolved by action; when it is not present the
-     * resolution is empty and the read is null, so the gate stays open.
-     */
-    private fun Context.safeServiceIntent(intent: Intent): Intent? {
-        return try {
-            if (intent.action == null) return null
-            // The car publishes its state through a bound service; the bind is read-only
-            // and one-shot. A missing service resolves to nothing.
-            val name = serviceClassName(intent)
-            if (name == null) return null
-            Intent(intent)
-        } catch (all: Throwable) {
-            null
-        }
-    }
-
-    /**
-     * The class of the car state service, or null when it is not on this device.
-     */
-    private fun serviceClassName(intent: Intent): String? {
-        val action = intent.action ?: return null
-        return try {
-            // The vendor service is looked up by its published action. When the device has
-            // no such service the lookup is empty and the gate stays open.
-            when (action) {
-                INTENT_GEARBOX -> "com.bydauto.gearbox.GearboxDevice"
-                INTENT_PANORAMA -> "com.bydauto.panorama.PanoramaDevice"
-                else -> null
-            }
-        } catch (all: Throwable) {
-            null
+    fun isReverseIntent(intent: Intent): Boolean {
+        val action = intent.action ?: return false
+        return when {
+            gearboxActions.contains(action) ->
+                intent.getIntExtra(EXTRA_GEARBOX_MODE, 0) == GEARBOX_MODE_REVERSE
+            panoramaActions.contains(action) ->
+                intent.getIntExtra(EXTRA_PANORAMA_MODE, 0) == PANORAMA_MODE_REVERSE
+            else -> false
         }
     }
 }

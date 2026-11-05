@@ -331,15 +331,18 @@ class HomeFragment : ScopeFragment() {
     }
 
     /**
-     * Picks the home playlists: the most-played ones first, capped at 8. Ties keep the order they
-     * arrived in (server order for the live list, cached order for the instant render).
+     * Picks the home playlists: the most-played ones first, capped at the user-chosen count
+     * (HomePlaylistCount). Ties keep the order they arrived in (server order for the live list,
+     * cached order for the instant render). A count of -1 (All) shows every playlist.
      */
     private fun rankedTopPlaylists(list: List<PinnedPlaylist>): List<PinnedPlaylist> {
+        val cap = Settings.homePlaylistCount
+        val limit = if (cap <= 0) Int.MAX_VALUE else cap
         val counts = HomePrefs.getAllPlayCounts()
         return list.sortedWith(
             compareByDescending<PinnedPlaylist> { counts[it.id] ?: 0 }
                 .thenBy { list.indexOf(it) }
-        ).take(8)
+        ).take(limit)
     }
 
     private fun setupLibraryGrid(root: View) {
@@ -456,6 +459,18 @@ class HomeFragment : ScopeFragment() {
                 index = progress?.index ?: 0,
                 position = progress?.position ?: 0
             )
+            // Open that playlist's track list so the driver sees the playback progress and the
+            // other songs straight away. It is shown, not re-started (autoPlay defaults to false).
+            if (isAdded) {
+                findNavController().navigate(
+                    NavigationGraphDirections.toTrackCollection(
+                        id = playlist.id,
+                        name = playlist.name,
+                        playlistId = playlist.id,
+                        playlistName = playlist.name
+                    )
+                )
+            }
             Util.toast(
                 getString(R.string.home_playlist_playing, playlist.name),
                 context = context

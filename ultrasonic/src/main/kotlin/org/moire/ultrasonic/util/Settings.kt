@@ -159,6 +159,10 @@ object Settings {
     @JvmStatic
     var floatingReverseSafety by BooleanSetting(getKey(R.string.setting_key_floating_reverse_safety), true)
 
+    /** How many of the most-played playlists show on the home screen; -1 means every playlist. */
+    @JvmStatic
+    var homePlaylistCount by StringIntSetting(getKey(R.string.setting_key_home_playlist_count), 8)
+
     /** Number of songs kept on disk ahead of the current one, 0 disables the preloading. */
     @JvmStatic
     var carPreload by StringIntSetting(getKey(R.string.setting_key_car_preload), 1)

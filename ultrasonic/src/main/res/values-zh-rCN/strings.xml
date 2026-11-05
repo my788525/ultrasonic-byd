@@ -525,6 +525,9 @@
     <string name="home_view_all_playlists">查看全部歌单</string>
     <string name="home_resume_playlist">继续播放：%s</string>
     <string name="home_playlist_playing">正在播放：%s</string>
+    <string name="home_playlist_count_all">全部</string>
+    <string name="home_playlist_count_title">首页歌单显示数量</string>
+    <string name="home_playlist_count_summary">首页展示最常播放的歌单数量；选择「全部」展示所有歌单。</string>
 
     <!-- 车机界面：悬浮窗 -->
     <string name="settings_floating_title">悬浮窗</string>
