@@ -16,6 +16,13 @@
          Without it the installer refuses the download and says nothing useful. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- BYD Open Platform read-only permissions for the reverse / 360 safety gate.
+         These are vendor permissions defined by the BYD system framework; when the app runs
+         on a non-BYD device the system simply ignores the unknown names, and the gate stays
+         open via the reflection seam's safe degradation. -->
+    <uses-permission android:name="android.permission.BYDAUTO_GEARBOX_GET" />
+    <uses-permission android:name="android.permission.BYDAUTO_PANORAMA_GET" />
+
     <uses-sdk tools:overrideLibrary="androidx.car.app" />
 
     <supports-screens

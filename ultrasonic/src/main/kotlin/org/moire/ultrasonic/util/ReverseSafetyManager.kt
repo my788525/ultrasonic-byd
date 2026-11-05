@@ -7,13 +7,10 @@
 
 package org.moire.ultrasonic.util
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
-import androidx.core.content.ContextCompat
 import org.koin.core.component.KoinComponent
 import org.moire.ultrasonic.app.UApp
 import org.moire.ultrasonic.service.FloatingPlayerService
@@ -24,17 +21,17 @@ import java.util.concurrent.CopyOnWriteArrayList
 /**
  * The reverse-camera safety gate for the floating window and the music.
  *
- * When the car shifts into reverse, or when the 360-degree panorama view comes up while
- * reversing, the driver's eyes have to be on the camera. The floating window would
- * cover part of that view, and the music would take the driver's attention away from
- * the camera sound. So the gate does two things together: it hides the window, and it
- * pauses the music. When the reverse condition ends, both come back by themselves.
+ * When the car shifts into reverse, or when the 360-degree panorama view comes up, the
+ * driver's eyes have to be on the camera. The floating window would cover part of that view,
+ * and the music would take the driver's attention away from the camera sound. So the gate
+ * does two things together: it hides the window, and it pauses the music. When the reverse
+ * condition ends, both come back by themselves.
  *
  * The car signals are read through a [reverseSignalSource], which is a seam that can be
- * replaced in tests. On a real head unit the source is a [BydReverseSignalSource] that
- * asks the car service for the gearbox and the panorama state; on a device without the
- * service the source simply reports "not reversing", so the gate stays open and the
- * window and the music are not touched.
+ * replaced in tests. On a real BYD head unit the source is a [BydReverseSignalSource] that
+ * asks the car's BYD Open Platform service for the gearbox and the panorama state; on a
+ * device without that service the source simply reports "not reversing", so the gate stays
+ * open and the window and the music are not touched.
  *
  * The gate is behind [Settings.floatingReverseSafety], which is on by default: on a car
  * the behaviour is the safe one, and a driver who wants the window up in reverse has to
@@ -196,38 +193,39 @@ interface ReverseSignalSource : ReverseSignalListener {
 }
 
 /**
- * The production source of the reverse signal: it asks the car service for the gearbox and
- * the panorama state, and polls them on a timer.
+ * The production source of the reverse signal: it asks the BYD Open Platform car service for
+ * the gearbox and the panorama (360) state, and polls them on a timer.
  *
- * The BYD open API is not on the class path of this app; the reads go through a guarded
- * reflection seam so the build does not need the car vendor jar, and a head unit without
- * the service reports "not reversing", so the gate stays open. The result is a source
- * that is safe on any device and only acts on a car that exposes the reverse state.
+ * The BYD Open Platform classes (android.hardware.bydauto.gearbox.BYDAutoGearboxDevice and
+ * android.hardware.bydauto.panorama.BYDAutoPanoramaDevice) are part of the car's system
+ * framework, not of this app's compile classpath. The reads go through a guarded reflection
+ * seam so the build does not need the vendor jar, and a head unit without the service reports
+ * "not reversing" (ClassNotFound / SecurityException / RemoteException), so the gate stays
+ * open. The result is a source that is safe on any device and only acts on a real BYD head
+ * unit that exposes the open platform.
+ *
+ * Reverse is detected when the gearbox reports R (GEARBOX_AUTO_MODE_R), or when the panorama
+ * (360) reports an open / active view (getPanoWorkState() != 0). The reverse gear constant is
+ * read by name from the device class so its value is never hard-coded wrong.
  */
 class BydReverseSignalSource : ReverseSignalSource {
 
     private val listeners = CopyOnWriteArrayList<ReverseSignalListener>()
-    private val handler = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var running = false
     private var lastState = false
-    private var registered = false
 
-    /**
-     * The broadcast receiver for the car's gearbox and panorama (360) state.
-     *
-     * The car publishes its reverse / 360 state as broadcast intents; the receiver turns each
-     * one into a reverse-or-not decision and tells the listeners only when the state changes.
-     */
-    private val receiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent == null) return
-            val reversing = BydCarState.isReverseIntent(intent)
-            if (reversing != lastState) {
-                lastState = reversing
-                for (l in listeners) handler.post { l.onReverseChanged(lastState) }
-            }
-        }
-    }
+    /** Background thread that performs the (binder) reads away from the main thread. */
+    private var pollerThread: HandlerThread? = null
+    private var pollerHandler: Handler? = null
+    private var pollCount = 0
+
+    /** BYD Open Platform device classes and instances, resolved by reflection at start(). */
+    private var gearboxClazz: Class<*>? = null
+    private var gearboxInstance: Any? = null
+    private var gearboxR = GEARBOX_AUTO_MODE_R_FALLBACK
+    private var panoramaClazz: Class<*>? = null
+    private var panoramaInstance: Any? = null
 
     override fun addListener(listener: ReverseSignalListener) {
         if (!listeners.contains(listener)) listeners.add(listener)
@@ -240,99 +238,136 @@ class BydReverseSignalSource : ReverseSignalSource {
     override fun start() {
         if (running) return
         running = true
-        val context = UApp.instance ?: return
-        val filter = IntentFilter().apply {
-            BydCarState.gearboxActions.forEach { addAction(it) }
-            BydCarState.panoramaActions.forEach { addAction(it) }
+        if (!resolveDevices()) {
+            // The car does not expose the open platform, or the permission is missing. The
+            // gate stays open: the safe direction for a device we cannot read.
+            Timber.w("BYD Open Platform devices unavailable; reverse gate stays open (non-BYD device or missing permission)")
+            for (l in listeners) mainHandler.post { l.onReverseChanged(false) }
+            return
         }
-        try {
-            // RECEIVER_NOT_EXPORTED: the app only listens to the car's own broadcasts, never
-            // to those from other apps, so exporting would be both unnecessary and unsafe.
-            ContextCompat.registerReceiver(
-                context,
-                receiver,
-                filter,
-                ContextCompat.RECEIVER_NOT_EXPORTED
-            )
-            registered = true
-        } catch (all: Throwable) {
-            Timber.w(all, "Could not register the BYD reverse receiver")
-            registered = false
+        pollerThread = HandlerThread("byd-reverse-poll").also { it.start() }
+        pollerHandler = Handler(pollerThread!!.looper)
+        val poller = object : Runnable {
+            override fun run() {
+                if (!running) return
+                val reversing = readReverseState()
+                if (reversing != lastState) {
+                    lastState = reversing
+                    for (l in listeners) mainHandler.post { l.onReverseChanged(lastState) }
+                }
+                pollCount++
+                if (pollCount % DIAGNOSTIC_EVERY_N == 0) {
+                    Timber.d("BYD reverse poll: gearboxR=%s, lastState=%s", gearboxR, lastState)
+                }
+                pollerHandler?.postDelayed(this, POLL_INTERVAL_MS)
+            }
         }
-        // Seed the listeners with the current (non-reversing) state so the gate starts
-        // disengaged even before the first broadcast arrives. A sticky broadcast, if the car
-        // sends one, is delivered immediately on registration and updates it right away.
-        for (l in listeners) handler.post { l.onReverseChanged(lastState) }
+        pollerHandler?.post(poller)
+        Timber.i("BydReverseSignalSource started (BYD Open Platform polling, gearboxR=%d)", gearboxR)
     }
 
     override fun stop() {
         running = false
-        val context = UApp.instance
-        if (registered && context != null) {
-            try {
-                context.unregisterReceiver(receiver)
-            } catch (all: Throwable) {
-                Timber.w(all, "Could not unregister the BYD reverse receiver")
-            }
-        }
-        registered = false
+        pollerHandler?.removeCallbacksAndMessages(null)
+        pollerThread?.quitSafely()
+        pollerThread = null
+        pollerHandler = null
+        gearboxInstance = null
+        panoramaInstance = null
+        gearboxClazz = null
+        panoramaClazz = null
     }
 
     override fun onReverseChanged(reversing: Boolean) {
         // The source itself does not react; the manager's listener does.
     }
-}
-
-/**
- * A guarded reader of the BYD car state, kept in one place so a single on-device check can
- * confirm or correct the vendor broadcast names.
- *
- * The BYD open API jar is not part of this build, so the state is read from broadcast intents
- * the car emits. The action names and mode values are vendor strings that vary between BYD
- * firmware versions; they live here so the one thing to verify on a given head unit is these
- * constants. When none of the broadcasts match, [isReverseIntent] returns false and the gate
- * stays open — the safe direction for the driver.
- */
-object BydCarState {
-
-    /** Broadcast actions the gearbox publishes its state under. */
-    val gearboxActions = listOf(
-        "com.byd.auto.GEARBOX_STATE"
-    )
-
-    /** Broadcast actions the 360 / panorama camera publishes its state under. */
-    val panoramaActions = listOf(
-        "com.byd.auto.PANORAMA_STATE",
-        "com.byd.auto.avm.AVM_STATE"
-    )
-
-    /** Extra the gearbox puts its mode into. */
-    const val EXTRA_GEARBOX_MODE = "gearbox_mode"
-
-    /** Extra the panorama / 360 puts its mode into. */
-    const val EXTRA_PANORAMA_MODE = "panorama_mode"
-
-    /** Gearbox mode value meaning reverse. */
-    const val GEARBOX_MODE_REVERSE = 3
-
-    /** Panorama / 360 mode value meaning the reverse camera view is up. */
-    const val PANORAMA_MODE_REVERSE = 2
 
     /**
-     * Decides whether a car-state broadcast means "reversing or 360 up".
-     *
-     * Returns false for any broadcast this app does not recognise, so a device that never
-     * fires these intents simply never engages the gate.
+     * Resolves the BYD Open Platform gearbox and panorama device classes/instances through
+     * reflection. Returns false when the classes are absent (non-BYD device) or the required
+     * permission is missing; the caller then keeps the gate open.
      */
-    fun isReverseIntent(intent: Intent): Boolean {
-        val action = intent.action ?: return false
-        return when {
-            gearboxActions.contains(action) ->
-                intent.getIntExtra(EXTRA_GEARBOX_MODE, 0) == GEARBOX_MODE_REVERSE
-            panoramaActions.contains(action) ->
-                intent.getIntExtra(EXTRA_PANORAMA_MODE, 0) == PANORAMA_MODE_REVERSE
-            else -> false
+    private fun resolveDevices(): Boolean {
+        val context = UApp.instance ?: return false
+        return try {
+            gearboxClazz = Class.forName("android.hardware.bydauto.gearbox.BYDAutoGearboxDevice")
+            gearboxInstance = gearboxClazz!!.getMethod("getInstance", Context::class.java)
+                .invoke(null, context)
+            // Reverse gear constant, read by name so we never hard-code a wrong value.
+            gearboxR = try {
+                gearboxClazz!!.getField("GEARBOX_AUTO_MODE_R").getInt(null)
+            } catch (all: Throwable) {
+                Timber.w(all, "BYD GEARBOX_AUTO_MODE_R constant not found; using fallback %d", GEARBOX_AUTO_MODE_R_FALLBACK)
+                GEARBOX_AUTO_MODE_R_FALLBACK
+            }
+            // Panorama is optional: 360 detection is disabled if it is unavailable, but the
+            // gearbox-based reverse detection still works.
+            try {
+                panoramaClazz = Class.forName("android.hardware.bydauto.panorama.BYDAutoPanoramaDevice")
+                panoramaInstance = panoramaClazz!!.getMethod("getInstance", Context::class.java)
+                    .invoke(null, context)
+                Timber.i("BYD panorama device resolved")
+            } catch (all: Throwable) {
+                Timber.w(all, "BYD panorama device unavailable; 360 detection disabled")
+                panoramaClazz = null
+                panoramaInstance = null
+            }
+            true
+        } catch (all: Throwable) {
+            Timber.w(all, "BYD Open Platform gearbox device unavailable")
+            false
         }
+    }
+
+    /**
+     * Reads the reverse state from the resolved devices.
+     *
+     * Reverse when the gearbox reports R, or when the panorama (360) reports an open/active
+     * view. Each read is guarded: a failure (permission, IPC, RemoteException) is treated as
+     * "not reversing" for that source, so a transient error never hides the window wrongly.
+     */
+    private fun readReverseState(): Boolean {
+        val gearbox = gearboxClazz
+        val gInst = gearboxInstance
+        if (gearbox != null && gInst != null) {
+            try {
+                val mode = gearbox.getMethod("getGearboxAutoModeType").invoke(gInst) as? Int ?: 0
+                if (mode == gearboxR) {
+                    Timber.d("BYD gearbox mode=%d (R), engaging reverse gate", mode)
+                    return true
+                }
+            } catch (all: Throwable) {
+                Timber.w(all, "BYD gearbox read failed")
+            }
+        }
+        val pano = panoramaClazz
+        val pInst = panoramaInstance
+        if (pano != null && pInst != null) {
+            try {
+                val workState = pano.getMethod("getPanoWorkState").invoke(pInst) as? Int ?: 0
+                if (workState != 0) {
+                    Timber.d("BYD panorama workState=%d, engaging reverse gate", workState)
+                    return true
+                }
+            } catch (all: Throwable) {
+                Timber.w(all, "BYD panorama read failed")
+            }
+        }
+        return false
+    }
+
+    companion object {
+        /** How often the car is asked for its reverse state, in milliseconds. */
+        private const val POLL_INTERVAL_MS = 800L
+
+        /** How often (in polls) to log a diagnostic line, so logcat can confirm values. */
+        private const val DIAGNOSTIC_EVERY_N = 30
+
+        /**
+         * Fallback value of GEARBOX_AUTO_MODE_R if the constant cannot be read.
+         * Per the BYD OpenAPI SDK: P=1, R=2, N=3, D=4, M=5, S=6.
+         */
+        private const val GEARBOX_AUTO_MODE_R_FALLBACK = 2
     }
 }
 

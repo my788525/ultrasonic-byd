@@ -1,16 +1,18 @@
 {
-  "versionCode": 512,
-  "versionName": "4.8.0-byd.30",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.30/NavMusic-4.8.0-byd.30.apk",
-  "sha256": "58ca4891a61330aec39ae1add2912e798fa6cdf351703ead19b9e3fd6a0d32d1",
-  "size": 11438956,
-  "publishedAt": "2026-11-05T00:14:51Z",
+  "versionCode": 513,
+  "versionName": "4.8.0-byd.31",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.31/NavMusic-4.8.0-byd.31.apk",
+  "sha256": "8f878d9e56c4c2bd079a25b9a3e2b9b3fe4c9496fa6b8d8090b77d268979b923",
+  "size": 11439172,
+  "publishedAt": "2026-11-05T08:16:30Z",
   "changelog": [
-    "新增：首页\"我的歌单\"可显示数量设置项（设置→首页），默认 8，可选 4 / 8 / 12 / 16 / 全部",
-    "修复：歌单播放到最后一首后，按\"下一首\"自动循环回第一首（开始播放歌单时自动设为列表循环 REPEAT_MODE_ALL）",
-    "新增：点击首页歌单播放后，自动打开该歌单的曲目列表页，显示播放进度与歌单内其他歌曲",
-    "修复：倒车或调起全景 360 时浮窗未隐藏/未暂停 —— 重写倒车信号源为广播监听（BYD 倒车/全景广播），并在浮窗创建时启动、销毁时停止 ReverseSafetyManager",
-    "兼容性：无车机广播时安全降级（默认非倒车状态，浮窗正常显示），不影响非 BYD 设备",
-    "版本 bump 至 4.8.0-byd.30 (versionCode 512)"
+    "修正：倒车/360 浮窗未隐藏与未暂停 —— 弃用无效广播方案，改为反射接入比亚迪开放平台设备类",
+    "倒车检测：android.hardware.bydauto.gearbox.BYDAutoGearboxDevice.getInstance().getGearboxAutoModeType() == R（常量 GEARBOX_AUTO_MODE_R，按名反射读取，非硬编码）",
+    "360检测：android.hardware.bydauto.panorama.BYDAutoPanoramaDevice.getInstance().getPanoWorkState() != 0（全景打开状态）",
+    "轮询：后台 HandlerThread 每 800ms 读取挡位/全景，仅在状态变化时通知 gate；读取全部 try-catch，IPC/权限失败安全降级为非倒车",
+    "兼容：开发机/模拟器/非 BYD 设备无 android.hardware.bydauto.* 类时 ClassNotFound → 安全降级，浮窗与音乐不受影响",
+    "新增清单权限 android.permission.BYDAUTO_GEARBOX_GET / BYDAUTO_PANORAMA_GET（非 BYD 设备系统自动忽略未知权限）",
+    "验证：腾势X / 2021款比亚迪唐 DiLink 属开放平台体系，需 OTA 后在真车实测确认触发；附诊断日志便于校准",
+    "版本 bump 至 4.8.0-byd.31 (versionCode 513)"
   ]
 }
