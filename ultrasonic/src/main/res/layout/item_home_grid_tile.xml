@@ -15,12 +15,19 @@
     a:paddingEnd="10dp"
     a:paddingBottom="12dp">
 
-    <ImageView
-        a:id="@+id/home_tile_icon"
-        a:layout_width="26dp"
-        a:layout_height="26dp"
-        a:contentDescription="@null"
-        a:scaleType="fitCenter" />
+    <FrameLayout
+        a:id="@+id/home_tile_chip"
+        a:layout_width="48dp"
+        a:layout_height="48dp"
+        a:gravity="center">
+
+        <ImageView
+            a:id="@+id/home_tile_icon"
+            a:layout_width="24dp"
+            a:layout_height="24dp"
+            a:contentDescription="@null"
+            a:scaleType="fitCenter" />
+    </FrameLayout>
 
     <TextView
         a:id="@+id/home_tile_label"

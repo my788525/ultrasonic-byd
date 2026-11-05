@@ -165,7 +165,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         }
         shuffleButton?.setOnClickListener {
             val enabled = mediaPlayerManager.toggleShuffle()
-            shuffleButton?.alpha = if (enabled) ALPHA_ACTIVE else ALPHA_INACTIVE
+            applyToggleTint(shuffleButton, enabled)
         }
         repeatButton?.setOnClickListener { cycleRepeatMode() }
 
@@ -294,8 +294,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         nextButton?.alpha =
             if (mediaPlayerManager.canSeekToNext()) ALPHA_ACTIVE else ALPHA_DISABLED
 
-        shuffleButton?.alpha =
-            if (mediaPlayerManager.isShufflePlayEnabled) ALPHA_ACTIVE else ALPHA_INACTIVE
+        applyToggleTint(shuffleButton, mediaPlayerManager.isShufflePlayEnabled)
 
         updateRepeatButton()
     }
@@ -488,8 +487,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             else -> R.drawable.media_repeat_off
         }
         repeatButton?.setImageResource(icon)
-        repeatButton?.alpha =
-            if (mediaPlayerManager.repeatMode == REPEAT_OFF) ALPHA_INACTIVE else ALPHA_ACTIVE
+        applyToggleTint(repeatButton, mediaPlayerManager.repeatMode != REPEAT_OFF)
     }
 
     private fun formatTime(millis: Int): String {
@@ -557,6 +555,17 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             Color.WHITE
         }
         sleepButton?.let { ImageViewCompat.setImageTintList(it, ColorStateList.valueOf(color)) }
+    }
+
+    /** The accent colour marks a toggle as on (shuffle/repeat); white means it is off. This is
+     *  the same cue the sleep-timer uses, so an active mode is always readable at a glance. */
+    private fun applyToggleTint(button: ImageButton?, active: Boolean) {
+        val color = if (active) {
+            CarTheme.accent(requireContext(), CarPalette.current())
+        } else {
+            Color.WHITE
+        }
+        button?.let { ImageViewCompat.setImageTintList(it, ColorStateList.valueOf(color)) }
     }
 
     override fun onSleepTimerActiveChanged(active: Boolean) {

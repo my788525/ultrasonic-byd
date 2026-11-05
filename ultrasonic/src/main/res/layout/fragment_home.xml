@@ -33,24 +33,26 @@
         <FrameLayout
             a:id="@+id/home_continue_card"
             a:layout_width="match_parent"
-            a:layout_height="66dp"
+            a:layout_height="96dp"
             a:clickable="true"
-            a:focusable="true">
+            a:focusable="true"
+            a:paddingStart="6dp"
+            a:paddingEnd="6dp">
 
             <LinearLayout
                 a:layout_width="match_parent"
                 a:layout_height="match_parent"
                 a:gravity="center_vertical"
                 a:orientation="horizontal"
-                a:paddingStart="10dp"
-                a:paddingEnd="10dp">
+                a:paddingStart="14dp"
+                a:paddingEnd="14dp">
 
                 <com.google.android.material.card.MaterialCardView
                     a:id="@+id/home_cover_card"
-                    a:layout_width="46dp"
-                    a:layout_height="46dp"
+                    a:layout_width="62dp"
+                    a:layout_height="62dp"
                     app:cardBackgroundColor="#14000000"
-                    app:cardCornerRadius="10dp"
+                    app:cardCornerRadius="14dp"
                     app:cardElevation="0dp"
                     app:strokeWidth="0dp">
 
@@ -134,6 +136,18 @@
                     a:padding="16dp"
                     a:scaleType="fitCenter"
                     a:src="@drawable/media_start" />
+
+                <ProgressBar
+                    a:id="@+id/home_progress"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    a:layout_width="match_parent"
+                    a:layout_height="4dp"
+                    a:layout_gravity="bottom"
+                    a:layout_marginStart="14dp"
+                    a:layout_marginEnd="14dp"
+                    a:layout_marginBottom="8dp"
+                    a:max="1000"
+                    a:progress="0" />
             </LinearLayout>
         </FrameLayout>
 

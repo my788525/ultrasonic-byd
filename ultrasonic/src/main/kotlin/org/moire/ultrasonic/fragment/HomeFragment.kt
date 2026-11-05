@@ -20,6 +20,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
@@ -84,6 +85,7 @@ class HomeFragment : ScopeFragment() {
     private var titleView: TextView? = null
     private var artistView: TextView? = null
     private var playButton: ImageButton? = null
+    private var progressView: ProgressBar? = null
     private var homePlaylistAdapter: HomePlaylistAdapter? = null
 
     private var currentCoverId: String? = null
@@ -120,6 +122,7 @@ class HomeFragment : ScopeFragment() {
         titleView = view.findViewById(R.id.home_title)
         artistView = view.findViewById(R.id.home_artist)
         playButton = view.findViewById(R.id.home_play)
+        progressView = view.findViewById(R.id.home_progress)
 
         decorateContinueCard(view)
         setupPlaylistGrid(view)
@@ -242,6 +245,9 @@ class HomeFragment : ScopeFragment() {
         )
 
         root.findViewById<TextView>(R.id.home_continue_label).setTextColor(accent)
+
+        root.findViewById<ProgressBar?>(R.id.home_progress)
+            ?.progressTintList = ColorStateList.valueOf(accent)
 
         applyOrientationLayout(root)
     }
@@ -581,6 +587,17 @@ class HomeFragment : ScopeFragment() {
             background
         )
 
+        val chip = view.findViewById<View?>(R.id.home_tile_chip)
+        chip?.background = android.graphics.drawable.GradientDrawable().apply {
+            shape = android.graphics.drawable.GradientDrawable.RECTANGLE
+            cornerRadius = CarTheme.dp(context, 14f)
+            setColor(CarTheme.withAlpha(CarTheme.color(context, palette.accentSoft), 0xCC))
+            setStroke(
+                CarTheme.dp(context, 1.5f).toInt(),
+                CarTheme.withAlpha(accent, 0x55)
+            )
+        }
+
         val icon = view.findViewById<ImageView>(R.id.home_tile_icon)
         icon.setImageDrawable(ResourcesCompat.getDrawable(context.resources, tile.icon, null))
         ImageViewCompat.setImageTintList(icon, ColorStateList.valueOf(accent))
@@ -711,12 +728,21 @@ class HomeFragment : ScopeFragment() {
             titleView?.setText(R.string.home_idle)
             artistView?.setText(R.string.home_idle_hint)
             loadCover(null)
+            progressView?.progress = 0
             return
         }
 
         titleView?.text = track.title
         artistView?.text = formatNowPlayingLine(track)
         loadCover(track)
+
+        // The hero card doubles as a glanceable progress indicator, so the driver can see how
+        // far into the track the car is without opening the player.
+        val position = mediaPlayerManager.playerPosition
+        val duration = mediaPlayerManager.playerDuration
+        progressView?.progress = if (duration > 0) {
+            (position.toLong() * 1000 / duration).toInt().coerceIn(0, 1000)
+        } else 0
     }
 
     /**
