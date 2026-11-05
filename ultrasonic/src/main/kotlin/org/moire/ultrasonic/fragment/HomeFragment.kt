@@ -54,7 +54,6 @@ import org.moire.ultrasonic.subsonic.ImageLoaderProvider
 import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.util.DownloadUtil
-import org.moire.ultrasonic.util.ForegroundAppMonitor
 import org.moire.ultrasonic.util.HomePrefs
 import org.moire.ultrasonic.util.PinnedPlaylist
 import org.moire.ultrasonic.util.PlaylistResumeStore
@@ -174,16 +173,6 @@ class HomeFragment : ScopeFragment() {
                 Timber.w(all, "Could not open the overlay permission screen")
             }
             return
-        }
-
-        // The navigation-only gate needs "usage access" to name the app on top. Offer the
-        // system page once, without blocking the toggle: the window still works, it just
-        // cannot hide itself over the camera view until the permission is granted.
-        if (enabled && Settings.floatingOnlyInNav &&
-            !ForegroundAppMonitor.hasUsageAccess(ctx)
-        ) {
-            Util.toast(R.string.floating_usage_access_needed, context = ctx)
-            ForegroundAppMonitor.openUsageAccessSettings(ctx)
         }
 
         FloatingPlayerService.setNavigationMode(ctx, enabled)

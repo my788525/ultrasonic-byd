@@ -55,9 +55,9 @@ import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.subsonic.ImageLoaderProvider
 import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
+import org.moire.ultrasonic.util.CameraProbeWindow
 import org.moire.ultrasonic.util.CarTransport
 import org.moire.ultrasonic.util.FloatingAppearance
-import org.moire.ultrasonic.util.ForegroundAppMonitor
 import org.moire.ultrasonic.util.LyricsParser
 import org.moire.ultrasonic.util.ReverseSafetyManager
 import org.moire.ultrasonic.activity.NavigationActivity
@@ -222,19 +222,13 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     }
 
     /**
-     * True while the app on top of the screen is not the navigation map. Together with the host
-     * flag and the reverse-safety gate this decides whether the overlay may exist at all.
+     * A 1x1 transparent window that only watches the drawing surface. When the head unit
+     * brings up the 360 / reversing camera it reclaims the app's surface - the very same
+     * zero-permission signal the fntv BYD fork uses to stop playback. It stays attached
+     * for the whole life of this service, independently of the player window, so hiding
+     * and rebuilding the player cannot destroy the sensor. No usage access is required.
      */
-    @Volatile
-    private var navOnlyHide = false
-
-    /** Watches the foreground app so the window disappears over the 360/reversing camera. */
-    private val foregroundRunnable = object : Runnable {
-        override fun run() {
-            checkForegroundApp()
-            handler.postDelayed(this, FOREGROUND_CHECK_INTERVAL_MS)
-        }
-    }
+    private val cameraProbeWindow by lazy { CameraProbeWindow(this) }
 
     private val idleFadeRunnable = Runnable { fadeToIdle() }
 
@@ -254,9 +248,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForeground(NOTIFICATION_ID, buildNotification())
         connectController()
-        // Watch which app is on top from the very first frame. This runs once immediately and
-        // then every 1.2 s, so a camera view taking the screen removes the window promptly.
-        handler.post(foregroundRunnable)
+        // Attach the zero-permission camera probe before anything can take the screen.
+        cameraProbeWindow.start()
 
         // The sleep timer owns its own countdown in a separate manager, so it survives even
         // when the floating window is rebuilt. A timer that was running when the process died
@@ -406,7 +399,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         reverseSafetyManager.stop()
         disposables.clear()
         handler.removeCallbacks(updateRunnable)
-        handler.removeCallbacks(foregroundRunnable)
+        cameraProbeWindow.stop()
         handler.removeCallbacks(idleFadeRunnable)
         handler.removeCallbacks(collapseDetailRunnable)
         controllerFuture?.let { MediaController.releaseFuture(it) }
@@ -420,9 +413,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     // region window
 
     private fun showOverlay() {
-        // Any of the three gates can veto the window: the app's own screens, the reverse/360
-        // safety gate, and the navigation-only gate. Skip creation entirely; applyOverlayVisibility
-        // removes the view again as soon as one of them asks for it.
+        // Any of the gates can veto the window: the app's own screens and the reverse/360
+        // safety gate (which now also carries the zero-permission camera signals). Skip
+        // creation entirely; applyOverlayVisibility removes it again when a gate asks.
         if (shouldHideOverlay()) return
         if (rootView == null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
@@ -1178,15 +1171,14 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      * and rebuilt on demand, which is cheap and leaves the map fully interactive.
      */
     /**
-     * All three gates that can veto the window, combined with a logical OR:
+     * The gates that can veto the window, combined with a logical OR:
      *  - the host app is on one of its own screens;
-     *  - the BYD reverse / 360 safety gate is engaged;
-     *  - "navigation apps only" is on and the app on top is not Amap.
+     *  - the reverse / 360 safety gate is engaged, either by the BYD car API or by a
+     *    zero-permission camera signal (surface reclaim, window hidden, camera process).
      */
     private fun shouldHideOverlay(): Boolean =
         FloatingPlayerService.hostWantsHide ||
-            FloatingPlayerService._reverseSafetyActive ||
-            (Settings.floatingOnlyInNav && navOnlyHide)
+            FloatingPlayerService._reverseSafetyActive
 
     /** The single place that shows or removes the overlay view. */
     private fun applyOverlayVisibility() {
@@ -1197,29 +1189,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         }
     }
 
-    /**
-     * Reads the app the driver is looking at and updates the navigation-only gate.
-     *
-     * The floating player belongs over the map, not over the launcher, the 360 surround view
-     * or the reversing camera. On head units where the foreground app cannot be named at all,
-     * the gate stays open (window visible) rather than silently disabling the feature; the BYD
-     * reverse-safety gate is still active as a second line of defence.
-     */
-    fun checkForegroundApp() {
-        val hide = if (!Settings.floatingOnlyInNav) {
-            false
-        } else {
-            val pkg = ForegroundAppMonitor.foregroundPackage(this)
-            pkg != null && !ForegroundAppMonitor.isNavigationApp(pkg)
-        }
-        if (hide != navOnlyHide) {
-            navOnlyHide = hide
-            Timber.d("Navigation-only gate: hide=%s", hide)
-            applyOverlayVisibility()
-        }
-    }
-
-    /** Called by the static reverse-safety accessors; the three gates are evaluated together. */
+    /** Called by the static reverse-safety accessors; the gates are evaluated together. */
     fun applyReverseSafetyVisibility() {
         applyOverlayVisibility()
     }
@@ -1975,8 +1945,6 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         private const val NOTIFICATION_ID = 4711
         private const val OVERLAY_FAILURE_FILE = "floating-failure.txt"
         private const val UPDATE_INTERVAL_MS = 500L
-        /** How often the app on top of the screen is checked for the navigation-only gate. */
-        private const val FOREGROUND_CHECK_INTERVAL_MS = 1200L
         private const val IDLE_TIMEOUT_MS = 3000L
         private const val FADE_MS = 220L
         private const val LONG_PRESS_MS = 700L
@@ -2100,9 +2068,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         @JvmStatic
         fun setHostHidden(context: Context, hidden: Boolean) {
             hostWantsHide = hidden
-            // Going to the background is exactly when the window would come back, so check
-            // what is on top right away instead of waiting for the next poll.
-            if (!hidden) instance?.checkForegroundApp()
+            // The camera gate is event driven now, so a host state change only has to
+            // re-evaluate the combined visibility of the remaining gates.
             instance?.applyOverlayVisibility()
         }
 

@@ -638,10 +638,10 @@
     <string name="home_playlist_pin_reset">恢复自动排序</string>
     <string name="home_playlist_pin_empty">还没有加载歌单，请先打开一次首页。</string>
     <string name="home_playlist_pin_saved">首页歌单已更新</string>
-    <string name="floating_only_in_nav_title">仅在导航地图上显示浮窗</string>
-    <string name="floating_only_in_nav_summary">桌面、360 环影、倒车影像等界面自动隐藏浮窗；目前仅高德地图视为导航窗口。</string>
-    <string name="floating_usage_access_title">使用情况访问权限</string>
-    <string name="floating_usage_access_summary">点击前往系统设置授权，以便识别当前前台窗口。</string>
-    <string name="floating_usage_access_granted">已授权，浮窗只会出现在导航地图上。</string>
-    <string name="floating_usage_access_needed">请授予「使用情况访问」权限，浮窗才不会挡住环影与倒车影像</string>
+    <string name="floating_reverse_safety_title">环影 / 倒车时自动隐藏并暂停</string>
+    <string name="floating_reverse_safety_summary">全景影像或倒挡激活时自动隐藏浮窗并暂停音乐，影像退出后自动恢复。检测同时使用车机接口与显示层信号，无需「使用情况访问」等权限。</string>
+    <string name="floating_camera_signal_status_title">影像检测状态</string>
+    <string name="floating_camera_signal_status_summary">最近信号：%1$s。当前状态：%2$s。无需特殊权限。</string>
+    <string name="floating_camera_signal_active">检测到影像，浮窗已隐藏</string>
+    <string name="floating_camera_signal_idle">正常，浮窗可见</string>
 </resources>

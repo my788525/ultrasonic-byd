@@ -449,14 +449,14 @@
             app:iconSpaceReserved="false"/>
         <CheckBoxPreference
             a:defaultValue="true"
-            a:key="@string/setting_key.floating_only_in_nav"
-            a:summary="@string/floating_only_in_nav_summary"
-            a:title="@string/floating_only_in_nav_title"
+            a:key="@string/setting_key.floating_reverse_safety"
+            a:summary="@string/floating_reverse_safety_summary"
+            a:title="@string/floating_reverse_safety_title"
             app:iconSpaceReserved="false"/>
         <Preference
-            a:key="@string/setting_key.floating_usage_access"
-            a:summary="@string/floating_usage_access_summary"
-            a:title="@string/floating_usage_access_title"
+            a:key="@string/setting_key.floating_camera_signal_status"
+            a:summary="@string/floating_camera_signal_status_summary"
+            a:title="@string/floating_camera_signal_status_title"
             app:iconSpaceReserved="false"/>
         <ListPreference
             a:defaultValue="1"

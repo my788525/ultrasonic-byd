@@ -213,6 +213,9 @@ class BydReverseSignalSource : ReverseSignalSource {
     private val listeners = CopyOnWriteArrayList<ReverseSignalListener>()
     private val mainHandler = Handler(Looper.getMainLooper())
     private var running = false
+
+    /** Written by the poller thread and the main-thread signal bus, read by both. */
+    @Volatile
     private var lastState = false
 
     /** Background thread that performs the (binder) reads away from the main thread. */
@@ -227,6 +230,13 @@ class BydReverseSignalSource : ReverseSignalSource {
     private var panoramaClazz: Class<*>? = null
     private var panoramaInstance: Any? = null
 
+    /** Zero-permission hints: a camera process on top, plus the surface / window signals. */
+    private var cameraScanner: CameraForegroundScanner? = null
+    private var lastCameraPkg: String? = null
+
+    /** Pushes a zero-permission bus change into the same gate as the BYD polling result. */
+    private val busListener: (Boolean) -> Unit = { active -> setReverseState(active) }
+
     override fun addListener(listener: ReverseSignalListener) {
         if (!listeners.contains(listener)) listeners.add(listener)
     }
@@ -238,36 +248,41 @@ class BydReverseSignalSource : ReverseSignalSource {
     override fun start() {
         if (running) return
         running = true
+        CameraSignalBus.addListener(busListener)
+        cameraScanner = UApp.instance?.let { CameraForegroundScanner(it) }
+
+        // The BYD Open Platform reads are signature-protected on most DiLink builds, so they
+        // are often unavailable to a sideloaded app. That must NOT stop the poller: the same
+        // loop drives the zero-permission camera signals and refreshes their timeouts.
         if (!resolveDevices()) {
-            // The car does not expose the open platform, or the permission is missing. The
-            // gate stays open: the safe direction for a device we cannot read.
-            Timber.w("BYD Open Platform devices unavailable; reverse gate stays open (non-BYD device or missing permission)")
-            for (l in listeners) mainHandler.post { l.onReverseChanged(false) }
-            return
+            Timber.w("BYD Open Platform devices unavailable; using zero-permission camera signals")
         }
         pollerThread = HandlerThread("byd-reverse-poll").also { it.start() }
         pollerHandler = Handler(pollerThread!!.looper)
         val poller = object : Runnable {
             override fun run() {
                 if (!running) return
-                val reversing = readReverseState()
-                if (reversing != lastState) {
-                    lastState = reversing
-                    for (l in listeners) mainHandler.post { l.onReverseChanged(lastState) }
-                }
+                setReverseState(readReverseState())
                 pollCount++
                 if (pollCount % DIAGNOSTIC_EVERY_N == 0) {
-                    Timber.d("BYD reverse poll: gearboxR=%s, lastState=%s", gearboxR, lastState)
+                    Timber.d(
+                        "Camera poll: gearboxR=%s, active=%s, reason=%s",
+                        gearboxR, lastState, CameraSignalBus.lastReason
+                    )
                 }
                 pollerHandler?.postDelayed(this, POLL_INTERVAL_MS)
             }
         }
         pollerHandler?.post(poller)
-        Timber.i("BydReverseSignalSource started (BYD Open Platform polling, gearboxR=%d)", gearboxR)
+        Timber.i("Camera view source started (BYD polling + zero-permission surface signals)")
     }
 
     override fun stop() {
         running = false
+        CameraSignalBus.removeListener(busListener)
+        CameraSignalBus.reset()
+        cameraScanner = null
+        lastCameraPkg = null
         pollerHandler?.removeCallbacksAndMessages(null)
         pollerThread?.quitSafely()
         pollerThread = null
@@ -276,6 +291,14 @@ class BydReverseSignalSource : ReverseSignalSource {
         panoramaInstance = null
         gearboxClazz = null
         panoramaClazz = null
+        lastState = false
+    }
+
+    /** One place for the BYD poll and the zero-permission bus to flip the gate. */
+    private fun setReverseState(active: Boolean) {
+        if (active == lastState) return
+        lastState = active
+        for (l in listeners) mainHandler.post { l.onReverseChanged(active) }
     }
 
     override fun onReverseChanged(reversing: Boolean) {
@@ -289,34 +312,54 @@ class BydReverseSignalSource : ReverseSignalSource {
      */
     private fun resolveDevices(): Boolean {
         val context = UApp.instance ?: return false
-        return try {
-            gearboxClazz = Class.forName("android.hardware.bydauto.gearbox.BYDAutoGearboxDevice")
-            gearboxInstance = gearboxClazz!!.getMethod("getInstance", Context::class.java)
-                .invoke(null, context)
+        // The two devices are resolved independently. The old code wrapped both in one try:
+        // on head units that only expose the panorama device, a missing gearbox class used to
+        // disable 360 detection as well, which is exactly the case we need most.
+        resolveGearbox(context)
+        resolvePanorama(context)
+        val available = gearboxInstance != null || panoramaInstance != null
+        Timber.i(
+            "BYD Open Platform devices: gearbox=%s, panorama=%s",
+            gearboxInstance != null, panoramaInstance != null
+        )
+        return available
+    }
+
+    private fun resolveGearbox(context: Context) {
+        try {
+            val clazz = Class.forName("android.hardware.bydauto.gearbox.BYDAutoGearboxDevice")
+            val instance = clazz.getMethod("getInstance", Context::class.java).invoke(null, context)
+            gearboxClazz = clazz
+            gearboxInstance = instance
             // Reverse gear constant, read by name so we never hard-code a wrong value.
             gearboxR = try {
-                gearboxClazz!!.getField("GEARBOX_AUTO_MODE_R").getInt(null)
+                clazz.getField("GEARBOX_AUTO_MODE_R").getInt(null)
             } catch (all: Throwable) {
-                Timber.w(all, "BYD GEARBOX_AUTO_MODE_R constant not found; using fallback %d", GEARBOX_AUTO_MODE_R_FALLBACK)
+                Timber.w(all, "BYD GEARBOX_AUTO_MODE_R constant not found; using fallback")
                 GEARBOX_AUTO_MODE_R_FALLBACK
             }
-            // Panorama is optional: 360 detection is disabled if it is unavailable, but the
-            // gearbox-based reverse detection still works.
-            try {
-                panoramaClazz = Class.forName("android.hardware.bydauto.panorama.BYDAutoPanoramaDevice")
-                panoramaInstance = panoramaClazz!!.getMethod("getInstance", Context::class.java)
-                    .invoke(null, context)
-                Timber.i("BYD panorama device resolved")
-            } catch (all: Throwable) {
-                Timber.w(all, "BYD panorama device unavailable; 360 detection disabled")
-                panoramaClazz = null
-                panoramaInstance = null
-            }
-            true
         } catch (all: Throwable) {
-            Timber.w(all, "BYD Open Platform gearbox device unavailable")
-            false
+            Timber.w(all, "BYD gearbox device unavailable")
+            gearboxClazz = null
+            gearboxInstance = null
         }
+    }
+
+    private fun resolvePanorama(context: Context) {
+        for (name in PANORAMA_CLASS_NAMES) {
+            try {
+                val clazz = Class.forName(name)
+                val instance = clazz.getMethod("getInstance", Context::class.java).invoke(null, context)
+                panoramaClazz = clazz
+                panoramaInstance = instance
+                Timber.i("BYD panorama device resolved as %s", name)
+                return
+            } catch (all: Throwable) {
+                Timber.w(all, "BYD panorama device %s unavailable", name)
+            }
+        }
+        panoramaClazz = null
+        panoramaInstance = null
     }
 
     /**
@@ -327,14 +370,15 @@ class BydReverseSignalSource : ReverseSignalSource {
      * "not reversing" for that source, so a transient error never hides the window wrongly.
      */
     private fun readReverseState(): Boolean {
+        var bydActive = false
         val gearbox = gearboxClazz
         val gInst = gearboxInstance
         if (gearbox != null && gInst != null) {
             try {
                 val mode = gearbox.getMethod("getGearboxAutoModeType").invoke(gInst) as? Int ?: 0
                 if (mode == gearboxR) {
-                    Timber.d("BYD gearbox mode=%d (R), engaging reverse gate", mode)
-                    return true
+                    Timber.d("BYD gearbox mode=%d (R)", mode)
+                    bydActive = true
                 }
             } catch (all: Throwable) {
                 Timber.w(all, "BYD gearbox read failed")
@@ -346,14 +390,36 @@ class BydReverseSignalSource : ReverseSignalSource {
             try {
                 val workState = pano.getMethod("getPanoWorkState").invoke(pInst) as? Int ?: 0
                 if (workState != 0) {
-                    Timber.d("BYD panorama workState=%d, engaging reverse gate", workState)
-                    return true
+                    Timber.d("BYD panorama workState=%d", workState)
+                    bydActive = true
                 }
             } catch (all: Throwable) {
-                Timber.w(all, "BYD panorama read failed")
+                Timber.w(all, "BYD panorama workState read failed")
+            }
+            try {
+                // DISPLAY_MODE_RF_REVERSE = 4, DISPLAY_MODE_REVERSE = 5 in the BYD OpenAPI.
+                val displayMode = pano.getMethod("getDisplayMode").invoke(pInst) as? Int ?: 0
+                if (displayMode == 4 || displayMode == 5) {
+                    Timber.d("BYD panorama displayMode=%d (reverse)", displayMode)
+                    bydActive = true
+                }
+            } catch (all: Throwable) {
+                Timber.w(all, "BYD panorama displayMode read failed")
             }
         }
-        return false
+
+        // The running-process table needs no permission. It only sees a camera *activity*,
+        // which is a supporting hint: on most DiLink builds the camera is a system window.
+        val pkg = cameraScanner?.scan()
+        if (pkg != null) {
+            lastCameraPkg = pkg
+            CameraSignalBus.noteForegroundCamera(pkg)
+        } else if (lastCameraPkg != null) {
+            lastCameraPkg = null
+            CameraSignalBus.noteForegroundCameraGone()
+        }
+
+        return bydActive || CameraSignalBus.isActive()
     }
 
     companion object {
@@ -362,6 +428,12 @@ class BydReverseSignalSource : ReverseSignalSource {
 
         /** How often (in polls) to log a diagnostic line, so logcat can confirm values. */
         private const val DIAGNOSTIC_EVERY_N = 30
+
+        /** Official package path, plus a variant used by some DiLink generations. */
+        private val PANORAMA_CLASS_NAMES = arrayOf(
+            "android.hardware.bydauto.panorama.BYDAutoPanoramaDevice",
+            "com.byd.auto.panorama.BYDAutoPanoramaDevice"
+        )
 
         /**
          * Fallback value of GEARBOX_AUTO_MODE_R if the constant cannot be read.

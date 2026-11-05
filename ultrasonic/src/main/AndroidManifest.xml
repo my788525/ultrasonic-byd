@@ -12,11 +12,6 @@
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <!-- Needed to name the app on top of the screen, so the floating player can stay off the
-         360 / reversing camera view and only show over the navigation map. -->
-    <uses-permission
-        android:name="android.permission.PACKAGE_USAGE_STATS"
-        tools:ignore="ProtectedPermissions" />
     <!-- Android 8 and newer ask the user for this before an APK of ours may be installed.
          Without it the installer refuses the download and says nothing useful. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

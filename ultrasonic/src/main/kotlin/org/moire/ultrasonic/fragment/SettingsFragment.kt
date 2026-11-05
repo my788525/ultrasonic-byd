@@ -39,7 +39,7 @@ import org.moire.ultrasonic.util.ConfirmationDialog
 import org.moire.ultrasonic.util.Constants
 import org.moire.ultrasonic.util.ErrorDialog
 import org.moire.ultrasonic.util.FileUtil.ultrasonicDirectory
-import org.moire.ultrasonic.util.ForegroundAppMonitor
+import org.moire.ultrasonic.util.CameraSignalBus
 import org.moire.ultrasonic.util.HomePrefs
 import org.moire.ultrasonic.util.InfoDialog
 import org.moire.ultrasonic.util.SelectCacheActivityContract
@@ -150,30 +150,27 @@ class SettingsFragment :
     }
 
     /**
-     * The navigation-only gate needs the "usage access" permission to name the app on top of
-     * the screen. The settings row is a one-tap shortcut to the system page, and its summary
-     * reflects the current permission so the driver can tell why the gate is not active yet.
+     * Read-only diagnostic: which zero-permission signal last hid the window. On a
+     * real head unit this says whether the camera was seen at all, without adb.
      */
     private fun setupFloatingPreferences() {
-        findPreference<Preference>(getString(R.string.setting_key_floating_usage_access))
-            ?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-                val ctx = context
-                if (ctx != null) ForegroundAppMonitor.openUsageAccessSettings(ctx)
-                true
-            }
-        updateUsageAccessSummary()
+        updateCameraSignalSummary()
     }
 
-    private fun updateUsageAccessSummary() {
-        val ctx = context ?: return
+    private fun updateCameraSignalSummary() {
         val row = findPreference<Preference>(
-            getString(R.string.setting_key_floating_usage_access)
+            getString(R.string.setting_key_floating_camera_signal_status)
         ) ?: return
-        row.summary = if (ForegroundAppMonitor.hasUsageAccess(ctx)) {
-            getString(R.string.floating_usage_access_granted)
+        val state = if (CameraSignalBus.isActive()) {
+            getString(R.string.floating_camera_signal_active)
         } else {
-            getString(R.string.floating_usage_access_summary)
+            getString(R.string.floating_camera_signal_idle)
         }
+        row.summary = getString(
+            R.string.floating_camera_signal_status_summary,
+            CameraSignalBus.lastReason,
+            state
+        )
     }
 
     /**
@@ -318,8 +315,8 @@ class SettingsFragment :
     override fun onResume() {
         super.onResume()
         preferences.registerOnSharedPreferenceChangeListener(this)
-        // The driver may be coming back from the system usage-access page.
-        updateUsageAccessSummary()
+        // Refresh the camera-detection diagnostic after returning from another screen.
+        updateCameraSignalSummary()
     }
 
     override fun onPause() {
