@@ -526,8 +526,8 @@
     <string name="home_resume_playlist">继续播放：%s</string>
     <string name="home_playlist_playing">正在播放：%s</string>
     <string name="home_playlist_count_all">全部</string>
-    <string name="home_playlist_count_title">首页歌单显示数量</string>
-    <string name="home_playlist_count_summary">首页展示最常播放的歌单数量；选择「全部」展示所有歌单。</string>
+    <string name="home_playlist_count_title">首页歌单显示行数</string>
+    <string name="home_playlist_count_summary">设置第一屏显示几行歌单（4 个 = 1 行，8 个 = 2 行）。无论选多少，左右滑动都能查看全部歌单；「全部」保留 4 行。</string>
 
     <!-- 车机界面：悬浮窗 -->
     <string name="settings_floating_title">悬浮窗</string>
@@ -632,19 +632,11 @@
     <string name="update_notification_title">有新版本 %1$s</string>
     <string name="update_notification_text">到「设置」里下载并安装</string>
     <string name="update_no_changelog">这个版本没有发布更新说明</string>
-    <!-- Sound effects / audio enhancement -->
-    <string name="fx_title">音效增强</string>
-    <string name="fx_master">音效增强总开关</string>
-    <string name="fx_presets_label">预设</string>
-    <string name="fx_bass">重低音</string>
-    <string name="fx_surround">3D环绕</string>
-    <string name="fx_loudness">响度</string>
-    <string name="fx_unavailable_note">本车机未提供部分音效，已自动隐藏对应项。</string>
-    <string name="fx_advanced">高级均衡器</string>
-    <string name="fx_preset_off">关闭</string>
-    <string name="fx_preset_default">标准</string>
-    <string name="fx_preset_bass">重低音</string>
-    <string name="fx_preset_vocal">人声突出</string>
-    <string name="fx_preset_surround">环绕现场</string>
-    <string name="fx_preset_driving">驾驶模式</string>
+    <string name="home_playlists_hint">左右滑动查看更多 \u203A</string>
+    <string name="home_playlist_pin_title">首页优先显示的歌单</string>
+    <string name="home_playlist_pin_summary">勾选优先排在最前的歌单；未勾选的歌单左右滑动仍可查看，不会被隐藏。</string>
+    <string name="home_playlist_pin_dialog_title">选择首页优先显示的歌单</string>
+    <string name="home_playlist_pin_reset">恢复自动排序</string>
+    <string name="home_playlist_pin_empty">还没有加载歌单，请先打开一次首页。</string>
+    <string name="home_playlist_pin_saved">首页歌单已更新</string>
 </resources>

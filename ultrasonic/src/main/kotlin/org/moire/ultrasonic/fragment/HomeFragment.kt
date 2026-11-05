@@ -16,7 +16,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -37,6 +39,7 @@ import androidx.recyclerview.widget.RecyclerView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.moire.ultrasonic.NavigationGraphDirections
@@ -87,6 +90,8 @@ class HomeFragment : ScopeFragment() {
     private var playButton: ImageButton? = null
     private var progressView: ProgressBar? = null
     private var homePlaylistAdapter: HomePlaylistAdapter? = null
+    private var playlistRowsCached = 0
+    private var lastPlayingState: Boolean? = null
 
     private var currentCoverId: String? = null
 
@@ -287,41 +292,98 @@ class HomeFragment : ScopeFragment() {
     }
 
     /**
-     * Shows the driver's playlists on the home screen, right above the music library, so a
-     * playlist is only ever one tap away. The cached list renders instantly, then a background
-     * refresh keeps it current (skipped while the cache is still fresh).
+     * Shows the driver's playlists as a horizontally scrollable grid. The number chosen in
+     * settings controls how many rows are visible on the first screen (4 playlists = one row,
+     * 8 = two rows, ...). It never truncates the list: every playlist stays reachable by
+     * swiping sideways. The cached list renders instantly, then a throttled background refresh
+     * keeps it current (skipped while the cache is still fresh).
      */
     private fun setupPlaylistGrid(root: View) {
-        val container = root.findViewById<ViewGroup>(R.id.home_playlists_container)
         val recycler = root.findViewById<RecyclerView>(R.id.home_playlists_grid)
-        recycler.layoutManager = GridLayoutManager(requireContext(), columns())
+        val rows = playlistRows()
+
+        if (playlistRowsCached != rows) {
+            recycler.layoutManager = GridLayoutManager(
+                requireContext(), rows, RecyclerView.HORIZONTAL, false
+            )
+            playlistRowsCached = rows
+        }
         recycler.isNestedScrollingEnabled = false
-        homePlaylistAdapter = HomePlaylistAdapter { playHomePlaylist(it) }
-        recycler.adapter = homePlaylistAdapter
+        // A RecyclerView inside a ScrollView only measures the first screenful.
+        // An exact height makes every row and column measurable before it is scrolled into view.
+        val gridHeight = playlistGridHeightPx(rows)
+        if (recycler.layoutParams.height != gridHeight) {
+            recycler.layoutParams = recycler.layoutParams.apply { this.height = gridHeight }
+        }
+
+        if (homePlaylistAdapter == null) {
+            homePlaylistAdapter = HomePlaylistAdapter { playHomePlaylist(it) }
+            recycler.adapter = homePlaylistAdapter
+            attachHorizontalScrollGuard(recycler)
+        }
 
         root.findViewById<View?>(R.id.home_playlists_view_all)?.setOnClickListener {
             jumpToPlaylistsTab()
         }
 
-        fun render(list: List<PinnedPlaylist>) {
-            val ranked = rankedTopPlaylists(list)
-            if (ranked.isEmpty()) {
-                container.visibility = View.GONE
-                return
-            }
-            val wasHidden = container.visibility != View.VISIBLE
-            container.visibility = View.VISIBLE
-            // The grid sizes itself to its content (wrap_content), so no manual height is needed.
-            homePlaylistAdapter?.submitList(ranked)
-            if (wasHidden) {
-                container.alpha = 0f
-                container.animate().alpha(1f).setDuration(220).start()
-            }
-        }
-
         // Instant render from cache, then a throttled background refresh from the server.
-        render(HomePrefs.getCachedPlaylists())
-        loadHomePlaylists(::render)
+        renderPlaylists(HomePrefs.getCachedPlaylists())
+        loadHomePlaylists(::renderPlaylists)
+    }
+
+    private fun renderPlaylists(list: List<PinnedPlaylist>) {
+        val container = view?.findViewById<View?>(R.id.home_playlists_container) ?: return
+        val ranked = rankedTopPlaylists(list)
+        if (ranked.isEmpty()) {
+            container.visibility = View.GONE
+            return
+        }
+        container.visibility = View.VISIBLE
+        homePlaylistAdapter?.submitList(ranked)
+    }
+
+    /** Rows visible on the first screen: 4 playlists = one row, 8 = two rows, and so on. */
+    private fun playlistRows(): Int {
+        val count = Settings.homePlaylistCount
+        val visible = if (count <= 0) 16 else count // "All": four rows, still fully scrollable
+        val maxRows = if (columns() == 1) 2 else 4
+        return (visible / columns().coerceAtLeast(1)).coerceIn(1, maxRows)
+    }
+
+    /** Exact height for the horizontal playlist grid so every row is measured and drawn. */
+    private fun playlistGridHeightPx(rows: Int): Int {
+        val tileH = resources.getDimensionPixelSize(R.dimen.home_playlist_tile_height)
+        val gap = resources.getDimensionPixelSize(R.dimen.home_grid_tile_gap)
+        return rows * (tileH + 2 * gap)
+    }
+
+    /**
+     * Keeps horizontal drags inside the playlist grid: the outer ScrollView must not steal a
+     * sideways gesture, while a mostly vertical drag still scrolls the whole page.
+     */
+    private fun attachHorizontalScrollGuard(recycler: RecyclerView) {
+        val slop = ViewConfiguration.get(recycler.context).scaledTouchSlop
+        var downX = 0f
+        var downY = 0f
+        recycler.setOnTouchListener { v, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = abs(event.x - downX)
+                    val dy = abs(event.y - downY)
+                    if (dy > dx && dy > slop) {
+                        v.parent?.requestDisallowInterceptTouchEvent(false)
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                    v.parent?.requestDisallowInterceptTouchEvent(false)
+            }
+            false // let the RecyclerView handle the gesture itself
+        }
     }
 
     /** Switches the hosting ViewPager to the Playlists tab. */
@@ -337,18 +399,24 @@ class HomeFragment : ScopeFragment() {
     }
 
     /**
-     * Picks the home playlists: the most-played ones first, capped at the user-chosen count
-     * (HomePlaylistCount). Ties keep the order they arrived in (server order for the live list,
-     * cached order for the instant render). A count of -1 (All) shows every playlist.
+     * Orders the home playlists without ever truncating: playlists pinned in Settings come
+     * first, then the most-played ones, then the rest in server order. The count setting only
+     * controls how many rows are visible at once; sideways scrolling always reaches every
+     * playlist, regardless of that setting or the pin selection.
      */
     private fun rankedTopPlaylists(list: List<PinnedPlaylist>): List<PinnedPlaylist> {
-        val cap = Settings.homePlaylistCount
-        val limit = if (cap <= 0) Int.MAX_VALUE else cap
+        val pinned = HomePrefs.getVisiblePlaylistIds().orEmpty()
         val counts = HomePrefs.getAllPlayCounts()
-        return list.sortedWith(
+        // Build the arrival-order index once instead of an O(n^2) indexOf per comparison.
+        val order = HashMap<String, Int>(list.size)
+        list.forEachIndexed { index, playlist -> order[playlist.id] = index }
+        val byPlays = list.sortedWith(
             compareByDescending<PinnedPlaylist> { counts[it.id] ?: 0 }
-                .thenBy { list.indexOf(it) }
-        ).take(limit)
+                .thenBy { order[it.id] ?: Int.MAX_VALUE }
+        )
+        if (pinned.isEmpty()) return byPlays
+        val front = list.filter { pinned.contains(it.id) }
+        return front + byPlays.filterNot { pinned.contains(it.id) }
     }
 
     private fun setupLibraryGrid(root: View) {
@@ -678,14 +746,24 @@ class HomeFragment : ScopeFragment() {
 
         private fun bindPlaylistIcon(icon: ImageView, playlist: PinnedPlaylist, accent: Int) {
             val sizeDp = if (playlist.coverArt.isNotEmpty()) 84f else 56f
+            val sizePx = CarTheme.dp(icon.context, sizeDp).toInt()
+            // Reassigning layoutParams on every bind forces a measure pass; only do it when the
+            // recycled view actually needs a different icon size.
             (icon.layoutParams as? ViewGroup.LayoutParams)?.let {
-                it.width = CarTheme.dp(icon.context, sizeDp).toInt()
-                it.height = CarTheme.dp(icon.context, sizeDp).toInt()
-                icon.layoutParams = it
+                if (it.width != sizePx || it.height != sizePx) {
+                    it.width = sizePx
+                    it.height = sizePx
+                    icon.layoutParams = it
+                }
             }
             if (playlist.coverArt.isNotEmpty()) {
                 icon.scaleType = ImageView.ScaleType.CENTER_CROP
                 icon.imageTintList = null
+                // Horizontal scrolling rebinds tiles often. A recycled tile that already shows
+                // this cover needs no new decode request (a major jank source on a head unit).
+                val token = "playlist-${playlist.coverArt}"
+                if (icon.getTag(R.id.home_tile_icon) == token) return
+                icon.setTag(R.id.home_tile_icon, token)
                 imageLoaderProvider.executeOn { loader ->
                     if (isAdded) {
                         loader.loadImage(
@@ -699,6 +777,7 @@ class HomeFragment : ScopeFragment() {
                     }
                 }
             } else {
+                icon.setTag(R.id.home_tile_icon, null)
                 icon.scaleType = ImageView.ScaleType.FIT_CENTER
                 icon.setImageDrawable(
                     ResourcesCompat.getDrawable(
@@ -720,20 +799,25 @@ class HomeFragment : ScopeFragment() {
         val track = mediaPlayerManager.currentMediaItem?.toTrack()
         val playing = mediaPlayerManager.isPlaying
 
-        playButton?.setImageResource(
-            if (playing) R.drawable.media_pause else R.drawable.media_start
-        )
+        // setImageResource re-creates a drawable and invalidates the view. This runs once per
+        // second, so only do it when the play state really changes.
+        if (lastPlayingState != playing) {
+            lastPlayingState = playing
+            playButton?.setImageResource(
+                if (playing) R.drawable.media_pause else R.drawable.media_start
+            )
+        }
 
         if (track == null) {
-            titleView?.setText(R.string.home_idle)
-            artistView?.setText(R.string.home_idle_hint)
+            setTextIfChanged(titleView, getString(R.string.home_idle))
+            setTextIfChanged(artistView, getString(R.string.home_idle_hint))
             loadCover(null)
             progressView?.progress = 0
             return
         }
 
-        titleView?.text = track.title
-        artistView?.text = formatNowPlayingLine(track)
+        setTextIfChanged(titleView, track.title.orEmpty())
+        setTextIfChanged(artistView, formatNowPlayingLine(track))
         loadCover(track)
 
         // The hero card doubles as a glanceable progress indicator, so the driver can see how
@@ -745,25 +829,21 @@ class HomeFragment : ScopeFragment() {
         } else 0
     }
 
+    /** Avoids a layout/invalidate pass every second when the label has not changed. */
+    private fun setTextIfChanged(view: TextView?, text: String) {
+        if (view != null && view.text?.toString() != text) view.text = text
+    }
+
     /**
-     * Builds the secondary line of the continue-playing card: artist/album, plus the live progress
-     * ("第 N 首 · mm:ss") so the driver can see where playback will resume at a glance.
+     * Builds the secondary line of the continue-playing card: artist/album plus the position of
+     * the track in the queue. The live progress is already drawn by the card's progress bar, so
+     * the text no longer changes every second (that used to force a full layout pass each tick).
      */
     private fun formatNowPlayingLine(track: Track?): String {
         val meta = listOfNotNull(track?.artist, track?.album).joinToString(" · ")
         val index = mediaPlayerManager.currentMediaItemIndex
-        val positionMs = mediaPlayerManager.playerPosition.toLong()
-        val progress = if (index >= 0 && positionMs > 0) {
-            " · 第${index + 1}首 · ${formatMs(positionMs)}"
-        } else {
-            ""
-        }
-        return (meta.ifBlank { getString(R.string.home_idle_hint) }) + progress
-    }
-
-    private fun formatMs(ms: Long): String {
-        val totalSec = ms / 1000
-        return "%02d:%02d".format(totalSec / 60, totalSec % 60)
+        val trackNo = if (index >= 0) " · 第${index + 1}首" else ""
+        return meta.ifBlank { getString(R.string.home_idle_hint) } + trackNo
     }
 
     private fun loadCover(track: Track?) {

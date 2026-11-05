@@ -5,7 +5,7 @@
      stay fully visible instead of being clipped by a too-short, single-line tile.
      The accent/background is applied in code (CarTheme), keyed off the selected palette. -->
 <LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
-    a:layout_width="match_parent"
+    a:layout_width="@dimen/home_playlist_tile_width"
     a:layout_height="@dimen/home_playlist_tile_height"
     a:layout_margin="@dimen/home_grid_tile_gap"
     a:clickable="true"

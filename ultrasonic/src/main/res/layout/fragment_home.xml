@@ -137,18 +137,21 @@
                     a:scaleType="fitCenter"
                     a:src="@drawable/media_start" />
 
-                <ProgressBar
-                    a:id="@+id/home_progress"
-                    style="?android:attr/progressBarStyleHorizontal"
-                    a:layout_width="match_parent"
-                    a:layout_height="4dp"
-                    a:layout_gravity="bottom"
-                    a:layout_marginStart="14dp"
-                    a:layout_marginEnd="14dp"
-                    a:layout_marginBottom="8dp"
-                    a:max="1000"
-                    a:progress="0" />
             </LinearLayout>
+
+            <!-- 进度条必须是 FrameLayout 的覆盖层。之前放在水平 LinearLayout 里，
+                 match_parent 宽度会把 weight=1 的歌名/歌手区域挤成 0，并造成二次测量。 -->
+            <ProgressBar
+                a:id="@+id/home_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                a:layout_width="match_parent"
+                a:layout_height="4dp"
+                a:layout_gravity="bottom"
+                a:layout_marginStart="14dp"
+                a:layout_marginEnd="14dp"
+                a:layout_marginBottom="8dp"
+                a:max="1000"
+                a:progress="0" />
         </FrameLayout>
 
         <!-- My playlists: the driver's playlists from the server, shown straight on the home
@@ -162,22 +165,44 @@
             a:orientation="vertical"
             a:visibility="gone">
 
-            <TextView
-                a:layout_width="wrap_content"
+            <LinearLayout
+                a:layout_width="match_parent"
                 a:layout_height="wrap_content"
                 a:layout_marginTop="18dp"
                 a:layout_marginBottom="2dp"
-                a:letterSpacing="0.12"
-                a:text="@string/home_playlists_title"
-                a:textColor="@color/pal_text_secondary"
-                a:textSize="14sp" />
+                a:gravity="center_vertical"
+                a:orientation="horizontal">
 
+                <TextView
+                    a:layout_width="wrap_content"
+                    a:layout_height="wrap_content"
+                    a:letterSpacing="0.12"
+                    a:text="@string/home_playlists_title"
+                    a:textColor="@color/pal_text_secondary"
+                    a:textSize="14sp" />
+
+                <TextView
+                    a:layout_width="0dp"
+                    a:layout_height="wrap_content"
+                    a:layout_weight="1"
+                    a:gravity="end"
+                    a:letterSpacing="0.04"
+                    a:text="@string/home_playlists_hint"
+                    a:textColor="@color/pal_text_secondary"
+                    a:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- 横向滚动：所有歌单都能左右滑到；高度在代码里按设置的行数精确指定，
+                 否则嵌套在 ScrollView 中的 wrap_content 只会测量第一屏。 -->
             <androidx.recyclerview.widget.RecyclerView
                 a:id="@+id/home_playlists_grid"
                 a:layout_width="match_parent"
-                a:layout_height="wrap_content"
+                a:layout_height="@dimen/home_playlist_tile_height"
                 a:layout_marginTop="10dp"
-                a:nestedScrollingEnabled="false" />
+                a:clipToPadding="false"
+                a:nestedScrollingEnabled="false"
+                a:overScrollMode="ifContentScrolls"
+                a:scrollbars="none" />
 
             <TextView
                 a:id="@+id/home_playlists_view_all"

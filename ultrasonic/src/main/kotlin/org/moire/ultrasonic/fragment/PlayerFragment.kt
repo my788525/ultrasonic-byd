@@ -9,19 +9,11 @@ package org.moire.ultrasonic.fragment
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Color.argb
-import android.graphics.Outline
 import android.graphics.Point
-import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
-import android.view.ViewOutlineProvider
-import android.widget.RelativeLayout
-import androidx.core.content.ContextCompat
 import android.os.Build
 import android.app.AlertDialog
 import android.content.Intent
@@ -90,7 +82,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.koin.core.component.KoinScopeComponent
@@ -191,11 +182,6 @@ class PlayerFragment :
     private lateinit var genreTextView: TextView
     private lateinit var bitrateFormatTextView: TextView
     private lateinit var albumArtImageView: ImageView
-    private lateinit var albumArtLayout: RelativeLayout
-    private lateinit var bloomView: ImageView
-    private lateinit var glowView: View
-    private lateinit var bloomScrim: View
-    private var bloomRadius = 420f
     private lateinit var playlistView: RecyclerView
     private lateinit var positionTextView: TextView
     private lateinit var downloadTrackTextView: TextView
@@ -260,10 +246,6 @@ class PlayerFragment :
         genreTextView = view.findViewById(R.id.current_playing_genre)
         bitrateFormatTextView = view.findViewById(R.id.current_playing_bitrate_format)
         albumArtImageView = view.findViewById(R.id.current_playing_album_art_image)
-        albumArtLayout = view.findViewById(R.id.current_playing_album_art_layout)
-        bloomView = view.findViewById(R.id.current_playing_bloom)
-        glowView = view.findViewById(R.id.current_playing_glow)
-        bloomScrim = view.findViewById(R.id.current_playing_scrim)
         positionTextView = view.findViewById(R.id.current_playing_position)
         downloadTrackTextView = view.findViewById(R.id.current_playing_track)
         downloadTotalDurationTextView = view.findViewById(R.id.current_total_duration)
@@ -306,8 +288,6 @@ class PlayerFragment :
             width = size.x
             height = size.y
         }
-
-        stylePlayerArtCard(width, height)
 
         // Register our options menu
         (requireActivity() as MenuHost).addMenuProvider(
@@ -1283,7 +1263,6 @@ class PlayerFragment :
             imageLoaderProvider.executeOn {
                 it.loadImage(albumArtImageView, currentSong, true, 0)
             }
-            refreshBloom(currentSong)
 
             updateSongRatingDisplay()
         } else {
@@ -1298,7 +1277,6 @@ class PlayerFragment :
             imageLoaderProvider.executeOn {
                 it.loadImage(albumArtImageView, null, true, 0)
             }
-            refreshBloom(null)
         }
 
         updateSongRatingDisplay()
@@ -1309,117 +1287,6 @@ class PlayerFragment :
     private fun updateMediaButtonActivationState() {
         nextButton.isEnabled = mediaPlayerManager.canSeekToNext()
         previousButton.isEnabled = mediaPlayerManager.canSeekToPrevious()
-    }
-
-    /**
-     * 把全屏封面改成居中的圆角卡片，并把模糊晕染层初始化为深色底，
-     * 这样封面加载前不会发白。
-     */
-    private fun stylePlayerArtCard(screenW: Int, screenH: Int) {
-        val size = (min(screenW, screenH) * 0.64f).toInt()
-        bloomRadius = min(screenW, screenH) * 0.55f
-
-        val params = albumArtImageView.layoutParams as RelativeLayout.LayoutParams
-        params.width = size
-        params.height = size
-        params.removeRule(RelativeLayout.ALIGN_PARENT_TOP)
-        params.addRule(RelativeLayout.CENTER_IN_PARENT)
-        albumArtImageView.layoutParams = params
-        albumArtImageView.scaleType = ImageView.ScaleType.CENTER_CROP
-        val radius = CarTheme.dp(requireContext(), 26f)
-        albumArtImageView.clipToOutline = true
-        albumArtImageView.outlineProvider = object : ViewOutlineProvider() {
-            override fun getOutline(view: View, outline: Outline) {
-                outline.setRoundRect(0, 0, view.width, view.height, radius)
-            }
-        }
-        albumArtImageView.elevation = CarTheme.dp(requireContext(), 14f)
-
-        val bgBottom = ContextCompat.getColor(requireContext(), CarPalette.current().bgBottom)
-        albumArtLayout.setBackgroundColor(bgBottom)
-
-        // 底部暗渐变，保证五颗星评分始终可读
-        bloomScrim.background = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(Color.argb(0, 0, 0, 0), Color.argb(170, 0, 0, 0))
-        )
-    }
-
-    /** 取封面 Bitmap 并切到主线程刷新晕染（IO 取图，避免阻塞 UI）。 */
-    private fun refreshBloom(entry: MusicDirectory.Child?) {
-        ioScope.launch {
-            val bmp = runCatching {
-                imageLoaderProvider.getImageLoader().getImageBitmap(entry, true, 0)
-            }.getOrNull()
-            withContext(Dispatchers.Main) { updateBloom(bmp) }
-        }
-    }
-
-    private fun updateBloom(bitmap: Bitmap?) {
-        if (bitmap == null) {
-            bloomView.setImageDrawable(null)
-            bloomView.background = null
-            glowView.background = null
-            return
-        }
-        val dominant = extractDominantColor(bitmap)
-        // 64px 降采样后再放大 = 廉价模糊
-        val targetW = 64
-        val targetH = (bitmap.height * targetW / bitmap.width).coerceAtLeast(1)
-        val blurred = Bitmap.createScaledBitmap(bitmap, targetW, targetH, true)
-        bloomView.background = ColorDrawable(dominant)
-        bloomView.setImageBitmap(blurred)
-        glowView.background = radialGlow(dominant)
-    }
-
-    /** 主色径向光晕，中心亮、四周透明。 */
-    private fun radialGlow(color: Int): Drawable {
-        val r = Color.red(color)
-        val g = Color.green(color)
-        val b = Color.blue(color)
-        val gd = GradientDrawable(
-            GradientDrawable.Orientation.TOP_BOTTOM,
-            intArrayOf(Color.argb(200, r, g, b), Color.argb(0, r, g, b))
-        )
-        gd.gradientType = GradientDrawable.RADIAL_GRADIENT
-        gd.gradientRadius = bloomRadius
-        return gd
-    }
-
-    /** 从封面取平均主色，低饱和时轻微提色让光晕更有质感。 */
-    private fun extractDominantColor(bmp: Bitmap): Int {
-        val small = if (bmp.width > 32 || bmp.height > 32) {
-            Bitmap.createScaledBitmap(bmp, 32, 32, true)
-        } else {
-            bmp
-        }
-        val px = IntArray(small.width * small.height)
-        small.getPixels(px, 0, small.width, 0, 0, small.width, small.height)
-        var r = 0
-        var g = 0
-        var b = 0
-        var count = 0
-        for (c in px) {
-            val a = c ushr 24 and 0xff
-            if (a < 128) continue
-            r += c and 0xff
-            g += (c ushr 8) and 0xff
-            b += (c ushr 16) and 0xff
-            count++
-        }
-        if (count == 0) return Color.DKGRAY
-        r /= count
-        g /= count
-        b /= count
-        val maxC = maxOf(r, g, b)
-        val minC = minOf(r, g, b)
-        val sat = if (maxC == 0) 0f else (maxC - minC) / maxC.toFloat()
-        val boost = if (sat < 0.25f) 1.18f else 1.0f
-        return Color.rgb(
-            (r * boost).toInt().coerceIn(0, 255),
-            (g * boost).toInt().coerceIn(0, 255),
-            (b * boost).toInt().coerceIn(0, 255)
-        )
     }
 
     @Synchronized

@@ -191,26 +191,6 @@ class ImageLoader(
         }
     }
 
-    /**
-     * Load the cover of a given entry and return it as a Bitmap, or null if it cannot be fetched.
-     * Blocking — call from an IO dispatcher, never the main thread.
-     */
-    fun getImageBitmap(
-        entry: MusicDirectory.Child?,
-        large: Boolean,
-        size: Int
-    ): Bitmap? {
-        val id = entry?.coverArt
-        if (id.isNullOrEmpty()) return null
-        val key = FileUtil.getAlbumArtKey(entry, large)
-        return try {
-            getImage(id, key, large, size)
-        } catch (e: Exception) {
-            Timber.w(e, "getImageBitmap failed for %s", id)
-            null
-        }
-    }
-
     fun cacheArtistPicture(artist: Artist) {
         if (artist.coverArt == null) return
         val key = FileUtil.getArtistArtKey(artist.name, false)

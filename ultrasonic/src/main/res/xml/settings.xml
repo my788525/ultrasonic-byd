@@ -467,6 +467,11 @@
             a:summary="@string/home_playlist_count_summary"
             a:title="@string/home_playlist_count_title"
             app:iconSpaceReserved="false"/>
+        <Preference
+            a:key="@string/setting_key.home_playlists_pinned"
+            a:summary="@string/home_playlist_pin_summary"
+            a:title="@string/home_playlist_pin_title"
+            app:iconSpaceReserved="false"/>
     </PreferenceCategory>
     <PreferenceCategory
         a:title="@string/settings.debug.title"

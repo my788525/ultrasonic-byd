@@ -18,29 +18,6 @@
             a:gravity="start"
             a:orientation="vertical" >
 
-            <!-- 渐变晕染：模糊封面铺底 -->
-            <ImageView
-                a:id="@+id/current_playing_bloom"
-                a:layout_width="match_parent"
-                a:layout_height="match_parent"
-                a:scaleType="centerCrop"
-                a:alpha="0.9"
-                a:contentDescription="@null" />
-
-            <!-- 主色径向光晕 -->
-            <View
-                a:id="@+id/current_playing_glow"
-                a:layout_width="match_parent"
-                a:layout_height="match_parent"
-                a:contentDescription="@null" />
-
-            <!-- 底部暗渐变，保证五颗星评分可读 -->
-            <View
-                a:id="@+id/current_playing_scrim"
-                a:layout_width="match_parent"
-                a:layout_height="match_parent"
-                a:contentDescription="@null" />
-
             <ImageView
                 a:id="@+id/current_playing_album_art_image"
                 a:layout_width="match_parent"

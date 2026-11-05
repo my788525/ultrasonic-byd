@@ -38,6 +38,7 @@ object HomePrefs {
     private const val KEY_CACHED = "cached_playlists"
     private const val KEY_PLAY_COUNT = "playlist_play_count"
     private const val KEY_PLAYLIST_FETCH_TIME = "playlist_fetch_time"
+    private const val KEY_VISIBLE_PLAYLISTS = "visible_playlists"
 
     private fun prefs(): SharedPreferences =
         UApp.applicationContext().getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -109,6 +110,30 @@ object HomePrefs {
         val raw = map.entries.joinToString(";") { "${it.key}\\u0001${it.value}" }
         prefs().edit().putString(KEY_PLAY_COUNT, raw).apply()
         return next
+    }
+
+    /**
+     * Playlists the driver explicitly pinned to the front of the home grid.
+     *
+     * `null` or an empty set means "no custom selection" (fall back to most-played order).
+     * Pinning never hides anything: the home grid scrolls horizontally, so all remaining
+     * playlists stay reachable by swiping sideways. Stored as server playlist ids so renames
+     * and re-fetches keep the choice.
+     */
+    fun getVisiblePlaylistIds(): Set<String>? {
+        if (!prefs().contains(KEY_VISIBLE_PLAYLISTS)) return null
+        val raw = prefs().getString(KEY_VISIBLE_PLAYLISTS, null) ?: return emptySet()
+        if (raw.isBlank()) return emptySet()
+        return raw.split(",").filter { it.isNotBlank() }.toSet()
+    }
+
+    fun setVisiblePlaylistIds(ids: Set<String>) {
+        prefs().edit().putString(KEY_VISIBLE_PLAYLISTS, ids.joinToString(",")).apply()
+    }
+
+    /** Goes back to the automatic most-played list. */
+    fun clearVisiblePlaylistIds() {
+        prefs().edit().remove(KEY_VISIBLE_PLAYLISTS).apply()
     }
 }
 

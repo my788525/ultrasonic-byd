@@ -1,16 +1,17 @@
 {
-  "versionCode": 516,
-  "versionName": "4.8.0-byd.34",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.34/NavMusic-4.8.0-byd.34.apk",
-  "sha256": "56f9d61f05751c73ab39c09a367b9ac2016ddf82394559e335fbc379f1b486e6",
-  "size": 11456462,
-  "publishedAt": "2026-11-05T11:17:00Z",
+  "versionCode": 517,
+  "versionName": "4.8.0-byd.35",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.35/NavMusic-4.8.0-byd.35.apk",
+  "sha256": "557500ad894026260b080d9dbc0c5e3bc31671fa7a9d29b89bd9a84d407b5347",
+  "size": 11445242,
+  "publishedAt": "2026-11-05T13:24:19Z",
   "changelog": [
-    "音效增强全家桶：在图形均衡器基础上新增重低音（BassBoost）、3D 环绕（Virtualizer）、响度增强（LoudnessEnhancer）三种原生音效",
-    "新增「音效」面板：主开关、车载预设（关闭/标准/重低音/人声突出/环绕现场/驾驶模式）、重低音/3D环绕/响度三档滑块、高级均衡器入口",
-    "播放面板控制行新增常驻「音效」按钮，车机一键直达，无需进入全屏页溢出菜单",
-    "各音效按设备能力探测（try/catch）：车机不支持某效果时自动隐藏对应控件并优雅降级为仅均衡器，绝不崩溃",
-    "主开关真正静音全部效果（保存期望强度，关闭时不覆盖用户设置）",
-    "版本 bump 至 4.8.0-byd.34 (versionCode 516)"
+    "撤回 byd.34 音效增强：开启后歌曲大概率无声（同一 audio session 叠加 EQ/重低音/环绕/响度四个 AudioEffect，与车机 HAL effect chain 冲突），恢复原有图形均衡器并移除音效面板与播放面板入口",
+    "撤回 byd.33 播放页大封面晕染：切歌时主线程重复缩放位图并常驻全屏渐变重绘，是近期 UI 卡顿主因",
+    "修复首页「继续播放」卡不显示歌名/歌手：进度条误放进水平布局，把文字区挤成 0 宽；现改为卡片底部覆盖层",
+    "首页歌单改为左右滑动：设置里的数量只决定第一屏显示几行（4=1 行、8=2 行、12=3 行、16 或全部=4 行），不再截断列表，所有歌单都能滑到",
+    "新增「首页优先显示的歌单」多选（设置页）：勾选的歌单排在最前，未勾选的仍可左右滑动查看，不会被隐藏；可一键恢复自动排序",
+    "性能优化：歌单封面按复用 token 跳过重复解码、播放按钮与文本仅在变化时刷新、移除歌单淡入动画、歌单排序由 O(n²) 改为预建索引",
+    "版本 bump 至 4.8.0-byd.35 (versionCode 517)"
   ]
 }

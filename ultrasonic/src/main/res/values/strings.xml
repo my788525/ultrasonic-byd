@@ -548,8 +548,8 @@
     <string name="home_resume_playlist">Continue: %s</string>
     <string name="home_playlist_playing">Playing: %s</string>
     <string name="home_playlist_count_all">All</string>
-    <string name="home_playlist_count_title">Playlists shown on home</string>
-    <string name="home_playlist_count_summary">How many of your most-played playlists appear on the home screen. Choose All to show every playlist.</string>
+    <string name="home_playlist_count_title">Playlist rows on home</string>
+    <string name="home_playlist_count_summary">How many playlists are visible on the first screen (4 = one row, 8 = two rows). Swipe sideways to reach every playlist, whatever you choose. All keeps four rows.</string>
 
     <!-- Car UI: floating window -->
     <string name="settings_floating_title">Floating window</string>
@@ -658,19 +658,11 @@
     <string name="update_notification_title">Version %1$s is available</string>
     <string name="update_notification_text">Open Settings to download and install it</string>
     <string name="update_no_changelog">No changelog was published for this version</string>
-    <!-- Sound effects / audio enhancement -->
-    <string name="fx_title">Sound Effects</string>
-    <string name="fx_master">Sound enhancement</string>
-    <string name="fx_presets_label">Preset</string>
-    <string name="fx_bass">Bass boost</string>
-    <string name="fx_surround">3D surround</string>
-    <string name="fx_loudness">Loudness</string>
-    <string name="fx_unavailable_note">Some effects are not available on this device.</string>
-    <string name="fx_advanced">Advanced equalizer</string>
-    <string name="fx_preset_off">Off</string>
-    <string name="fx_preset_default">Default</string>
-    <string name="fx_preset_bass">Bass</string>
-    <string name="fx_preset_vocal">Vocal</string>
-    <string name="fx_preset_surround">Surround</string>
-    <string name="fx_preset_driving">Driving</string>
+    <string name="home_playlists_hint">Swipe sideways for more \u203A</string>
+    <string name="home_playlist_pin_title">Pin playlists on home</string>
+    <string name="home_playlist_pin_summary">Choose the playlists that appear first. Every other playlist stays one sideways swipe away.</string>
+    <string name="home_playlist_pin_dialog_title">Playlists to show first</string>
+    <string name="home_playlist_pin_reset">Automatic</string>
+    <string name="home_playlist_pin_empty">No playlists loaded yet. Open the home screen once first.</string>
+    <string name="home_playlist_pin_saved">Home playlists updated</string>
 </resources>
