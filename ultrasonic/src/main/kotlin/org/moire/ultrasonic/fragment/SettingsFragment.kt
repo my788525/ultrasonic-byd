@@ -1,5 +1,7 @@
 package org.moire.ultrasonic.fragment
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.DialogInterface
 import android.content.Context
 import android.content.Intent
@@ -158,6 +160,29 @@ class SettingsFragment :
      */
     private fun setupFloatingPreferences() {
         findPreference<Preference>(
+            getString(R.string.setting_key_floating_camera_adb_grant)
+        )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+            val command = getString(R.string.floating_camera_adb_command)
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.floating_camera_adb_grant_dialog_title)
+                .setMessage(getString(R.string.floating_camera_adb_grant_dialog))
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.floating_camera_adb_grant_copy) { _, _ ->
+                    val clipboard = requireContext()
+                        .getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                    clipboard?.setPrimaryClip(
+                        ClipData.newPlainText("NavMusic ADB command", command)
+                    )
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        R.string.floating_camera_adb_grant_copied,
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                .show()
+            true
+        }
+        findPreference<Preference>(
             getString(R.string.setting_key_floating_camera_detection_service)
         )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
             try {
@@ -205,8 +230,8 @@ class SettingsFragment :
         val off = getString(R.string.floating_camera_source_off)
         val sources = getString(
             R.string.floating_camera_signal_sources,
-            if (enabled) on else off,
             if (usage) on else off,
+            if (enabled) on else off,
             if (CameraSignalBus.bydApiAvailable) on else off,
             CameraSignalBus.lastForegroundPackage ?: "-"
         )

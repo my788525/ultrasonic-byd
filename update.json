@@ -1,21 +1,20 @@
 {
-  "versionCode": 520,
-  "versionName": "4.8.0-byd.38",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.38/NavMusic-4.8.0-byd.38.apk",
-  "sha256": "97c9ed54091d3049581250bb3bcda4b4baa6bc10da56f2e19fb3d9adc6a96069",
-  "size": 11462978,
-  "publishedAt": "2026-11-07T12:35:51Z",
+  "versionCode": 521,
+  "versionName": "4.8.0-byd.39",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.39/NavMusic-4.8.0-byd.39.apk",
+  "sha256": "055ff83c21793585d5158446d01386cf73f97b51f456176d1da824042087e6ec",
+  "size": 11468269,
+  "publishedAt": "2026-11-07T13:01:23Z",
   "changelog": [
-    "定位并修正影像检测失效根因：上一版把飞牛 TV 的「前台 Activity 画面被影像回收」机制移植到 Service 的独立悬浮窗探针，而比亚迪车机影像由 com.byd.avc 系统窗口绘制，不会回收第三方悬浮窗，探针永不触发",
-    "核查 BYD 开放平台权限模型（BYD-Assistant-NG 逆向文档 + 官方 OpenAPI）：BYDAUTO_*_GET 为签名级权限，普通安装的应用读取一律被拒，车机接口路径不再作为主检测手段",
-    "改用无障碍服务识别顶层影像窗口：监听 window state 事件与窗口列表，命中 com.byd.avc / 全景 / 影像等窗口时立即隐藏浮窗并暂停音乐，影像退出后延迟 2 秒恢复；窗口信号 30 秒心跳自动过期，避免永久隐藏",
-    "恢复「使用情况访问」为可选增强：车机设置里无入口时可用无线 ADB 一次性授权（appops set org.moire.ultrasonic GET_USAGE_STATS allow），授权后自动生效，不再弹出无效引导",
-    "修正零权限进程扫描遗漏 com.byd.avc 等真实影像包名的缺陷，并剔除可能误伤导航应用的宽泛关键字",
-    "无障碍服务每 5 秒复核窗口列表，长时间环影不会因信号过期而让浮窗自己弹回；非影像窗口事件仅首次触发延迟释放，避免通知栏刷新反复推迟恢复",
-    "新增零权限兜底检测（车机完全封闭、无法开启无障碍服务时仍可工作）：后台线程每 1.5 秒扫描 getprop 系统属性、Settings.Global / Settings.System 键值变化与媒体音量被车机静音的边沿，并尝试 dumpsys window windows 读取 com.byd.avc 可见窗口；命中即隐藏并暂停，信号 30 秒自动过期",
-    "兜底扫描把每一次属性/设置变化（即使未命中关键词）写入设置页诊断，便于按真车实际信号补规则，全程不需要 adb；所有扫描均在独立后台线程，主线程无额外开销",
-    "新增人工兜底：常驻通知栏与设置页均提供「隐藏浮窗 30 秒」，30 秒后自动恢复，不依赖任何权限",
-    "设置页新增「开启影像检测服务」「零权限兜底检测」「影像检测状态」三项，显示无障碍 / 使用情况访问 / 车机接口 / 兜底扫描 / 最近窗口包名",
-    "删除无效的常驻 1x1 悬浮探针窗口，减少额外窗口开销；版本 bump 至 4.8.0-byd.38 (versionCode 520)"
+    "依据同款 DiLink 车机真实运行项目 AndyShaman/BYDMate 的实证修正方向：其源码明确记录 DiLink 没有无障碍设置界面、影像画面不是无障碍窗口，可靠信号是 com.byd.avc 的 ACTIVITY_RESUMED 前台事件",
+    "把 UsageStats 从每 2.4 秒扫描 15 秒窗口的「可选增强」升级为主检测器：改为 500 毫秒增量尾随事件流（lastEventTs 只查增量）、首次回看 5 分钟以捕获启动前已开启的影像、无新事件时保持上一前台包名，长时间环影不再因查询窗口滑出而误判",
+    "前台包名改为「电平信号」：com.byd.avc 在前台期间持续隐藏浮窗并暂停音乐，切回其它应用立即恢复；不再依赖 30 秒心跳猜状态，且权威的关闭信号会清掉其它脉冲，避免影像退出后仍多隐藏半分钟",
+    "补回 PACKAGE_USAGE_STATS 权限声明（撤回 byd.37 时误删），ADB 授予 appop 后 queryEvents 才能正常返回事件",
+    "设置页新增「一次性 ADB 授权（推荐）」：点击显示说明并可一键复制精确命令 adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow；无需 root、无需签名、重启后仍有效、执行完立即生效",
+    "修正 com.byd.avc 是常驻系统进程导致的隐患：一旦拿到 ADB 授权，零权限进程扫描主动退出，避免它每 800 毫秒刷新心跳把浮窗永久隐藏",
+    "无障碍服务改为以窗口事件的原始包名为主判据，不再要求窗口列表中存在占屏幕四分之一以上的影像窗口（BYDMate 证实影像画面可能根本不是无障碍窗口）；过滤状态栏 / 输入法等噪声窗口，并在命中后 2 秒宽限期内忽略无关窗口事件",
+    "影像检测状态诊断项调整信号源顺序为「ADB 使用情况授权(主) / 无障碍 / 车机接口(签名级) / 最近前台包名」，便于真车确认授权是否生效",
+    "保留上一版的零权限兜底扫描（getprop / Settings / 媒体静音 / dumpsys 窗口）与通知栏「隐藏 30 秒」手动兜底，车机完全封闭、连 ADB 也不方便时仍可用",
+    "版本 bump 至 4.8.0-byd.39 (versionCode 521)"
   ]
 }

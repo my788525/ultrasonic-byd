@@ -454,6 +454,11 @@
             a:title="@string/floating_reverse_safety_title"
             app:iconSpaceReserved="false"/>
         <Preference
+            a:key="@string/setting_key.floating_camera_adb_grant"
+            a:summary="@string/floating_camera_adb_grant_summary"
+            a:title="@string/floating_camera_adb_grant_title"
+            app:iconSpaceReserved="false"/>
+        <Preference
             a:key="@string/setting_key.floating_camera_detection_service"
             a:summary="@string/floating_camera_detection_service_off"
             a:title="@string/floating_camera_detection_service_title"

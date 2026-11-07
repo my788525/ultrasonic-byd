@@ -256,6 +256,10 @@ class BydReverseSignalSource : ReverseSignalSource {
                 CameraWatchAccessibilityService.isEnabled(context)
             CameraSignalBus.usageAccessGranted =
                 ForegroundPackageMonitor.hasUsageAccess(context)
+            // Primary detector, validated on DiLink by BYDMate: the UsageStats
+            // ACTIVITY_RESUMED tail names com.byd.avc while the camera view is up.
+            // It starts even when the appop is missing and picks the grant up live.
+            ForegroundPackageMonitor.start(context)
             // Fallback for locked-down head units: no permission of any kind is needed.
             ZeroPermissionCameraDetector.start(context)
         }
@@ -273,7 +277,6 @@ class BydReverseSignalSource : ReverseSignalSource {
                 if (!running) return
                 setReverseState(readReverseState())
                 pollCount++
-                if (pollCount % USAGE_EVERY_N == 0) checkUsageAccessForeground()
                 if (pollCount % DIAGNOSTIC_EVERY_N == 0) {
                     Timber.d(
                         "Camera poll: gearboxR=%s, active=%s, reason=%s",
@@ -289,6 +292,8 @@ class BydReverseSignalSource : ReverseSignalSource {
 
     override fun stop() {
         running = false
+        ForegroundPackageMonitor.stop()
+        ZeroPermissionCameraDetector.stop()
         CameraSignalBus.removeListener(busListener)
         CameraSignalBus.reset()
         cameraScanner = null
@@ -373,21 +378,6 @@ class BydReverseSignalSource : ReverseSignalSource {
         panoramaInstance = null
     }
 
-    /** Usage access is optional; when ADB granted it, name the app on top as a hint. */
-    private fun checkUsageAccessForeground() {
-        val context = UApp.instance ?: return
-        if (!CameraSignalBus.usageAccessGranted) {
-            CameraSignalBus.usageAccessGranted =
-                ForegroundPackageMonitor.hasUsageAccess(context)
-        }
-        if (!CameraSignalBus.usageAccessGranted) return
-        val pkg = ForegroundPackageMonitor.currentForegroundPackage(context) ?: return
-        CameraSignalBus.lastForegroundPackage = pkg
-        if (CameraPackages.isCameraPackage(pkg)) {
-            CameraSignalBus.noteForegroundCamera(pkg)
-        }
-    }
-
     /**
      * Reads the reverse state from the resolved devices.
      *
@@ -434,12 +424,19 @@ class BydReverseSignalSource : ReverseSignalSource {
             }
         }
 
-        // The running-process table needs no permission. It only sees a camera *activity*,
-        // which is a supporting hint: on most DiLink builds the camera is a system window.
-        val pkg = cameraScanner?.scan()
-        if (pkg != null) {
-            lastCameraPkg = pkg
-            CameraSignalBus.noteForegroundCamera(pkg)
+        // The running-process table needs no permission, but com.byd.avc is a persistent
+        // system process on DiLink: it can stay IMPORTANCE_FOREGROUND for the whole drive.
+        // Once the authoritative UsageStats grant is available, this hint must stand down,
+        // otherwise its 800 ms heartbeat would keep the floating window hidden forever.
+        if (!CameraSignalBus.usageAccessGranted) {
+            val pkg = cameraScanner?.scan()
+            if (pkg != null) {
+                lastCameraPkg = pkg
+                CameraSignalBus.noteForegroundCamera(pkg)
+            } else if (lastCameraPkg != null) {
+                lastCameraPkg = null
+                CameraSignalBus.noteForegroundCameraGone()
+            }
         } else if (lastCameraPkg != null) {
             lastCameraPkg = null
             CameraSignalBus.noteForegroundCameraGone()
@@ -454,9 +451,6 @@ class BydReverseSignalSource : ReverseSignalSource {
 
         /** How often (in polls) to log a diagnostic line, so logcat can confirm values. */
         private const val DIAGNOSTIC_EVERY_N = 30
-
-        /** Usage access is queried every third poll, so the extra IPC stays cheap. */
-        private const val USAGE_EVERY_N = 3
 
         /** Official package path, plus a variant used by some DiLink generations. */
         private val PANORAMA_CLASS_NAMES = arrayOf(

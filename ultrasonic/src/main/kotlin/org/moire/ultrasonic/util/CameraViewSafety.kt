@@ -83,6 +83,14 @@ object CameraSignalBus {
     @Volatile private var lastPublished: Boolean? = null
     @Volatile private var releasePending = false
 
+    /**
+     * Level signal from the UsageStats ACTIVITY_RESUMED tail. Unlike the pulse signals above
+     * it does not expire: BYDMate proved on DiLink that com.byd.avc stays the raw foreground
+     * package for the whole camera view, with no events while it is up. A TTL here would show
+     * the floating window again in the middle of a long reversing manoeuvre.
+     */
+    @Volatile private var cameraUsageActive = false
+
     /** The last signal that fired, shown in settings so a real car can be diagnosed. */
     @Volatile var lastReason: String = "none"
         private set
@@ -154,6 +162,36 @@ object CameraSignalBus {
         publish()
     }
 
+    /**
+     * Authoritative answer from the UsageStats event tail: com.byd.avc resumed (true) or a
+     * different package resumed (false). This is a level, so it survives any number of polls
+     * without new events. Other sources remain OR-ed in as supporting hints.
+     */
+    fun setCameraUsage(active: Boolean, reason: String) {
+        if (active == cameraUsageActive && active) {
+            // No change; avoid resetting the release timer on every 500 ms poll.
+            return
+        }
+        cameraUsageActive = active
+        if (active) {
+            mainHandler.removeCallbacks(releaseRunnable)
+            releasePending = false
+            note(reason)
+        } else {
+            // The raw foreground package changed to a non-camera app: that is the
+            // authoritative "camera gone" evidence (BYDMate CameraStateMonitor.publish).
+            // Clear the supporting pulses too, otherwise their 30 s TTL would keep the
+            // floating window hidden long after the picture has disappeared.
+            cameraWindowAt = 0L
+            foregroundCameraAt = 0L
+            fallbackAt = 0L
+            releasePending = false
+            mainHandler.removeCallbacks(releaseRunnable)
+            note(reason)
+        }
+        publish()
+    }
+
     /** A positive answer from the BYD Open Platform (only possible on a signed build). */
     fun noteBydApi(active: Boolean, reason: String) {
         if (active) {
@@ -181,6 +219,7 @@ object CameraSignalBus {
         foregroundCameraAt = 0L
         bydApiAt = 0L
         fallbackAt = 0L
+        cameraUsageActive = false
         lastPublished = null
         releasePending = false
         mainHandler.removeCallbacks(recheckRunnable)
@@ -188,7 +227,7 @@ object CameraSignalBus {
     }
 
     fun isActive(now: Long = System.currentTimeMillis()): Boolean =
-        fresh(cameraWindowAt, now) || fresh(foregroundCameraAt, now) ||
+        cameraUsageActive || fresh(cameraWindowAt, now) || fresh(foregroundCameraAt, now) ||
             fresh(bydApiAt, now) || fresh(fallbackAt, now)
 
     private fun fresh(at: Long, now: Long): Boolean = at > 0L && now - at < WINDOW_SIGNAL_TTL_MS

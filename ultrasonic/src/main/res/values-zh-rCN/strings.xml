@@ -644,10 +644,10 @@
     <string name="camera_watch_service_description">仅监听顶层窗口属于哪个应用，用于在全景 / 倒车影像显示时自动隐藏浮窗并暂停音乐。不读取屏幕内容，也不执行任何操作。</string>
     <string name="floating_camera_detection_service_title">开启影像检测服务</string>
     <string name="floating_camera_detection_service_on">已开启。全景 / 倒车影像出现时会自动隐藏浮窗。</string>
-    <string name="floating_camera_detection_service_off">未开启 — 下方的零权限兜底检测仍在运行。为获得最可靠的检测，点击进入无障碍设置打开「NavMusic 影像检测」。若车机没有该入口，可用无线 ADB 一次性开启：adb shell settings put secure enabled_accessibility_services org.moire.ultrasonic/.util.CameraWatchAccessibilityService；再执行 adb shell settings put secure accessibility_enabled 1</string>
+    <string name="floating_camera_detection_service_off">未开启。比亚迪 DiLink 车机没有无障碍设置界面，这条路通常走不通；请改用上方的「一次性 ADB 授权」（真车验证过的可靠信号）。无论是否开启，下方零权限兜底检测都会继续运行。</string>
     <string name="floating_camera_signal_status_title">影像检测状态</string>
     <string name="floating_camera_signal_status_summary">最近信号：%1$s。当前状态：%2$s。%3$s</string>
-    <string name="floating_camera_signal_sources">信号源：无障碍 %1$s、使用情况访问 %2$s、车机接口(签名级) %3$s；最近窗口 %4$s。</string>
+    <string name="floating_camera_signal_sources">信号源：ADB 使用情况授权(主) %1$s、无障碍 %2$s、车机接口(签名级) %3$s；最近前台 %4$s。</string>
     <string name="floating_camera_source_on">已启用</string>
     <string name="floating_camera_source_off">未启用</string>
     <string name="floating_camera_signal_active">检测到影像，浮窗已隐藏</string>
@@ -657,4 +657,19 @@
     <string name="floating_camera_fallback_summary">兜底扫描 %1$s。最近观测：%2$s。窗口列表权限 %3$s。</string>
     <string name="floating_camera_temp_hide_title">立即隐藏浮窗 30 秒</string>
     <string name="floating_camera_temp_hide_summary">车机完全封闭时的手动兜底：隐藏浮窗 30 秒后自动恢复；常驻通知栏里也有同样的按钮。</string>
+    <string name="floating_camera_adb_grant_title">一次性 ADB 授权（推荐）</string>
+    <string name="floating_camera_adb_grant_summary">DiLink 车机没有「使用情况访问」和无障碍设置界面，权限无法从车机里点开；用无线 ADB 执行一次命令即可永久生效。点击查看并复制精确命令。</string>
+    <string name="floating_camera_adb_grant_dialog_title">一次性 ADB 命令</string>
+    <string name="floating_camera_adb_grant_dialog">比亚迪 DiLink 隐藏了「使用情况访问」和无障碍两个设置界面，所以车机上点不开开关。用手机或电脑连一次无线 ADB，执行下面这一条命令即可：
+
+adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow
+
+不需要 root，不需要系统签名，重启后依然有效，执行完立即生效、无需重启 App。之后 NavMusic 会持续监听 com.byd.avc（影像 App）切到前台，影像显示多久浮窗就隐藏多久，退出后立刻恢复。
+
+仅当你的车机确实有无障碍界面时，才需要这两条（可选）：
+adb shell settings put secure enabled_accessibility_services org.moire.ultrasonic/.util.CameraWatchAccessibilityService
+adb shell settings put secure accessibility_enabled 1</string>
+    <string name="floating_camera_adb_grant_copy">复制命令</string>
+    <string name="floating_camera_adb_grant_copied">ADB 命令已复制到剪贴板</string>
+    <string name="floating_camera_adb_command">adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow</string>
 </resources>

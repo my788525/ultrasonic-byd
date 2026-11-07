@@ -89,6 +89,7 @@
     <string name="setting_key.floating_pass_through" translatable="false">floatingPassThrough</string>
     <string name="setting_key.floating_reverse_safety" translatable="false">floatingReverseSafety</string>
     <string name="setting_key.floating_camera_signal_status" translatable="false">floatingCameraSignalStatus</string>
+    <string name="setting_key.floating_camera_adb_grant" translatable="false">floatingCameraAdbGrant</string>
     <string name="setting_key.floating_camera_detection_service" translatable="false">floatingCameraDetectionService</string>
     <string name="setting_key.floating_camera_fallback" translatable="false">floatingCameraFallback</string>
     <string name="setting_key.floating_camera_temp_hide" translatable="false">floatingCameraTempHide</string>

@@ -34,13 +34,29 @@ class CameraWatchAccessibilityService : AccessibilityService() {
             // events and to the bus timeout, so a transient unreadable window is harmless.
             val hit = findLargeCameraWindow()
             if (hit != null) {
-                CameraSignalBus.setCameraWindow(true, "camera window still on top: $hit")
+                noteCameraHit("camera window still on top: $hit")
             }
             handler.postDelayed(this, HEARTBEAT_MS)
         }
     }
 
     private val handler = Handler(Looper.getMainLooper())
+
+    /** Timestamp of the last positive camera hit, used to ignore the window-event flurry. */
+    @Volatile private var lastCameraHitAt = 0L
+
+    /** Windows that never mean "the camera went away" (BYDMate uses the same exclusions). */
+    private fun isNoise(pkg: String): Boolean {
+        val lower = pkg.lowercase()
+        return lower == "com.android.systemui" ||
+            lower.contains("inputmethod") ||
+            lower == "android"
+    }
+
+    private fun noteCameraHit(reason: String) {
+        lastCameraHitAt = System.currentTimeMillis()
+        CameraSignalBus.setCameraWindow(true, reason)
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -63,16 +79,29 @@ class CameraWatchAccessibilityService : AccessibilityService() {
             return
         }
         val eventPackage = event.packageName?.toString().orEmpty()
-        val direct = CameraPackages.isCameraPackage(eventPackage)
-        val window = if (direct) null else findLargeCameraWindow()
-        val active = direct || window != null
-        val reason = when {
-            direct -> "camera window event from $eventPackage"
-            window != null -> "camera window on top: $window"
-            else -> "top window is $eventPackage"
-        }
         CameraSignalBus.lastForegroundPackage = eventPackage.ifEmpty { CameraSignalBus.lastForegroundPackage }
-        CameraSignalBus.setCameraWindow(active, reason)
+
+        // BYDMate's field notes on DiLink: the 360 surface is drawn as a system window and may
+        // not be an accessibility window at all, but com.byd.avc still emits window-state
+        // events. A raw package match is therefore the reliable hint - do not require the
+        // window list to contain a large camera window.
+        if (CameraPackages.isCameraPackage(eventPackage)) {
+            noteCameraHit("camera window event from $eventPackage")
+            return
+        }
+        val window = findLargeCameraWindow()
+        if (window != null) {
+            noteCameraHit("camera window on top: $window")
+            return
+        }
+        // A head unit emits a flurry of unrelated window events while the camera view comes
+        // up (status bar, keyboard, notification shade). Only a real activity of a different
+        // app releases the gate, and never inside the grace period after a camera hit.
+        if (eventPackage.isEmpty() || isNoise(eventPackage) || event.className.isNullOrEmpty()) {
+            return
+        }
+        if (System.currentTimeMillis() - lastCameraHitAt < CAMERA_EVENT_GRACE_MS) return
+        CameraSignalBus.setCameraWindow(false, "top window is $eventPackage")
     }
 
     override fun onInterrupt() {
@@ -133,6 +162,9 @@ class CameraWatchAccessibilityService : AccessibilityService() {
     companion object {
 
         private const val HEARTBEAT_MS = 5_000L
+
+        /** Ignore unrelated window events for this long after a camera hit. */
+        private const val CAMERA_EVENT_GRACE_MS = 2_000L
 
         /** Whether the driver has switched this service on in the car's settings. */
         fun isEnabled(context: Context): Boolean {

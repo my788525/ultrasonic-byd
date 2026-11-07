@@ -12,6 +12,13 @@
     <uses-permission android:name="android.permission.BLUETOOTH"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- DiLink exposes no "usage access" settings screen. Declaring the permission is
+         required for UsageStatsManager.queryEvents to accept an appop granted over ADB
+         (appops set org.moire.ultrasonic GET_USAGE_STATS allow). This is the field-tested
+         BYDMate / DiLink way of detecting the com.byd.avc camera activity. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
     <!-- Android 8 and newer ask the user for this before an APK of ours may be installed.
          Without it the installer refuses the download and says nothing useful. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />

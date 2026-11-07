@@ -668,10 +668,10 @@
     <string name="camera_watch_service_description">Watches only which app window is on top, so NavMusic can hide its floating player and pause music while the car shows the 360 / reversing camera picture. It does not read your screen content and does not perform any action.</string>
     <string name="floating_camera_detection_service_title">Enable camera detection service</string>
     <string name="floating_camera_detection_service_on">Enabled. The floating window will hide while the car camera view is on top.</string>
-    <string name="floating_camera_detection_service_off">NOT enabled - the zero-permission fallback below is still active. For the most reliable detection, tap here to open accessibility settings and switch on NavMusic camera view detection. If the car has no accessibility menu, use wireless ADB once: adb shell settings put secure enabled_accessibility_services org.moire.ultrasonic/.util.CameraWatchAccessibilityService (then: adb shell settings put secure accessibility_enabled 1)</string>
+    <string name="floating_camera_detection_service_off">NOT enabled. BYD DiLink has no accessibility settings screen, so this route is often unavailable; use the one-time ADB grant above instead (the reliable, field-tested signal). The zero-permission fallback below stays active either way.</string>
     <string name="floating_camera_signal_status_title">Camera detection status</string>
     <string name="floating_camera_signal_status_summary">Last signal: %1$s. Current: %2$s. %3$s</string>
-    <string name="floating_camera_signal_sources">Sources: accessibility %1$s, usage access %2$s, BYD car API (signature-only) %3$s, last window %4$s.</string>
+    <string name="floating_camera_signal_sources">Sources: ADB usage grant (primary) %1$s, accessibility %2$s, BYD car API (signature-only) %3$s, last foreground %4$s.</string>
     <string name="floating_camera_source_on">on</string>
     <string name="floating_camera_source_off">off</string>
     <string name="floating_camera_signal_active">camera view detected, window hidden</string>
@@ -681,4 +681,19 @@
     <string name="floating_camera_fallback_summary">Fallback scan %1$s. Last observation: %2$s. Window dump %3$s.</string>
     <string name="floating_camera_temp_hide_title">Hide floating window for 30 seconds</string>
     <string name="floating_camera_temp_hide_summary">Manual fallback when the car allows no detection service: hides the window for 30 seconds, then restores it. The ongoing notification has the same action.</string>
+    <string name="floating_camera_adb_grant_title">One-time ADB grant (recommended)</string>
+    <string name="floating_camera_adb_grant_summary">DiLink has NO usage-access or accessibility settings screen. Grant the appop once over wireless ADB and camera detection works permanently. Tap to see and copy the exact command.</string>
+    <string name="floating_camera_adb_grant_dialog_title">One-time ADB command</string>
+    <string name="floating_camera_adb_grant_dialog">BYD DiLink hides both the usage-access and the accessibility settings screens, so the switch cannot be turned on from the car UI. Run this ONCE from a phone or PC connected over wireless ADB:
+
+adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow
+
+It needs no root and no signature, survives reboots, and takes effect immediately without restarting the app. NavMusic then watches com.byd.avc (the camera app) resume and hides the floating window for exactly as long as the picture is up.
+
+Optional, only if your car DOES have an accessibility screen:
+adb shell settings put secure enabled_accessibility_services org.moire.ultrasonic/.util.CameraWatchAccessibilityService
+adb shell settings put secure accessibility_enabled 1</string>
+    <string name="floating_camera_adb_grant_copy">Copy command</string>
+    <string name="floating_camera_adb_grant_copied">ADB command copied to clipboard</string>
+    <string name="floating_camera_adb_command">adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow</string>
 </resources>
