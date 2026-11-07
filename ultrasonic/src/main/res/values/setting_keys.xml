@@ -89,6 +89,9 @@
     <string name="setting_key.floating_pass_through" translatable="false">floatingPassThrough</string>
     <string name="setting_key.floating_reverse_safety" translatable="false">floatingReverseSafety</string>
     <string name="setting_key.floating_camera_signal_status" translatable="false">floatingCameraSignalStatus</string>
+    <string name="setting_key.floating_camera_detection_service" translatable="false">floatingCameraDetectionService</string>
+    <string name="setting_key.floating_camera_fallback" translatable="false">floatingCameraFallback</string>
+    <string name="setting_key.floating_camera_temp_hide" translatable="false">floatingCameraTempHide</string>
     <string name="setting_key.home_playlist_count" translatable="false">homePlaylistCount</string>
     <string name="setting_key.home_playlists_pinned" translatable="false">homePinnedPlaylists</string>
     <string name="setting_key.update_check_now" translatable="false">update.check_now</string>

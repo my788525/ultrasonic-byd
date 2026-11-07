@@ -16,10 +16,10 @@
          Without it the installer refuses the download and says nothing useful. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- BYD Open Platform read-only permissions for the reverse / 360 safety gate.
-         These are vendor permissions defined by the BYD system framework; when the app runs
-         on a non-BYD device the system simply ignores the unknown names, and the gate stays
-         open via the reflection seam's safe degradation. -->
+    <!-- BYD Open Platform read permissions are signature-level: a sideloaded app is
+         refused even when it declares them (BYDAutoService logs "permission deny"). They
+         remain here for a system-signed build; on a normal install the camera gate uses
+         the accessibility observer below. -->
     <uses-permission android:name="android.permission.BYDAUTO_GEARBOX_GET" />
     <uses-permission android:name="android.permission.BYDAUTO_PANORAMA_GET" />
 
@@ -180,5 +180,20 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <!-- Observes the top window so the car's 360 / reversing picture (com.byd.avc)
+             can hide the floating player. The driver switches this on once in the car's
+             accessibility settings; it reads no content and performs no action. -->
+        <service
+            android:name=".util.CameraWatchAccessibilityService"
+            android:exported="true"
+            android:label="@string/camera_watch_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/camera_watch_accessibility" />
+        </service>
     </application>
 </manifest>

@@ -91,6 +91,7 @@ class ReverseSafetyManager : KoinComponent {
      * next time the window is shown the music state is read fresh from the player.
      */
     fun stop() {
+        ZeroPermissionCameraDetector.stop()
         runningSource?.let {
             it.removeListener(listener)
             it.stop()
@@ -250,6 +251,14 @@ class BydReverseSignalSource : ReverseSignalSource {
         running = true
         CameraSignalBus.addListener(busListener)
         cameraScanner = UApp.instance?.let { CameraForegroundScanner(it) }
+        UApp.instance?.let { context ->
+            CameraSignalBus.accessibilityEnabled =
+                CameraWatchAccessibilityService.isEnabled(context)
+            CameraSignalBus.usageAccessGranted =
+                ForegroundPackageMonitor.hasUsageAccess(context)
+            // Fallback for locked-down head units: no permission of any kind is needed.
+            ZeroPermissionCameraDetector.start(context)
+        }
 
         // The BYD Open Platform reads are signature-protected on most DiLink builds, so they
         // are often unavailable to a sideloaded app. That must NOT stop the poller: the same
@@ -264,6 +273,7 @@ class BydReverseSignalSource : ReverseSignalSource {
                 if (!running) return
                 setReverseState(readReverseState())
                 pollCount++
+                if (pollCount % USAGE_EVERY_N == 0) checkUsageAccessForeground()
                 if (pollCount % DIAGNOSTIC_EVERY_N == 0) {
                     Timber.d(
                         "Camera poll: gearboxR=%s, active=%s, reason=%s",
@@ -318,6 +328,7 @@ class BydReverseSignalSource : ReverseSignalSource {
         resolveGearbox(context)
         resolvePanorama(context)
         val available = gearboxInstance != null || panoramaInstance != null
+        CameraSignalBus.bydApiAvailable = available
         Timber.i(
             "BYD Open Platform devices: gearbox=%s, panorama=%s",
             gearboxInstance != null, panoramaInstance != null
@@ -360,6 +371,21 @@ class BydReverseSignalSource : ReverseSignalSource {
         }
         panoramaClazz = null
         panoramaInstance = null
+    }
+
+    /** Usage access is optional; when ADB granted it, name the app on top as a hint. */
+    private fun checkUsageAccessForeground() {
+        val context = UApp.instance ?: return
+        if (!CameraSignalBus.usageAccessGranted) {
+            CameraSignalBus.usageAccessGranted =
+                ForegroundPackageMonitor.hasUsageAccess(context)
+        }
+        if (!CameraSignalBus.usageAccessGranted) return
+        val pkg = ForegroundPackageMonitor.currentForegroundPackage(context) ?: return
+        CameraSignalBus.lastForegroundPackage = pkg
+        if (CameraPackages.isCameraPackage(pkg)) {
+            CameraSignalBus.noteForegroundCamera(pkg)
+        }
     }
 
     /**
@@ -428,6 +454,9 @@ class BydReverseSignalSource : ReverseSignalSource {
 
         /** How often (in polls) to log a diagnostic line, so logcat can confirm values. */
         private const val DIAGNOSTIC_EVERY_N = 30
+
+        /** Usage access is queried every third poll, so the extra IPC stays cheap. */
+        private const val USAGE_EVERY_N = 3
 
         /** Official package path, plus a variant used by some DiLink generations. */
         private val PANORAMA_CLASS_NAMES = arrayOf(

@@ -9,6 +9,7 @@ package org.moire.ultrasonic.service
 
 import android.annotation.SuppressLint
 import android.app.Notification
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ComponentName
 import android.content.Context
@@ -55,7 +56,6 @@ import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.subsonic.ImageLoaderProvider
 import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
-import org.moire.ultrasonic.util.CameraProbeWindow
 import org.moire.ultrasonic.util.CarTransport
 import org.moire.ultrasonic.util.FloatingAppearance
 import org.moire.ultrasonic.util.LyricsParser
@@ -228,9 +228,17 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      * for the whole life of this service, independently of the player window, so hiding
      * and rebuilding the player cannot destroy the sensor. No usage access is required.
      */
-    private val cameraProbeWindow by lazy { CameraProbeWindow(this) }
-
     private val idleFadeRunnable = Runnable { fadeToIdle() }
+
+    /**
+     * Manual fallback for a locked-down head unit: the notification action hides the
+     * window for 30 seconds, then it comes back by itself. No permission is involved.
+     */
+    @Volatile private var tempHideActive = false
+    private val tempHideRunnable = Runnable {
+        tempHideActive = false
+        applyOverlayVisibility()
+    }
 
     /** Collapses the detail block into the lyric lines after the chosen number of seconds. */
     private val collapseDetailRunnable = Runnable {
@@ -248,8 +256,6 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForeground(NOTIFICATION_ID, buildNotification())
         connectController()
-        // Attach the zero-permission camera probe before anything can take the screen.
-        cameraProbeWindow.start()
 
         // The sleep timer owns its own countdown in a separate manager, so it survives even
         // when the floating window is rebuilt. A timer that was running when the process died
@@ -339,6 +345,14 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
                 if (rootView != null) applyAppearance()
                 return START_STICKY
             }
+
+            ACTION_TEMP_HIDE -> {
+                handler.removeCallbacks(tempHideRunnable)
+                tempHideActive = true
+                applyOverlayVisibility()
+                handler.postDelayed(tempHideRunnable, TEMP_HIDE_MS)
+                return START_STICKY
+            }
         }
 
         tier = intent?.getIntExtra(EXTRA_TIER, tier) ?: tier
@@ -399,8 +413,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         reverseSafetyManager.stop()
         disposables.clear()
         handler.removeCallbacks(updateRunnable)
-        cameraProbeWindow.stop()
         handler.removeCallbacks(idleFadeRunnable)
+        handler.removeCallbacks(tempHideRunnable)
         handler.removeCallbacks(collapseDetailRunnable)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
@@ -1178,7 +1192,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      */
     private fun shouldHideOverlay(): Boolean =
         FloatingPlayerService.hostWantsHide ||
-            FloatingPlayerService._reverseSafetyActive
+            FloatingPlayerService._reverseSafetyActive ||
+            tempHideActive
 
     /** The single place that shows or removes the overlay view. */
     private fun applyOverlayVisibility() {
@@ -1714,11 +1729,30 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             notificationManager = androidx.core.app.NotificationManagerCompat.from(this)
         )
 
+        // Manual fallback: one tap on the ongoing notification hides the window for a
+        // short while. It works even when the head unit allows no accessibility service,
+        // no usage access and no car API at all.
+        val hideIntent = Intent(this, FloatingPlayerService::class.java).apply {
+            action = ACTION_TEMP_HIDE
+        }
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
+            (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                PendingIntent.FLAG_IMMUTABLE
+            } else {
+                0
+            })
+        val hidePending = PendingIntent.getService(this, NOTIFICATION_ID + 1, hideIntent, pendingFlags)
+
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_play)
             .setContentTitle(getString(R.string.floating_notification_title))
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .addAction(
+                R.drawable.ic_stat_play,
+                getString(R.string.floating_temp_hide_action),
+                hidePending
+            )
             .build()
     }
 
@@ -1938,6 +1972,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         private const val ACTION_STOP = "org.moire.ultrasonic.FLOATING_STOP"
         private const val ACTION_NAV_ON = "org.moire.ultrasonic.FLOATING_NAV_ON"
         private const val ACTION_REFRESH = "org.moire.ultrasonic.FLOATING_REFRESH"
+        private const val ACTION_TEMP_HIDE = "org.moire.ultrasonic.FLOATING_TEMP_HIDE"
         private const val EXTRA_TIER = "tier"
         private const val EXTRA_NAV = "nav"
 
@@ -1946,6 +1981,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         private const val OVERLAY_FAILURE_FILE = "floating-failure.txt"
         private const val UPDATE_INTERVAL_MS = 500L
         private const val IDLE_TIMEOUT_MS = 3000L
+        private const val TEMP_HIDE_MS = 30_000L
         private const val FADE_MS = 220L
         private const val LONG_PRESS_MS = 700L
         private const val DRAG_SLOP_DP = 6
@@ -2058,6 +2094,19 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
                     action = ACTION_STOP
                 }
             )
+        }
+
+        /** Manual fallback used by the settings screen and the notification action. */
+        @JvmStatic
+        fun hideTemporarily(context: Context) {
+            val intent = Intent(context, FloatingPlayerService::class.java).apply {
+                action = ACTION_TEMP_HIDE
+            }
+            try {
+                context.startService(intent)
+            } catch (all: Exception) {
+                Timber.w(all, "Could not hide the floating window temporarily")
+            }
         }
 
         /**

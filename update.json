@@ -1,16 +1,21 @@
 {
-  "versionCode": 519,
-  "versionName": "4.8.0-byd.37",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.37/NavMusic-4.8.0-byd.37.apk",
-  "sha256": "ffd6edfb96416459fc59645584397e6d45b34c881d7ae4058c0f4d648824fb6a",
-  "size": 11452012,
-  "publishedAt": "2026-11-05T14:27:31Z",
+  "versionCode": 520,
+  "versionName": "4.8.0-byd.38",
+  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.38/NavMusic-4.8.0-byd.38.apk",
+  "sha256": "97c9ed54091d3049581250bb3bcda4b4baa6bc10da56f2e19fb3d9adc6a96069",
+  "size": 11462978,
+  "publishedAt": "2026-11-07T12:35:51Z",
   "changelog": [
-    "撤回上一版依赖「使用情况访问」识别前台窗口的方案：车机无法授予该权限，权限声明、授权入口与首次开启引导全部移除，浮窗不再依赖任何特殊权限",
-    "参考飞牛 TV 比亚迪专版已验证的 reverse_pause 机制改用零权限检测：常驻 1x1 透明 SurfaceView 探针监听显示层被环影/倒车影像抢占，叠加窗口可见性边沿与无权限影像进程扫描",
-    "所有临时信号 12 秒自动过期，影像退出后立即恢复，误报也不会让浮窗永久消失",
-    "修复 BYD 车载开放平台反射源缺陷：gearbox 缺失不再连坐禁用 panorama；新增 getDisplayMode 倒车模式判定与多候选类名",
-    "设置页新增只读「影像检测状态」诊断项，并补上此前缺失的「环影/倒车自动隐藏并暂停」开关",
-    "版本 bump 至 4.8.0-byd.37 (versionCode 519)"
+    "定位并修正影像检测失效根因：上一版把飞牛 TV 的「前台 Activity 画面被影像回收」机制移植到 Service 的独立悬浮窗探针，而比亚迪车机影像由 com.byd.avc 系统窗口绘制，不会回收第三方悬浮窗，探针永不触发",
+    "核查 BYD 开放平台权限模型（BYD-Assistant-NG 逆向文档 + 官方 OpenAPI）：BYDAUTO_*_GET 为签名级权限，普通安装的应用读取一律被拒，车机接口路径不再作为主检测手段",
+    "改用无障碍服务识别顶层影像窗口：监听 window state 事件与窗口列表，命中 com.byd.avc / 全景 / 影像等窗口时立即隐藏浮窗并暂停音乐，影像退出后延迟 2 秒恢复；窗口信号 30 秒心跳自动过期，避免永久隐藏",
+    "恢复「使用情况访问」为可选增强：车机设置里无入口时可用无线 ADB 一次性授权（appops set org.moire.ultrasonic GET_USAGE_STATS allow），授权后自动生效，不再弹出无效引导",
+    "修正零权限进程扫描遗漏 com.byd.avc 等真实影像包名的缺陷，并剔除可能误伤导航应用的宽泛关键字",
+    "无障碍服务每 5 秒复核窗口列表，长时间环影不会因信号过期而让浮窗自己弹回；非影像窗口事件仅首次触发延迟释放，避免通知栏刷新反复推迟恢复",
+    "新增零权限兜底检测（车机完全封闭、无法开启无障碍服务时仍可工作）：后台线程每 1.5 秒扫描 getprop 系统属性、Settings.Global / Settings.System 键值变化与媒体音量被车机静音的边沿，并尝试 dumpsys window windows 读取 com.byd.avc 可见窗口；命中即隐藏并暂停，信号 30 秒自动过期",
+    "兜底扫描把每一次属性/设置变化（即使未命中关键词）写入设置页诊断，便于按真车实际信号补规则，全程不需要 adb；所有扫描均在独立后台线程，主线程无额外开销",
+    "新增人工兜底：常驻通知栏与设置页均提供「隐藏浮窗 30 秒」，30 秒后自动恢复，不依赖任何权限",
+    "设置页新增「开启影像检测服务」「零权限兜底检测」「影像检测状态」三项，显示无障碍 / 使用情况访问 / 车机接口 / 兜底扫描 / 最近窗口包名",
+    "删除无效的常驻 1x1 悬浮探针窗口，减少额外窗口开销；版本 bump 至 4.8.0-byd.38 (versionCode 520)"
   ]
 }

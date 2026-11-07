@@ -639,9 +639,22 @@
     <string name="home_playlist_pin_empty">还没有加载歌单，请先打开一次首页。</string>
     <string name="home_playlist_pin_saved">首页歌单已更新</string>
     <string name="floating_reverse_safety_title">环影 / 倒车时自动隐藏并暂停</string>
-    <string name="floating_reverse_safety_summary">全景影像或倒挡激活时自动隐藏浮窗并暂停音乐，影像退出后自动恢复。检测同时使用车机接口与显示层信号，无需「使用情况访问」等权限。</string>
+    <string name="floating_reverse_safety_summary">全景影像或倒挡激活时自动隐藏浮窗并暂停音乐，影像退出后自动恢复。需要先开启下方的影像检测服务：比亚迪车机接口对第三方应用是签名级权限，普通安装无法直接读取。</string>
+    <string name="camera_watch_service_label">NavMusic 影像检测</string>
+    <string name="camera_watch_service_description">仅监听顶层窗口属于哪个应用，用于在全景 / 倒车影像显示时自动隐藏浮窗并暂停音乐。不读取屏幕内容，也不执行任何操作。</string>
+    <string name="floating_camera_detection_service_title">开启影像检测服务</string>
+    <string name="floating_camera_detection_service_on">已开启。全景 / 倒车影像出现时会自动隐藏浮窗。</string>
+    <string name="floating_camera_detection_service_off">未开启 — 下方的零权限兜底检测仍在运行。为获得最可靠的检测，点击进入无障碍设置打开「NavMusic 影像检测」。若车机没有该入口，可用无线 ADB 一次性开启：adb shell settings put secure enabled_accessibility_services org.moire.ultrasonic/.util.CameraWatchAccessibilityService；再执行 adb shell settings put secure accessibility_enabled 1</string>
     <string name="floating_camera_signal_status_title">影像检测状态</string>
-    <string name="floating_camera_signal_status_summary">最近信号：%1$s。当前状态：%2$s。无需特殊权限。</string>
+    <string name="floating_camera_signal_status_summary">最近信号：%1$s。当前状态：%2$s。%3$s</string>
+    <string name="floating_camera_signal_sources">信号源：无障碍 %1$s、使用情况访问 %2$s、车机接口(签名级) %3$s；最近窗口 %4$s。</string>
+    <string name="floating_camera_source_on">已启用</string>
+    <string name="floating_camera_source_off">未启用</string>
     <string name="floating_camera_signal_active">检测到影像，浮窗已隐藏</string>
     <string name="floating_camera_signal_idle">正常，浮窗可见</string>
+    <string name="floating_temp_hide_action">隐藏 30 秒</string>
+    <string name="floating_camera_fallback_title">零权限兜底检测</string>
+    <string name="floating_camera_fallback_summary">兜底扫描 %1$s。最近观测：%2$s。窗口列表权限 %3$s。</string>
+    <string name="floating_camera_temp_hide_title">立即隐藏浮窗 30 秒</string>
+    <string name="floating_camera_temp_hide_summary">车机完全封闭时的手动兜底：隐藏浮窗 30 秒后自动恢复；常驻通知栏里也有同样的按钮。</string>
 </resources>

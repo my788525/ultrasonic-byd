@@ -40,6 +40,9 @@ import org.moire.ultrasonic.util.Constants
 import org.moire.ultrasonic.util.ErrorDialog
 import org.moire.ultrasonic.util.FileUtil.ultrasonicDirectory
 import org.moire.ultrasonic.util.CameraSignalBus
+import org.moire.ultrasonic.util.CameraWatchAccessibilityService
+import org.moire.ultrasonic.util.ForegroundPackageMonitor
+import org.moire.ultrasonic.util.ZeroPermissionCameraDetector
 import org.moire.ultrasonic.util.HomePrefs
 import org.moire.ultrasonic.util.InfoDialog
 import org.moire.ultrasonic.util.SelectCacheActivityContract
@@ -154,10 +157,42 @@ class SettingsFragment :
      * real head unit this says whether the camera was seen at all, without adb.
      */
     private fun setupFloatingPreferences() {
+        findPreference<Preference>(
+            getString(R.string.setting_key_floating_camera_detection_service)
+        )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+            try {
+                startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+            } catch (all: Exception) {
+                Timber.w(all, "Accessibility settings not available on this head unit")
+            }
+            true
+        }
+        findPreference<Preference>(
+            getString(R.string.setting_key_floating_camera_temp_hide)
+        )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+            FloatingPlayerService.hideTemporarily(requireContext())
+            true
+        }
         updateCameraSignalSummary()
     }
 
     private fun updateCameraSignalSummary() {
+        val context = context ?: return
+        val enabled = CameraWatchAccessibilityService.isEnabled(context)
+        val usage = ForegroundPackageMonitor.hasUsageAccess(context)
+        CameraSignalBus.accessibilityEnabled = enabled
+        CameraSignalBus.usageAccessGranted = usage
+
+        findPreference<Preference>(
+            getString(R.string.setting_key_floating_camera_detection_service)
+        )?.summary = getString(
+            if (enabled) {
+                R.string.floating_camera_detection_service_on
+            } else {
+                R.string.floating_camera_detection_service_off
+            }
+        )
+
         val row = findPreference<Preference>(
             getString(R.string.setting_key_floating_camera_signal_status)
         ) ?: return
@@ -166,10 +201,33 @@ class SettingsFragment :
         } else {
             getString(R.string.floating_camera_signal_idle)
         }
+        val on = getString(R.string.floating_camera_source_on)
+        val off = getString(R.string.floating_camera_source_off)
+        val sources = getString(
+            R.string.floating_camera_signal_sources,
+            if (enabled) on else off,
+            if (usage) on else off,
+            if (CameraSignalBus.bydApiAvailable) on else off,
+            CameraSignalBus.lastForegroundPackage ?: "-"
+        )
         row.summary = getString(
             R.string.floating_camera_signal_status_summary,
             CameraSignalBus.lastReason,
-            state
+            state,
+            sources
+        )
+
+        findPreference<Preference>(
+            getString(R.string.setting_key_floating_camera_fallback)
+        )?.summary = getString(
+            R.string.floating_camera_fallback_summary,
+            if (ZeroPermissionCameraDetector.running) on else off,
+            ZeroPermissionCameraDetector.lastObservation,
+            when (ZeroPermissionCameraDetector.dumpsysAvailable) {
+                true -> on
+                false -> off
+                else -> "-"
+            }
         )
     }
 
