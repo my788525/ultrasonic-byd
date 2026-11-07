@@ -235,6 +235,18 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      * window for 30 seconds, then it comes back by itself. No permission is involved.
      */
     @Volatile private var tempHideActive = false
+
+    /**
+     * Manual hide. This is the one path that needs no permission at all and therefore always
+     * works, even on head units whose ADB was disabled by the manufacturer. It is deliberately
+     * independent of the automatic camera gate: turning the automatic gate off must never take
+     * away the driver's reliable hide button.
+     */
+    @Volatile private var manualHidden = false
+    private var pausedByManualHide = false
+
+    /** The tiny edge bubble that brings the window back after a manual hide. */
+    private var restoreBubble: View? = null
     private val tempHideRunnable = Runnable {
         tempHideActive = false
         applyOverlayVisibility()
@@ -353,6 +365,18 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
                 handler.postDelayed(tempHideRunnable, TEMP_HIDE_MS)
                 return START_STICKY
             }
+
+            ACTION_MANUAL_HIDE -> {
+                handler.removeCallbacks(tempHideRunnable)
+                tempHideActive = false
+                setManualHidden(true)
+                return START_STICKY
+            }
+
+            ACTION_MANUAL_SHOW -> {
+                setManualHidden(false)
+                return START_STICKY
+            }
         }
 
         tier = intent?.getIntExtra(EXTRA_TIER, tier) ?: tier
@@ -420,6 +444,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         controllerFuture = null
         controller = null
         removeOverlay()
+        removeRestoreBubble()
         instance = null
         super.onDestroy()
     }
@@ -608,6 +633,10 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         view.findViewById<View>(R.id.floating_close).setOnClickListener {
             if (locked) return@setOnClickListener
             stopSelf()
+        }
+        view.findViewById<View>(R.id.floating_collapse)?.setOnClickListener {
+            if (locked) return@setOnClickListener
+            setManualHidden(true)
         }
         sleepButton?.setOnClickListener {
             if (locked) return@setOnClickListener
@@ -1176,6 +1205,72 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         rootView = null
     }
 
+    /** A 28 dp dot at the top edge: the always-available way back from a manual hide. */
+    private fun showRestoreBubble() {
+        if (restoreBubble != null) return
+        val bubble = View(this).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(0x66FFFFFF)
+                setStroke(dp(1), 0xCCFFFFFF.toInt())
+            }
+            contentDescription = getString(R.string.floating_restore_bubble_description)
+            setOnClickListener { setManualHidden(false) }
+        }
+        val params = WindowManager.LayoutParams(
+            dp(28), dp(28), overlayType(),
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = dp(8)
+            y = dp(DEFAULT_TOP_DP)
+        }
+        try {
+            windowManager?.addView(bubble, params)
+            restoreBubble = bubble
+        } catch (all: Throwable) {
+            Timber.w(all, "Could not show the restore bubble")
+        }
+    }
+
+    private fun removeRestoreBubble() {
+        val bubble = restoreBubble ?: return
+        restoreBubble = null
+        try {
+            windowManager?.removeView(bubble)
+        } catch (all: Throwable) {
+            Timber.w(all, "Could not remove the restore bubble")
+        }
+    }
+
+    /**
+     * Hides or restores the window on the driver's request. Music follows the window, so a
+     * manual hide also gives the driver the quiet he would get from the automatic camera gate.
+     */
+    private fun setManualHidden(hide: Boolean) {
+        if (manualHidden == hide) return
+        manualHidden = hide
+        if (hide) {
+            pausedByManualHide = controller?.isPlaying == true
+            if (pausedByManualHide) controller?.pause()
+        } else {
+            if (pausedByManualHide) controller?.play()
+            pausedByManualHide = false
+        }
+        applyOverlayVisibility()
+        refreshNotification()
+    }
+
+    private fun refreshNotification() {
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification())
+        } catch (all: Throwable) {
+            Timber.w(all, "Could not refresh the floating service notification")
+        }
+    }
+
     /**
      * Shows or removes the overlay view according to [FloatingPlayerService.hostWantsHide].
      *
@@ -1193,14 +1288,23 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private fun shouldHideOverlay(): Boolean =
         FloatingPlayerService.hostWantsHide ||
             FloatingPlayerService._reverseSafetyActive ||
-            tempHideActive
+            tempHideActive ||
+            manualHidden
 
     /** The single place that shows or removes the overlay view. */
     private fun applyOverlayVisibility() {
         if (shouldHideOverlay()) {
             if (rootView != null) removeOverlay()
-        } else if (rootView == null) {
-            showOverlay()
+            // The bubble is only for a *manual* hide. An automatic camera hide must leave the
+            // screen completely clear, and the app's own screens must not grow a dot either.
+            if (manualHidden && !FloatingPlayerService.hostWantsHide) {
+                showRestoreBubble()
+            } else {
+                removeRestoreBubble()
+            }
+        } else {
+            removeRestoreBubble()
+            if (rootView == null) showOverlay()
         }
     }
 
@@ -1729,18 +1833,33 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             notificationManager = androidx.core.app.NotificationManagerCompat.from(this)
         )
 
-        // Manual fallback: one tap on the ongoing notification hides the window for a
-        // short while. It works even when the head unit allows no accessibility service,
-        // no usage access and no car API at all.
-        val hideIntent = Intent(this, FloatingPlayerService::class.java).apply {
-            action = ACTION_TEMP_HIDE
-        }
+        // The first action is a real toggle: hide now, show again when the camera view is gone.
+        // Together with the edge bubble and the button inside the window this is the reliable
+        // path on head units where ADB, accessibility and usage access are all unavailable.
         val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PendingIntent.FLAG_IMMUTABLE
             } else {
                 0
             })
+        val toggleAction = if (manualHidden) ACTION_MANUAL_SHOW else ACTION_MANUAL_HIDE
+        val toggleLabel = getString(
+            if (manualHidden) {
+                R.string.floating_manual_show_action
+            } else {
+                R.string.floating_manual_hide_action
+            }
+        )
+        val toggleIntent = Intent(this, FloatingPlayerService::class.java).apply {
+            action = toggleAction
+        }
+        val togglePending = PendingIntent.getService(
+            this, NOTIFICATION_ID + 2, toggleIntent, pendingFlags
+        )
+        // The short timed hide stays as a second, lighter option.
+        val hideIntent = Intent(this, FloatingPlayerService::class.java).apply {
+            action = ACTION_TEMP_HIDE
+        }
         val hidePending = PendingIntent.getService(this, NOTIFICATION_ID + 1, hideIntent, pendingFlags)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
@@ -1748,6 +1867,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             .setContentTitle(getString(R.string.floating_notification_title))
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .addAction(R.drawable.ic_stat_play, toggleLabel, togglePending)
             .addAction(
                 R.drawable.ic_stat_play,
                 getString(R.string.floating_temp_hide_action),
@@ -1925,6 +2045,22 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             instance?.applyReverseSafetyVisibility()
         }
 
+        /** Driver-facing toggle used by Settings; it needs no permission of any kind. */
+        @JvmStatic
+        fun setManuallyHidden(context: Context, hidden: Boolean) {
+            val intent = Intent(context, FloatingPlayerService::class.java).apply {
+                action = if (hidden) ACTION_MANUAL_HIDE else ACTION_MANUAL_SHOW
+            }
+            try {
+                context.startService(intent)
+            } catch (all: Throwable) {
+                Timber.w(all, "Could not toggle the floating window from Settings")
+            }
+        }
+
+        @JvmStatic
+        fun isManuallyHidden(): Boolean = instance?.manualHidden == true
+
         /**
          * Hides the overlay for the duration of the reverse view.
          *
@@ -1973,6 +2109,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         private const val ACTION_NAV_ON = "org.moire.ultrasonic.FLOATING_NAV_ON"
         private const val ACTION_REFRESH = "org.moire.ultrasonic.FLOATING_REFRESH"
         private const val ACTION_TEMP_HIDE = "org.moire.ultrasonic.FLOATING_TEMP_HIDE"
+        private const val ACTION_MANUAL_HIDE = "org.moire.ultrasonic.FLOATING_MANUAL_HIDE"
+        private const val ACTION_MANUAL_SHOW = "org.moire.ultrasonic.FLOATING_MANUAL_SHOW"
         private const val EXTRA_TIER = "tier"
         private const val EXTRA_NAV = "nav"
 

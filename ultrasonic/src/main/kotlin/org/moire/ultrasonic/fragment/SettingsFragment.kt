@@ -198,6 +198,15 @@ class SettingsFragment :
             FloatingPlayerService.hideTemporarily(requireContext())
             true
         }
+        findPreference<Preference>(
+            getString(R.string.setting_key_floating_manual_toggle)
+        )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+            FloatingPlayerService.setManuallyHidden(
+                requireContext(), !FloatingPlayerService.isManuallyHidden()
+            )
+            updateCameraSignalSummary()
+            true
+        }
         updateCameraSignalSummary()
     }
 
@@ -233,7 +242,10 @@ class SettingsFragment :
             if (usage) on else off,
             if (enabled) on else off,
             if (CameraSignalBus.bydApiAvailable) on else off,
-            CameraSignalBus.lastForegroundPackage ?: "-"
+            if (Settings.floatingCameraAudioFocus) on else off,
+            if (FloatingPlayerService.isManuallyHidden()) on else off,
+            CameraSignalBus.lastForegroundPackage ?: "-",
+            CameraSignalBus.audioFocusLastEvent
         )
         row.summary = getString(
             R.string.floating_camera_signal_status_summary,

@@ -159,6 +159,16 @@ object Settings {
     @JvmStatic
     var floatingReverseSafety by BooleanSetting(getKey(R.string.setting_key_floating_reverse_safety), true)
 
+    /**
+     * Treat a transient audio-focus loss as a camera-view signal. Off by default: navigation
+     * prompts take the same focus, and hiding the window at every turn instruction is worse
+     * than showing it during a camera view.
+     */
+    @JvmStatic
+    var floatingCameraAudioFocus by BooleanSetting(
+        getKey(R.string.setting_key_floating_camera_audio_focus), false
+    )
+
     /** How many of the most-played playlists show on the home screen; -1 means every playlist. */
     @JvmStatic
     var homePlaylistCount by StringIntSetting(getKey(R.string.setting_key_home_playlist_count), 8)

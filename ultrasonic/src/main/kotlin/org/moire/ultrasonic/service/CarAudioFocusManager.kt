@@ -9,6 +9,7 @@ package org.moire.ultrasonic.service
 import android.media.AudioManager
 import androidx.media3.common.Player
 import timber.log.Timber
+import org.moire.ultrasonic.util.CameraSignalBus
 
 /**
  * Takes over the audio focus handling of the player so that the music can be ducked to a level
@@ -128,6 +129,12 @@ class CarAudioFocusManager(
     }
 
     private fun onFocusChanged(focusChange: Int) {
+        // Zero-permission hint for head units that take the audio for the camera / parking
+        // cues. Opt-in from Settings, because navigation prompts duck the music too.
+        CameraSignalBus.setAudioFocus(
+            focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+            "audio focus $focusChange"
+        )
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 restoreVolume()

@@ -105,6 +105,16 @@
                 a:src="@drawable/ic_sleep"
                 app:tint="#FFFFFFFF" />
 
+            <ImageButton
+                a:id="@+id/floating_collapse"
+                a:layout_width="40dp"
+                a:layout_height="52dp"
+                a:background="?attr/selectableItemBackgroundBorderless"
+                a:contentDescription="@string/floating_collapse_content_description"
+                a:scaleType="fitCenter"
+                a:src="@drawable/ic_floating_collapse"
+                app:tint="#B3FFFFFF" />
+
         </LinearLayout>
 
     </LinearLayout>

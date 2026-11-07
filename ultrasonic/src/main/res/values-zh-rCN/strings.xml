@@ -639,15 +639,15 @@
     <string name="home_playlist_pin_empty">还没有加载歌单，请先打开一次首页。</string>
     <string name="home_playlist_pin_saved">首页歌单已更新</string>
     <string name="floating_reverse_safety_title">环影 / 倒车时自动隐藏并暂停</string>
-    <string name="floating_reverse_safety_summary">全景影像或倒挡激活时自动隐藏浮窗并暂停音乐，影像退出后自动恢复。需要先开启下方的影像检测服务：比亚迪车机接口对第三方应用是签名级权限，普通安装无法直接读取。</string>
+    <string name="floating_reverse_safety_summary">全景影像或倒挡激活时自动隐藏浮窗并暂停音乐，影像退出后自动恢复。比亚迪车机接口对第三方应用是签名级权限；若车机 ADB 已被封闭，自动检测无法工作，请改用下方「显示 / 隐藏浮窗」一键操作。</string>
     <string name="camera_watch_service_label">NavMusic 影像检测</string>
     <string name="camera_watch_service_description">仅监听顶层窗口属于哪个应用，用于在全景 / 倒车影像显示时自动隐藏浮窗并暂停音乐。不读取屏幕内容，也不执行任何操作。</string>
     <string name="floating_camera_detection_service_title">开启影像检测服务</string>
     <string name="floating_camera_detection_service_on">已开启。全景 / 倒车影像出现时会自动隐藏浮窗。</string>
-    <string name="floating_camera_detection_service_off">未开启。比亚迪 DiLink 车机没有无障碍设置界面，这条路通常走不通；请改用上方的「一次性 ADB 授权」（真车验证过的可靠信号）。无论是否开启，下方零权限兜底检测都会继续运行。</string>
+    <string name="floating_camera_detection_service_off">未开启。比亚迪 DiLink 车机没有无障碍设置界面，新版固件又关闭了 ADB，封闭车机上这条路永久不可用。零权限兜底检测仍在运行，而「显示 / 隐藏浮窗」一键操作始终可用。</string>
     <string name="floating_camera_signal_status_title">影像检测状态</string>
     <string name="floating_camera_signal_status_summary">最近信号：%1$s。当前状态：%2$s。%3$s</string>
-    <string name="floating_camera_signal_sources">信号源：ADB 使用情况授权(主) %1$s、无障碍 %2$s、车机接口(签名级) %3$s；最近前台 %4$s。</string>
+    <string name="floating_camera_signal_sources">信号源：ADB 授权 %1$s、无障碍 %2$s、车机接口(签名级) %3$s、音频焦点 %4$s、手动隐藏 %5$s；最近前台 %6$s；最近音频焦点事件 %7$s。</string>
     <string name="floating_camera_source_on">已启用</string>
     <string name="floating_camera_source_off">未启用</string>
     <string name="floating_camera_signal_active">检测到影像，浮窗已隐藏</string>
@@ -657,14 +657,16 @@
     <string name="floating_camera_fallback_summary">兜底扫描 %1$s。最近观测：%2$s。窗口列表权限 %3$s。</string>
     <string name="floating_camera_temp_hide_title">立即隐藏浮窗 30 秒</string>
     <string name="floating_camera_temp_hide_summary">车机完全封闭时的手动兜底：隐藏浮窗 30 秒后自动恢复；常驻通知栏里也有同样的按钮。</string>
-    <string name="floating_camera_adb_grant_title">一次性 ADB 授权（推荐）</string>
-    <string name="floating_camera_adb_grant_summary">DiLink 车机没有「使用情况访问」和无障碍设置界面，权限无法从车机里点开；用无线 ADB 执行一次命令即可永久生效。点击查看并复制精确命令。</string>
+    <string name="floating_camera_adb_grant_title">一次性 ADB 授权（仅当车机 ADB 可用）</string>
+    <string name="floating_camera_adb_grant_summary">比亚迪 2606 及之后的固件已关闭 ADB 且无法重新开启。若你的车机打不开 ADB，这条路不可用，自动影像检测也就无法实现——请改用「显示 / 隐藏浮窗」一键操作。点击查看命令，仅供仍能开启 ADB 的车机使用。</string>
     <string name="floating_camera_adb_grant_dialog_title">一次性 ADB 命令</string>
-    <string name="floating_camera_adb_grant_dialog">比亚迪 DiLink 隐藏了「使用情况访问」和无障碍两个设置界面，所以车机上点不开开关。用手机或电脑连一次无线 ADB，执行下面这一条命令即可：
+    <string name="floating_camera_adb_grant_dialog">比亚迪 DiLink 隐藏了「使用情况访问」和无障碍两个设置界面，所以车机上点不开开关。在仍能开启无线 ADB 的车机上，用手机或电脑执行一次：
 
 adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow
 
-不需要 root，不需要系统签名，重启后依然有效，执行完立即生效、无需重启 App。之后 NavMusic 会持续监听 com.byd.avc（影像 App）切到前台，影像显示多久浮窗就隐藏多久，退出后立刻恢复。
+不需要 root，不需要系统签名，重启后依然有效，执行完立即生效。之后 NavMusic 会持续监听 com.byd.avc（影像 App）切到前台，影像显示多久浮窗就隐藏多久，退出后立刻恢复。
+
+重要：比亚迪 2606 及之后的固件已关闭 ADB，且无法重新开启。如果你的车机打不开 ADB，这条命令必然失败，这是平台限制而不是 App 故障。此时请使用「显示 / 隐藏浮窗」一键操作（浮窗内小按钮、隐藏后的边缘小圆点、常驻通知栏动作均可），它不需要任何权限。
 
 仅当你的车机确实有无障碍界面时，才需要这两条（可选）：
 adb shell settings put secure enabled_accessibility_services org.moire.ultrasonic/.util.CameraWatchAccessibilityService
@@ -672,4 +674,12 @@ adb shell settings put secure accessibility_enabled 1</string>
     <string name="floating_camera_adb_grant_copy">复制命令</string>
     <string name="floating_camera_adb_grant_copied">ADB 命令已复制到剪贴板</string>
     <string name="floating_camera_adb_command">adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow</string>
+    <string name="floating_manual_hide_action">隐藏浮窗</string>
+    <string name="floating_manual_show_action">显示浮窗</string>
+    <string name="floating_collapse_content_description">收起浮窗</string>
+    <string name="floating_restore_bubble_description">重新展开浮窗</string>
+    <string name="floating_camera_audio_focus_title">用音频焦点辅助判断影像</string>
+    <string name="floating_camera_audio_focus_summary">默认关闭。车机短暂抢占音频焦点时隐藏浮窗并暂停音乐。高德导航播报同样会抢占焦点，开启后可能每次转弯提示都隐藏浮窗，请仅在确认车机只为影像抢占焦点时启用。</string>
+    <string name="floating_manual_toggle_title">显示 / 隐藏浮窗</string>
+    <string name="floating_manual_toggle_summary">无需任何权限、始终可用的一键隐藏。浮窗内的小按钮、隐藏后屏幕边缘的小圆点、常驻通知栏动作都能触发；隐藏时音乐暂停，恢复时自动续播。</string>
 </resources>

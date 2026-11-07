@@ -474,6 +474,17 @@
             a:title="@string/floating_camera_temp_hide_title"
             app:iconSpaceReserved="false"/>
         <Preference
+            a:key="@string/setting_key.floating_manual_toggle"
+            a:summary="@string/floating_manual_toggle_summary"
+            a:title="@string/floating_manual_toggle_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="false"
+            a:key="@string/setting_key.floating_camera_audio_focus"
+            a:summary="@string/floating_camera_audio_focus_summary"
+            a:title="@string/floating_camera_audio_focus_title"
+            app:iconSpaceReserved="false"/>
+        <Preference
             a:key="@string/setting_key.floating_camera_signal_status"
             a:summary="@string/floating_camera_signal_status_summary"
             a:title="@string/floating_camera_signal_status_title"

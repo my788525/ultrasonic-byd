@@ -91,6 +91,13 @@ object CameraSignalBus {
      */
     @Volatile private var cameraUsageActive = false
 
+    /**
+     * Level signal from the player's audio focus. Some head units take the audio focus for
+     * the parking radar / camera cues. Off by default: navigation prompts can also take a
+     * transient focus, which must not hide the window on every turn instruction.
+     */
+    @Volatile private var audioFocusActive = false
+
     /** The last signal that fired, shown in settings so a real car can be diagnosed. */
     @Volatile var lastReason: String = "none"
         private set
@@ -100,6 +107,10 @@ object CameraSignalBus {
     @Volatile var usageAccessGranted = false
     @Volatile var bydApiAvailable = false
     @Volatile var lastForegroundPackage: String? = null
+
+    /** The most recent audio-focus change, shown in settings so a real car can be diagnosed. */
+    @Volatile var audioFocusLastEvent: String = "none"
+        private set
 
     private val recheckRunnable = Runnable { publish() }
     private val releaseRunnable = Runnable {
@@ -192,6 +203,23 @@ object CameraSignalBus {
         publish()
     }
 
+    /**
+     * Audio focus edge, zero permission and event driven. Only AUDIOFOCUS_LOSS_TRANSIENT is
+     * treated as a candidate; ducking (navigation prompts) never hides the window.
+     */
+    fun setAudioFocus(active: Boolean, reason: String) {
+        audioFocusLastEvent = reason
+        val wanted = active && Settings.floatingCameraAudioFocus
+        if (audioFocusActive == wanted) return
+        audioFocusActive = wanted
+        if (wanted) {
+            note(reason)
+        } else if (Settings.floatingCameraAudioFocus) {
+            note("audio focus restored ($reason)")
+        }
+        publish()
+    }
+
     /** A positive answer from the BYD Open Platform (only possible on a signed build). */
     fun noteBydApi(active: Boolean, reason: String) {
         if (active) {
@@ -220,6 +248,7 @@ object CameraSignalBus {
         bydApiAt = 0L
         fallbackAt = 0L
         cameraUsageActive = false
+        audioFocusActive = false
         lastPublished = null
         releasePending = false
         mainHandler.removeCallbacks(recheckRunnable)
@@ -227,7 +256,8 @@ object CameraSignalBus {
     }
 
     fun isActive(now: Long = System.currentTimeMillis()): Boolean =
-        cameraUsageActive || fresh(cameraWindowAt, now) || fresh(foregroundCameraAt, now) ||
+        cameraUsageActive || audioFocusActive ||
+            fresh(cameraWindowAt, now) || fresh(foregroundCameraAt, now) ||
             fresh(bydApiAt, now) || fresh(fallbackAt, now)
 
     private fun fresh(at: Long, now: Long): Boolean = at > 0L && now - at < WINDOW_SIGNAL_TTL_MS
