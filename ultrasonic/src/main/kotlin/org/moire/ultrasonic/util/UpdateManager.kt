@@ -13,13 +13,20 @@ import android.os.Looper
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
  * One version of the app, as the update file on GitHub describes it.
+ *
+ * [downloadUrls] holds the extra places the APK can be fetched from. A car network may
+ * reach raw.githubusercontent.com but time out on github.com release redirects, or the
+ * other way round, so the update file now carries several addresses instead of one.
  */
 data class UpdateInfo(
     val versionCode: Int,
@@ -28,7 +35,8 @@ data class UpdateInfo(
     val sha256: String,
     val size: Long,
     val publishedAt: String,
-    val changelog: List<String>
+    val changelog: List<String>,
+    val downloadUrls: List<String> = emptyList()
 ) {
     companion object {
         /**
@@ -52,6 +60,18 @@ data class UpdateInfo(
                         changelog.add(array.optString(index, ""))
                     }
                 }
+
+                val mirrors = mutableListOf<String>()
+                for (key in listOf("downloadUrls", "mirrors")) {
+                    val urls = root.optJSONArray(key) ?: continue
+                    for (index in 0 until urls.length()) {
+                        val value = urls.optString(index, "")
+                        if (value.startsWith("https://") && !mirrors.contains(value)) {
+                            mirrors.add(value)
+                        }
+                    }
+                }
+
                 UpdateInfo(
                     versionCode = versionCode,
                     versionName = versionName,
@@ -59,7 +79,8 @@ data class UpdateInfo(
                     sha256 = root.optString("sha256", ""),
                     size = root.optLong("size", 0L),
                     publishedAt = root.optString("publishedAt", ""),
-                    changelog = changelog.filter { it.isNotEmpty() }
+                    changelog = changelog.filter { it.isNotEmpty() },
+                    downloadUrls = mirrors
                 )
             }.getOrNull()
         }
@@ -78,16 +99,31 @@ data class UpdateCheckResult(
     val errorMessage: String? = null
 )
 
+/** Why no APK could be handed to the installer. */
+enum class UpdateFailure { NETWORK, CHECKSUM, STORAGE }
+
+/** The result of a download, including enough detail to explain a failure to the driver. */
+data class UpdateDownloadResult(
+    val file: File?,
+    val failure: UpdateFailure? = null,
+    val attempts: Int = 0,
+    val lastUrl: String = ""
+)
+
+private enum class DownloadOutcome { SUCCESS, NETWORK, TRUNCATED, STORAGE }
+
 /**
  * Looks for a newer version of the app and downloads it.
  *
  * A car head unit has no app store on it, so until now every version had to be brought over
  * by hand. The file this reads is a small `update.json` in the repository, written by the
- * release workflow; it points at the APK attached to the matching GitHub release.
+ * release workflow; it points at the APK attached to the matching GitHub release and at a
+ * plain static copy of the same APK on the `apk` branch.
  *
- * GitHub is not reliably reachable from every network the car ends up on, so the file is asked
- * for from several mirrors in turn, and the driver can put his own in the settings. The first
- * one that answers with something readable wins.
+ * Neither GitHub nor any single proxy is reliably reachable from every network the car ends
+ * up on. Both the update file and the APK are therefore tried at several addresses in turn,
+ * and every download is checked against the size and hash in the update file before it is
+ * allowed anywhere near the installer.
  */
 class UpdateManager(private val context: Context) {
 
@@ -95,19 +131,18 @@ class UpdateManager(private val context: Context) {
         private const val OWNER = "my788525"
         private const val REPO = "ultrasonic-byd"
         private const val BRANCH = "main"
+        private const val APK_BRANCH = "apk"
         private const val FILE = "update.json"
 
         private const val GITHUB_RAW = "https://raw.githubusercontent.com/$OWNER/$REPO/$BRANCH/$FILE"
         private const val GH_PROXY = "https://gh-proxy.com/$GITHUB_RAW"
         private const val JSDELIVR = "https://cdn.jsdelivr.net/gh/$OWNER/$REPO@$BRANCH/$FILE"
 
-        /** Prefix that turns a GitHub URL into one served by a mirror. */
-        private const val DOWNLOAD_PROXY = "https://gh-proxy.com/"
-
-        private const val CONNECT_TIMEOUT_MS = 10_000
-        private const val READ_TIMEOUT_MS = 15_000
+        private const val CONNECT_TIMEOUT_MS = 12_000
+        private const val READ_TIMEOUT_MS = 30_000
         private const val BUFFER_SIZE = 64 * 1024
         private const val DOWNLOAD_DIR = "update"
+        private const val USER_AGENT = "NavMusic-Updater/1.0"
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -157,37 +192,63 @@ class UpdateManager(private val context: Context) {
     }
 
     /**
-     * Downloads the APK and checks it against the hash in the update file.
+     * Downloads the APK and checks it against the size and hash in the update file.
      *
-     * The hash is not decoration: a file that a proxy cut short or replaced has to be thrown
-     * away before it reaches the installer. If the GitHub download fails, the same URL through
-     * the mirror is tried once.
+     * Every address in [UpdateInfo.downloadUrls] is tried, followed by addresses derived
+     * from the release URL and the static `apk` branch. A source that answers with an error
+     * page, a JSON description or a truncated file is rejected and the next one is tried.
      *
      * @param onProgress called with the percentage, on the main thread.
-     * @param onDone called with the file, or null when the download failed or the hash did not
-     * match, on the main thread.
+     * @param onDone called with the file, or with the reason no file could be used, on the
+     * main thread.
      */
-    fun download(info: UpdateInfo, onProgress: (Int) -> Unit, onDone: (File?) -> Unit) {
+    fun download(
+        info: UpdateInfo,
+        onProgress: (Int) -> Unit,
+        onDone: (UpdateDownloadResult) -> Unit
+    ) {
         executor.execute {
             val target = File(downloadDir(), "NavMusic-${info.versionName}.apk")
-            val candidates = listOf(info.downloadUrl, DOWNLOAD_PROXY + info.downloadUrl)
+            val urls = candidateUrls(info)
+            var attempts = 0
+            var lastUrl = ""
+            var sawChecksumFailure = false
+            var sawStorageFailure = false
             var downloaded: File? = null
 
-            for (url in candidates) {
+            for (url in urls) {
+                attempts++
+                lastUrl = url
                 target.delete()
-                val ok = runCatching {
-                    downloadToFile(url, info.size, target) { percent ->
-                        mainHandler.post { onProgress(percent) }
-                    }
-                }.getOrDefault(false)
-                if (!ok) continue
-                if (info.sha256.isEmpty() || sha256Of(target).equals(info.sha256, ignoreCase = true)) {
-                    downloaded = target
-                    break
+                val outcome = downloadToFile(url, info.size, target) { percent ->
+                    mainHandler.post { onProgress(percent) }
                 }
+                when (outcome) {
+                    DownloadOutcome.SUCCESS ->
+                        if (info.sha256.isEmpty() ||
+                            sha256Of(target).equals(info.sha256, ignoreCase = true)
+                        ) {
+                            downloaded = target
+                        } else {
+                            sawChecksumFailure = true
+                        }
+                    DownloadOutcome.TRUNCATED -> sawChecksumFailure = true
+                    DownloadOutcome.STORAGE -> sawStorageFailure = true
+                    DownloadOutcome.NETWORK -> Unit
+                }
+                if (downloaded != null) break
             }
 
-            val result = downloaded
+            val result = if (downloaded != null) {
+                UpdateDownloadResult(downloaded, null, attempts, lastUrl)
+            } else {
+                val failure = when {
+                    sawChecksumFailure -> UpdateFailure.CHECKSUM
+                    sawStorageFailure -> UpdateFailure.STORAGE
+                    else -> UpdateFailure.NETWORK
+                }
+                UpdateDownloadResult(null, failure, attempts, lastUrl)
+            }
             mainHandler.post { onDone(result) }
         }
     }
@@ -205,6 +266,44 @@ class UpdateManager(private val context: Context) {
         return File(base, DOWNLOAD_DIR).apply { mkdirs() }
     }
 
+    /**
+     * All addresses worth trying, best first, without duplicates.
+     *
+     * The static copy on the `apk` branch is deliberately included even when an older
+     * update file does not mention it: every release publishes its APK under the same
+     * predictable name there.
+     */
+    private fun candidateUrls(info: UpdateInfo): List<String> {
+        val urls = LinkedHashSet<String>()
+        fun add(url: String) {
+            if (url.startsWith("https://")) urls.add(url)
+        }
+
+        add(info.downloadUrl)
+        info.downloadUrls.forEach { add(it) }
+
+        val name = "NavMusic-${info.versionName}.apk"
+        add("https://raw.githubusercontent.com/$OWNER/$REPO/$APK_BRANCH/$name")
+        add("https://cdn.jsdelivr.net/gh/$OWNER/$REPO@$APK_BRANCH/$name")
+
+        // A mirror set for update.json is also tried as a base for the APK itself.
+        val configured = Settings.updateMirrorUrl.trim().trimEnd('/')
+        if (configured.isNotEmpty() && !configured.endsWith(FILE, ignoreCase = true)) {
+            add("$configured/$name")
+        }
+
+        val releaseUrl = (listOf(info.downloadUrl) + info.downloadUrls)
+            .firstOrNull { it.contains("/releases/download/") }
+            ?.substringBefore("?")
+        if (releaseUrl != null) {
+            add("$releaseUrl?raw=1")
+            add("https://ghfast.top/$releaseUrl")
+            add("https://gh-proxy.com/$releaseUrl")
+            add("https://hub.gitmirror.com/$releaseUrl")
+        }
+        return urls.toList()
+    }
+
     private fun readText(url: String): String? {
         val connection = URL(url).openConnection() as HttpURLConnection
         try {
@@ -212,6 +311,7 @@ class UpdateManager(private val context: Context) {
             connection.readTimeout = READ_TIMEOUT_MS
             connection.instanceFollowRedirects = true
             connection.setRequestProperty("Accept", "application/json")
+            connection.setRequestProperty("User-Agent", USER_AGENT)
             if (connection.responseCode != HttpURLConnection.HTTP_OK) return null
             return connection.inputStream.bufferedReader().use { it.readText() }
         } finally {
@@ -219,48 +319,81 @@ class UpdateManager(private val context: Context) {
         }
     }
 
+    /**
+     * Fetches one address into [target].
+     *
+     * The GitHub assets API answers with a JSON description unless it is explicitly asked
+     * for the binary, so that one address needs a different Accept header. A short file is
+     * rejected right here: a proxy that cut the download off must not be counted as success.
+     */
     private fun downloadToFile(
         url: String,
         expectedSize: Long,
         target: File,
         onProgress: (Int) -> Unit
-    ): Boolean {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.connectTimeout = CONNECT_TIMEOUT_MS
-            connection.readTimeout = READ_TIMEOUT_MS
-            connection.instanceFollowRedirects = true
-            if (connection.responseCode != HttpURLConnection.HTTP_OK) return false
+    ): DownloadOutcome {
+        var connection: HttpURLConnection? = null
+        return try {
+            val conn = URL(url).openConnection() as HttpURLConnection
+            connection = conn
+            conn.connectTimeout = CONNECT_TIMEOUT_MS
+            conn.readTimeout = READ_TIMEOUT_MS
+            conn.instanceFollowRedirects = true
+            conn.setRequestProperty("User-Agent", USER_AGENT)
+            conn.setRequestProperty(
+                "Accept",
+                if (url.contains("api.github.com") && url.contains("/releases/assets/")) {
+                    "application/octet-stream"
+                } else {
+                    "*/*"
+                }
+            )
+            if (conn.responseCode !in 200..299) {
+                DownloadOutcome.NETWORK
+            } else {
+                // contentLengthLong would be nicer, but it is API 24 and this still installs
+                // on Android 5. The plain one only loses precision above 2 GB, which an APK
+                // of ours never reaches.
+                val total = if (expectedSize > 0L) expectedSize
+                else conn.contentLength.toLong().coerceAtLeast(0L)
+                var done = 0L
+                var lastPercent = -1
 
-            // contentLengthLong would be nicer, but it is API 24 and this still installs on
-            // Android 5. The plain one only loses precision above 2 GB, which an APK of ours
-            // never reaches.
-            val total = if (expectedSize > 0L) expectedSize
-            else connection.contentLength.toLong().coerceAtLeast(0L)
-            var done = 0L
-            var lastPercent = -1
-
-            connection.inputStream.use { input ->
-                FileOutputStream(target).use { output ->
-                    val buffer = ByteArray(BUFFER_SIZE)
-                    while (true) {
-                        val read = input.read(buffer)
-                        if (read <= 0) break
-                        output.write(buffer, 0, read)
-                        done += read
-                        if (total > 0L) {
-                            val percent = ((done * 100L) / total).toInt().coerceIn(0, 100)
-                            if (percent != lastPercent) {
-                                lastPercent = percent
-                                onProgress(percent)
+                conn.inputStream.use { input ->
+                    FileOutputStream(target).use { output ->
+                        val buffer = ByteArray(BUFFER_SIZE)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read <= 0) break
+                            output.write(buffer, 0, read)
+                            done += read
+                            if (total > 0L) {
+                                val percent = ((done * 100L) / total).toInt().coerceIn(0, 100)
+                                if (percent != lastPercent) {
+                                    lastPercent = percent
+                                    onProgress(percent)
+                                }
                             }
                         }
                     }
                 }
+                when {
+                    target.length() <= 0L -> DownloadOutcome.NETWORK
+                    expectedSize > 0L && target.length() != expectedSize ->
+                        DownloadOutcome.TRUNCATED
+                    else -> DownloadOutcome.SUCCESS
+                }
             }
-            return target.length() > 0L
+        } catch (exception: SocketTimeoutException) {
+            DownloadOutcome.NETWORK
+        } catch (exception: UnknownHostException) {
+            DownloadOutcome.NETWORK
+        } catch (exception: IOException) {
+            DownloadOutcome.STORAGE
+        } catch (exception: Exception) {
+            DownloadOutcome.NETWORK
         } finally {
-            connection.disconnect()
+            connection?.disconnect()
         }
     }
 

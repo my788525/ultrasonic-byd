@@ -54,6 +54,8 @@ import org.moire.ultrasonic.util.Settings.preferences
 import org.moire.ultrasonic.util.Storage
 import org.moire.ultrasonic.util.UpdateInfo
 import org.moire.ultrasonic.util.UpdateInstaller
+import org.moire.ultrasonic.util.UpdateDownloadResult
+import org.moire.ultrasonic.util.UpdateFailure
 import org.moire.ultrasonic.util.UpdateManager
 import org.moire.ultrasonic.util.TimeSpanPreference
 import org.moire.ultrasonic.util.TimeSpanPreferenceDialogFragmentCompat
@@ -370,10 +372,11 @@ class SettingsFragment :
                     )
                 }
             },
-            onDone = { file ->
+            onDone = { result ->
                 val fragmentContext = this.context ?: return@download
+                val file = result.file
                 if (file == null) {
-                    toast(R.string.update_download_failed, context = fragmentContext)
+                    showDownloadFailure(info, result)
                     return@download
                 }
                 if (!UpdateInstaller.mayInstall(fragmentContext)) {
@@ -385,10 +388,41 @@ class SettingsFragment :
                     return@download
                 }
                 if (!UpdateInstaller.install(fragmentContext, file)) {
-                    toast(R.string.update_download_failed, context = fragmentContext)
+                    toast(R.string.update_install_failed, context = fragmentContext)
                 }
             }
         )
+    }
+
+    /**
+     * Says why the download failed instead of lumping network errors together with a bad
+     * checksum, and leaves the driver a way out: retry, or open the APK in the browser.
+     */
+    private fun showDownloadFailure(info: UpdateInfo, result: UpdateDownloadResult) {
+        val dialogContext = context ?: return
+        val reason = getString(
+            when (result.failure) {
+                UpdateFailure.CHECKSUM -> R.string.update_failure_checksum
+                UpdateFailure.STORAGE -> R.string.update_failure_storage
+                else -> R.string.update_failure_network
+            }
+        )
+        val message = buildString {
+            append(getString(R.string.update_download_failed, reason, result.attempts))
+            append("\n\n")
+            append(getString(R.string.update_download_source, info.downloadUrl))
+        }
+        MaterialAlertDialogBuilder(dialogContext)
+            .setTitle(R.string.update_download_failed_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.update_download_retry) { _, _ -> downloadUpdate(info) }
+            .setNeutralButton(R.string.update_download_browser) { _, _ ->
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(info.downloadUrl)))
+                }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun currentVersionCode(): Int {

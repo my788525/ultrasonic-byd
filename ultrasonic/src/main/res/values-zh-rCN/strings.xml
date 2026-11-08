@@ -626,7 +626,15 @@
     <string name="update_available_download">下载</string>
     <string name="update_available_skip">跳过这个版本</string>
     <string name="update_downloading">正在下载… %1$d%%</string>
-    <string name="update_download_failed">下载失败，或文件校验不一致</string>
+    <string name="update_download_failed">下载失败：%1$s（已尝试 %2$d 个下载地址）</string>
+    <string name="update_failure_network">所有下载地址都连不上，请检查车机网络</string>
+    <string name="update_failure_checksum">安装包不完整或被替换，校验未通过，已丢弃</string>
+    <string name="update_failure_storage">无法写入安装包，请检查存储空间</string>
+    <string name="update_install_failed">无法打开安装界面，请用文件管理器安装已下载的安装包</string>
+    <string name="update_download_failed_title">更新下载失败</string>
+    <string name="update_download_retry">重试</string>
+    <string name="update_download_browser">用浏览器下载</string>
+    <string name="update_download_source">下载地址：%1$s</string>
     <string name="update_install_permission_needed">请先允许本应用安装更新</string>
     <string name="update_notification_title">有新版本 %1$s</string>
     <string name="update_notification_text">到「设置」里下载并安装</string>

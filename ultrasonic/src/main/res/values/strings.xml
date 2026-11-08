@@ -652,7 +652,15 @@
     <string name="update_available_download">Download</string>
     <string name="update_available_skip">Skip this version</string>
     <string name="update_downloading">Downloading… %1$d%%</string>
-    <string name="update_download_failed">The download failed or the file did not match its checksum</string>
+    <string name="update_download_failed">Download failed: %1$s (%2$d addresses tried)</string>
+    <string name="update_failure_network">none of the download addresses could be reached; check the car network</string>
+    <string name="update_failure_checksum">the file was incomplete or replaced and failed verification</string>
+    <string name="update_failure_storage">the APK could not be written; check free storage space</string>
+    <string name="update_install_failed">Could not open the installer. Install the downloaded APK with a file manager</string>
+    <string name="update_download_failed_title">Update download failed</string>
+    <string name="update_download_retry">Retry</string>
+    <string name="update_download_browser">Open in browser</string>
+    <string name="update_download_source">Address: %1$s</string>
     <string name="update_install_permission_needed">Allow this app to install updates first</string>
     <string name="update_notification_title">Version %1$s is available</string>
     <string name="update_notification_text">Open Settings to download and install it</string>
