@@ -1,7 +1,7 @@
 {
   "versionCode": 522,
   "versionName": "4.8.0-byd.40",
-  "downloadUrl": "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.40/NavMusic-4.8.0-byd.40.apk",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.40.apk",
   "sha256": "2a1917699128676f2cb7dddfc27a4978b93bec2929b361d169fec194a25861f6",
   "size": 11474589,
   "publishedAt": "2026-11-07T13:27:23Z",
@@ -14,5 +14,11 @@
     "如实修正设置页文案：ADB 授权项不再标注「推荐」，明确 2606 起 ADB 被关闭时该路不可用；移除「改用 ADB 授权即可解决」的误导表述，并说明封闭车机上应以一键隐藏为准",
     "保留原有零权限兜底扫描（getprop / Settings / 媒体静音 / dumpsys 窗口）、无障碍服务、UsageStats 与通知栏「隐藏 30 秒」，车机若后续可开启任一权限仍会自动生效",
     "版本 bump 至 4.8.0-byd.40 (versionCode 522)"
+  ],
+  "downloadUrls": [
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.40.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.40/NavMusic-4.8.0-byd.40.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.40/NavMusic-4.8.0-byd.40.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.40/NavMusic-4.8.0-byd.40.apk"
   ]
 }
