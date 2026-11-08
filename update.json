@@ -1,24 +1,23 @@
 {
-  "versionCode": 522,
-  "versionName": "4.8.0-byd.40",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.40.apk",
-  "sha256": "2a1917699128676f2cb7dddfc27a4978b93bec2929b361d169fec194a25861f6",
-  "size": 11474589,
-  "publishedAt": "2026-11-07T13:27:23Z",
+  "versionCode": 523,
+  "versionName": "4.8.0-byd.41",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.41.apk",
+  "sha256": "c858dc0cda7e83a25011b29ec2d3be4c26bb35e67eb088ca2170c94d5742208f",
+  "size": 11479441,
+  "publishedAt": "2026-11-08T10:06:32Z",
   "changelog": [
-    "确认车机无法开启 ADB 后停止在自动检测上继续加码：比亚迪 2606 起固件已关闭 ADB 且无法重新开启，DiLink 没有无障碍设置界面（开服务需 WRITE_SECURE_SETTINGS，仅 ADB 可授），GET_USAGE_STATS appop 同样只能 ADB 授予，BYDAUTO_*_GET/_SET 为签名级权限——普通第三方 App 在这台车上无法读取挡位 / 影像状态，自动检测在平台层面不可达",
-    "新增 100% 可靠、零权限的一键隐藏 / 恢复：浮窗内新增收起小按钮（普通与横幅两种布局都有），隐藏后屏幕边缘保留一个 28dp 小圆点作为恢复入口，常驻通知栏首动作改为「隐藏浮窗 / 显示浮窗」切换，设置页也新增「显示 / 隐藏浮窗」入口",
-    "一键隐藏与自动闸门完全解耦：关掉「环影 / 倒车时自动隐藏并暂停」也不会失去手动按钮；隐藏时自动暂停音乐，恢复时自动续播，且隐藏期间不占用任何特殊权限",
-    "新增可选「音频焦点辅助判断」（默认关闭）：车机短暂抢占音频焦点时可隐藏浮窗并暂停音乐，焦点归还即恢复；因高德导航播报同样会抢占焦点，默认关闭以免每次转弯提示都隐藏浮窗，诊断项会记录最近一次音频焦点事件便于真车判断",
-    "影像检测状态诊断项扩展为 7 项：ADB 授权 / 无障碍 / 车机接口 / 音频焦点 / 手动隐藏 / 最近前台包名 / 最近音频焦点事件",
-    "如实修正设置页文案：ADB 授权项不再标注「推荐」，明确 2606 起 ADB 被关闭时该路不可用；移除「改用 ADB 授权即可解决」的误导表述，并说明封闭车机上应以一键隐藏为准",
-    "保留原有零权限兜底扫描（getprop / Settings / 媒体静音 / dumpsys 窗口）、无障碍服务、UsageStats 与通知栏「隐藏 30 秒」，车机若后续可开启任一权限仍会自动生效",
-    "版本 bump 至 4.8.0-byd.40 (versionCode 522)"
+    "修复车机「下载失败，或文件校验不一致」：实测清单与 APK 的 SHA-256、大小完全一致，故障是 App 内两个下载通道（GitHub 直链 / gh-proxy.com）在车机网络均返回 504，改为静态 APK 镜像优先",
+    "新增静态 APK 分发：每次发布把已签名 APK 同步放到 apk 分支，可从 raw.githubusercontent.com 与 jsDelivr 直接下载，不依赖 github.com 的 release 重定向与第三方代理",
+    "更新清单新增 downloadUrls 多地址：客户端按清单顺序逐个尝试，任一地址可用即可完成下载",
+    "下载结果区分「所有地址都连不上 / 文件校验不通过 / 存储写入失败」，弹窗给出具体原因、已尝试地址数与下载地址，并提供重试与浏览器下载入口",
+    "下载时先比对文件大小再比对 SHA-256：被代理截断、返回错误页或返回 GitHub API 的 JSON 描述都会直接丢弃，不再误判为成功",
+    "连接超时 12 秒、读取超时 30 秒以适配车机慢网；设置里的「更新镜像」现在同时用于 APK 下载",
+    "版本 bump 至 4.8.0-byd.41 (versionCode 523)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.40.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.40/NavMusic-4.8.0-byd.40.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.40/NavMusic-4.8.0-byd.40.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.40/NavMusic-4.8.0-byd.40.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.41.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.41/NavMusic-4.8.0-byd.41.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.41/NavMusic-4.8.0-byd.41.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.41/NavMusic-4.8.0-byd.41.apk"
   ]
 }
