@@ -38,5 +38,6 @@
         a:gravity="center"
         a:maxLines="1"
         a:textColor="@color/pal_text_primary"
-        a:textSize="17sp" />
+        a:textSize="16sp"
+        a:textStyle="bold" />
 </LinearLayout>

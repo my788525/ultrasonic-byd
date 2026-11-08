@@ -120,9 +120,10 @@ object CarTheme {
             intArrayOf(accent, edge, surface)
         ).apply {
             this.cornerRadius = dp(context, cornerDp)
-            setStroke(dp(context, 1f).toInt(), withAlpha(
-                ContextCompat.getColor(context, palette.accent), CARD_OUTLINE_ALPHA
-            ))
+            setStroke(
+                dp(context, 1f).toInt(),
+                withAlpha(ContextCompat.getColor(context, palette.accent), CARD_OUTLINE_ALPHA)
+            )
         }
     }
 
@@ -159,7 +160,10 @@ object CarTheme {
     }
 
     /** Round gradient button, used for the main play control of the home screen. */
-    fun accentButton(context: Context, palette: CarPalette = CarPalette.current()): GradientDrawable {
+    fun accentButton(
+        context: Context,
+        palette: CarPalette = CarPalette.current()
+    ): GradientDrawable {
         val accent = accent(context, palette)
         return GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
@@ -168,6 +172,31 @@ object CarTheme {
             shape = GradientDrawable.OVAL
         }
     }
+
+    /** Rounded surface or highlight pill drawable with an optional 1dp border. */
+    fun roundedFill(
+        context: Context,
+        @ColorInt fillColor: Int,
+        @ColorInt strokeColor: Int = Color.TRANSPARENT,
+        cornerDp: Float = 14f
+    ): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(context, cornerDp)
+            setColor(fillColor)
+            if (strokeColor != Color.TRANSPARENT) {
+                setStroke(dp(context, 1f).toInt(), strokeColor)
+            }
+        }
+    }
+
+    @ColorInt
+    fun surfaceColor(context: Context, palette: CarPalette = CarPalette.current()): Int =
+        tone(context, ContextCompat.getColor(context, palette.surface))
+
+    @ColorInt
+    fun surfaceAltColor(context: Context, palette: CarPalette = CarPalette.current()): Int =
+        tone(context, ContextCompat.getColor(context, palette.surfaceAlt()))
 
     private fun CarPalette.surfaceAlt(): Int = when (this) {
         CarPalette.GRAPHITE -> R.color.pal_graphite_surface_alt

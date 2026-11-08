@@ -36,24 +36,28 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.abs
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.moire.ultrasonic.NavigationGraphDirections
 import org.moire.ultrasonic.R
 import org.moire.ultrasonic.api.subsonic.models.AlbumListType
-import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.data.ActiveServerProvider
+import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.service.FloatingPlayerService
 import org.moire.ultrasonic.service.MediaPlayerManager
 import org.moire.ultrasonic.service.MusicServiceFactory
 import org.moire.ultrasonic.subsonic.ImageLoaderProvider
 import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
+import org.moire.ultrasonic.util.CarTransport
 import org.moire.ultrasonic.util.DownloadUtil
+import org.moire.ultrasonic.util.DownloadedTracks
 import org.moire.ultrasonic.util.HomePrefs
 import org.moire.ultrasonic.util.PinnedPlaylist
 import org.moire.ultrasonic.util.PlaylistResumeStore
@@ -61,7 +65,6 @@ import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.Util
 import org.moire.ultrasonic.util.toTrack
 import timber.log.Timber
-import java.util.concurrent.TimeUnit
 
 /**
  * The start screen of the car UI.
@@ -78,6 +81,7 @@ import java.util.concurrent.TimeUnit
  *
  * It has to be a [ScopeFragment]: the media player manager lives in the NavigationActivity scope.
  */
+@Suppress("TooManyFunctions")
 class HomeFragment : ScopeFragment() {
 
     private val mediaPlayerManager: MediaPlayerManager by inject()
@@ -87,13 +91,17 @@ class HomeFragment : ScopeFragment() {
     private var cover: ImageView? = null
     private var titleView: TextView? = null
     private var artistView: TextView? = null
+    private var prevButton: ImageButton? = null
     private var playButton: ImageButton? = null
+    private var nextButton: ImageButton? = null
     private var progressView: ProgressBar? = null
     private var homePlaylistAdapter: HomePlaylistAdapter? = null
     private var playlistRowsCached = 0
     private var lastPlayingState: Boolean? = null
 
     private var currentCoverId: String? = null
+    private var lastPrevClickAt = 0L
+    private var lastNextClickAt = 0L
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateRunnable = object : Runnable {
@@ -126,20 +134,46 @@ class HomeFragment : ScopeFragment() {
         cover = view.findViewById(R.id.home_cover)
         titleView = view.findViewById(R.id.home_title)
         artistView = view.findViewById(R.id.home_artist)
+        prevButton = view.findViewById(R.id.home_prev)
         playButton = view.findViewById(R.id.home_play)
+        nextButton = view.findViewById(R.id.home_next)
         progressView = view.findViewById(R.id.home_progress)
 
         decorateContinueCard(view)
         setupPlaylistGrid(view)
         setupLibraryGrid(view)
 
+        prevButton?.setOnClickListener {
+            val now = System.currentTimeMillis()
+            if (CarTransport.isDebounced(lastPrevClickAt, now)) return@setOnClickListener
+            lastPrevClickAt = now
+            val pos = mediaPlayerManager.playerPosition.toLong()
+            if (pos > CarTransport.PREVIOUS_RESTART_THRESHOLD_MS) {
+                mediaPlayerManager.seekTo(0)
+            } else {
+                mediaPlayerManager.seekToPrevious()
+            }
+            updateNowPlaying()
+        }
+
         playButton?.setOnClickListener {
             mediaPlayerManager.togglePlayPause()
             updateNowPlaying()
         }
 
+        nextButton?.setOnClickListener {
+            val now = System.currentTimeMillis()
+            if (CarTransport.isDebounced(lastNextClickAt, now)) return@setOnClickListener
+            lastNextClickAt = now
+            mediaPlayerManager.seekToNext()
+            updateNowPlaying()
+        }
+
         view.findViewById<View>(R.id.home_shuffle).setOnClickListener { shuffleAll() }
         view.findViewById<View>(R.id.home_nav_mode).setOnClickListener { toggleNavigationOverlay() }
+        view.findViewById<View?>(R.id.home_playlists_more)?.setOnClickListener {
+            findNavController().navigate(NavigationGraphDirections.toPlaylistFragment())
+        }
 
         // The card body opens the big player page, the buttons on it keep their own action.
         view.findViewById<View>(R.id.home_continue_card).setOnClickListener {
@@ -154,6 +188,7 @@ class HomeFragment : ScopeFragment() {
      * This is the gesture the driver uses before starting a route, so it lives on the home
      * screen and not three levels deep in the settings.
      */
+    @Suppress("TooGenericExceptionCaught")
     private fun toggleNavigationOverlay() {
         val ctx = context ?: return
         val enabled = !Settings.navFloating
@@ -176,6 +211,7 @@ class HomeFragment : ScopeFragment() {
         }
 
         FloatingPlayerService.setNavigationMode(ctx, enabled)
+        updateNavButtonTint()
         Util.toast(
             if (enabled) R.string.nav_floating_on else R.string.nav_floating_off,
             context = ctx
@@ -215,7 +251,9 @@ class HomeFragment : ScopeFragment() {
         cover = null
         titleView = null
         artistView = null
+        prevButton = null
         playButton = null
+        nextButton = null
         progressView = null
         lastPlayingState = null
         currentCoverId = null
@@ -228,6 +266,7 @@ class HomeFragment : ScopeFragment() {
         val context = requireContext()
         val palette = CarPalette.current()
         val accent = CarTheme.color(context, palette.accent)
+        val primaryText = CarTheme.onSurface(context)
 
         val card = root.findViewById<View>(R.id.home_continue_card)
         val cardBackground = CarTheme.cardBackground(context)
@@ -249,16 +288,23 @@ class HomeFragment : ScopeFragment() {
             ColorStateList.valueOf(ContextCompat.getColor(context, R.color.pal_on_accent))
         )
 
+        root.findViewById<ImageButton?>(R.id.home_prev)?.let {
+            ImageViewCompat.setImageTintList(it, ColorStateList.valueOf(primaryText))
+        }
+        root.findViewById<ImageButton?>(R.id.home_next)?.let {
+            ImageViewCompat.setImageTintList(it, ColorStateList.valueOf(primaryText))
+        }
+
         val shuffle = root.findViewById<ImageButton>(R.id.home_shuffle)
         ImageViewCompat.setImageTintList(
             shuffle,
-            android.content.res.ColorStateList.valueOf(accent)
+            ColorStateList.valueOf(accent)
         )
 
         val navMode = root.findViewById<ImageButton>(R.id.home_nav_mode)
         ImageViewCompat.setImageTintList(
             navMode,
-            android.content.res.ColorStateList.valueOf(
+            ColorStateList.valueOf(
                 if (Settings.navFloating) accent else CarTheme.onSurfaceSecondary(context)
             )
         )
@@ -478,34 +524,44 @@ class HomeFragment : ScopeFragment() {
      * Loads the driver's playlists from the server (unless the local cache is still fresh), caches
      * them, and reports them ordered. Skipping a warm cache avoids a redundant network call every
      * time the home screen is opened.
+     *
+     * When the network fails or times out, keeps the already-rendered cached playlists instead of
+     * wiping the row with an empty list.
      */
+    @Suppress("TooGenericExceptionCaught")
     private fun loadHomePlaylists(onResult: (List<PinnedPlaylist>) -> Unit) {
+        val cached = HomePrefs.getCachedPlaylists()
         val cacheAgeMs = System.currentTimeMillis() - HomePrefs.getPlaylistFetchTime()
-        if (cacheAgeMs < PLAYLIST_REFRESH_TTL_MS) {
+        if (cached.isNotEmpty() && cacheAgeMs < PLAYLIST_REFRESH_TTL_MS) {
             // Cache is fresh: the instant render already shows it, so skip the network round-trip.
             return
         }
         lifecycleScope.launch {
             val loaded = withContext(Dispatchers.IO) {
-                try {
-                    MusicServiceFactory.getMusicService().getPlaylists(false)
-                } catch (all: Exception) {
-                    Timber.w(all, "Could not load the home playlists")
-                    null
+                withTimeoutOrNull(NETWORK_ACTION_TIMEOUT_MS) {
+                    try {
+                        MusicServiceFactory.getMusicService().getPlaylists(false)
+                    } catch (all: Exception) {
+                        Timber.w(all, "Could not load the home playlists")
+                        null
+                    }
                 }
             }
-            if (!isAdded) return@launch
+            if (!isAdded || loaded == null) return@launch
 
-            val mapped = loaded.orEmpty().map { PinnedPlaylist(it.id, it.name, it.coverArt) }
+            val mapped = loaded.map { PinnedPlaylist(it.id, it.name, it.coverArt) }
             if (mapped.isNotEmpty()) {
                 HomePrefs.setCachedPlaylists(mapped)
                 HomePrefs.setPlaylistFetchTime(System.currentTimeMillis())
+                onResult(mapped)
+            } else if (cached.isEmpty()) {
+                onResult(emptyList())
             }
-            onResult(mapped)
         }
     }
 
     /** Starts a playlist immediately, continuing from the saved position when one exists. */
+    @Suppress("TooGenericExceptionCaught")
     private fun playHomePlaylist(playlist: PinnedPlaylist) {
         HomePrefs.incrementPlayCount(playlist.id)
         // Re-rank the home grid immediately so the just-played playlist moves up without waiting
@@ -514,17 +570,26 @@ class HomeFragment : ScopeFragment() {
         val progress = PlaylistResumeStore.get(playlist.id)
         lifecycleScope.launch {
             val songs = withContext(Dispatchers.IO) {
-                try {
-                    DownloadUtil.getTracksFromServerAsync(
-                        isArtist = false,
-                        id = playlist.id,
-                        isDirectory = false,
-                        name = playlist.name,
-                        isShare = false
-                    )
-                } catch (all: Exception) {
-                    Timber.w(all, "Could not load playlist %s", playlist.id)
-                    emptyList<Track>()
+                val remote = withTimeoutOrNull(NETWORK_ACTION_TIMEOUT_MS) {
+                    try {
+                        DownloadUtil.getTracksFromServerAsync(
+                            isArtist = false,
+                            id = playlist.id,
+                            isDirectory = false,
+                            name = playlist.name,
+                            isShare = false
+                        )
+                    } catch (all: Exception) {
+                        Timber.w(all, "Could not load playlist %s", playlist.id)
+                        emptyList<Track>()
+                    }
+                }.orEmpty()
+
+                remote.ifEmpty {
+                    // Fallback to local downloaded tracks if the server cannot be reached
+                    DownloadedTracks.scan()
+                        .filter { it.state != DownloadedTracks.State.PARTIAL }
+                        .map { it.track }
                 }
             }
 
@@ -614,9 +679,11 @@ class HomeFragment : ScopeFragment() {
             if (ActiveServerProvider.isOffline()) {
                 it.findNavController().navigate(R.id.downloadsFragment)
             } else {
-                it.findNavController().navigate(NavigationGraphDirections.toTrackCollection(
-                    getStarred = true
-                ))
+                it.findNavController().navigate(
+                    NavigationGraphDirections.toTrackCollection(
+                        getStarred = true
+                    )
+                )
             }
         },
         Tile("radio", R.drawable.ic_home_radio, R.string.home_radio_title) {
@@ -714,7 +781,7 @@ class HomeFragment : ScopeFragment() {
 
     private class PlaylistVH(val view: View) : RecyclerView.ViewHolder(view)
 
-    private val PLAYLIST_DIFF = object : DiffUtil.ItemCallback<PinnedPlaylist>() {
+    private val playlistDiff = object : DiffUtil.ItemCallback<PinnedPlaylist>() {
         override fun areItemsTheSame(a: PinnedPlaylist, b: PinnedPlaylist) = a.id == b.id
         override fun areContentsTheSame(a: PinnedPlaylist, b: PinnedPlaylist) =
             a.id == b.id && a.name == b.name && a.coverArt == b.coverArt
@@ -722,15 +789,13 @@ class HomeFragment : ScopeFragment() {
 
     private inner class HomePlaylistAdapter(
         private val onClick: (PinnedPlaylist) -> Unit
-    ) : ListAdapter<PinnedPlaylist, PlaylistVH>(PLAYLIST_DIFF) {
+    ) : ListAdapter<PinnedPlaylist, PlaylistVH>(playlistDiff) {
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PlaylistVH {
             val view = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_home_playlist_tile, parent, false)
             // One "page" of the sideways grid holds exactly `columns()` cards, so the setting
             // (4 / 8 / 12 / 16) really equals the number of playlists on the first screen.
-            // A hard-coded 148dp tile only fit three per row on the car panel, which made
-            // "8" show just 6 playlists and looked much larger than the old grid.
             val cols = columns().coerceAtLeast(1)
             val gap = parent.resources.getDimensionPixelSize(R.dimen.home_grid_tile_gap)
             val available = parent.width - parent.paddingLeft - parent.paddingRight
@@ -767,20 +832,10 @@ class HomeFragment : ScopeFragment() {
         }
 
         private fun bindPlaylistIcon(icon: ImageView, playlist: PinnedPlaylist, accent: Int) {
-            val sizeDp = if (playlist.coverArt.isNotEmpty()) 64f else 48f
-            val sizePx = CarTheme.dp(icon.context, sizeDp).toInt()
-            // Reassigning layoutParams on every bind forces a measure pass; only do it when the
-            // recycled view actually needs a different icon size.
-            (icon.layoutParams as? ViewGroup.LayoutParams)?.let {
-                if (it.width != sizePx || it.height != sizePx) {
-                    it.width = sizePx
-                    it.height = sizePx
-                    icon.layoutParams = it
-                }
-            }
             if (playlist.coverArt.isNotEmpty()) {
                 icon.scaleType = ImageView.ScaleType.CENTER_CROP
                 icon.imageTintList = null
+                icon.setPadding(0, 0, 0, 0)
                 // Horizontal scrolling rebinds tiles often. A recycled tile that already shows
                 // this cover needs no new decode request (a major jank source on a head unit).
                 val token = "playlist-${playlist.coverArt}"
@@ -800,7 +855,9 @@ class HomeFragment : ScopeFragment() {
                 }
             } else {
                 icon.setTag(R.id.home_tile_icon, null)
-                icon.scaleType = ImageView.ScaleType.FIT_CENTER
+                icon.scaleType = ImageView.ScaleType.CENTER_INSIDE
+                val pad = CarTheme.dp(icon.context, 12f).toInt()
+                icon.setPadding(pad, pad, pad, pad)
                 icon.setImageDrawable(
                     ResourcesCompat.getDrawable(
                         icon.context.resources, R.drawable.ic_menu_playlists, null
@@ -829,6 +886,13 @@ class HomeFragment : ScopeFragment() {
                 if (playing) R.drawable.media_pause else R.drawable.media_start
             )
         }
+
+        val canPrev = mediaPlayerManager.canSeekToPrevious() || mediaPlayerManager.playerPosition > 0
+        val canNext = mediaPlayerManager.canSeekToNext()
+        prevButton?.isEnabled = canPrev
+        prevButton?.alpha = if (canPrev) 1.0f else 0.38f
+        nextButton?.isEnabled = canNext
+        nextButton?.alpha = if (canNext) 1.0f else 0.38f
 
         if (track == null) {
             setTextIfChanged(titleView, getString(R.string.home_idle))
@@ -887,21 +951,46 @@ class HomeFragment : ScopeFragment() {
     /**
      * Plays a random selection of the whole library. On a head unit this is the fastest way to
      * get music going without browsing, so it gets its own always visible button.
+     *
+     * When the network is unreachable or times out, automatically falls back to shuffling local
+     * downloaded tracks so the driver never gets stuck.
      */
+    @Suppress("TooGenericExceptionCaught")
     private fun shuffleAll() {
         viewLifecycleOwner.lifecycleScope.launch {
+            var usedLocalFallback = false
             val songs = withContext(Dispatchers.IO) {
-                try {
-                    MusicServiceFactory.getMusicService().getRandomSongs(Settings.maxSongs).getTracks()
-                } catch (all: Exception) {
-                    Timber.w(all, "Could not load random songs")
-                    emptyList()
+                val remote = withTimeoutOrNull(NETWORK_ACTION_TIMEOUT_MS) {
+                    try {
+                        MusicServiceFactory.getMusicService()
+                            .getRandomSongs(Settings.maxSongs)
+                            .getTracks()
+                    } catch (all: Exception) {
+                        Timber.w(all, "Could not load random songs")
+                        emptyList()
+                    }
+                }.orEmpty()
+
+                if (remote.isNotEmpty()) {
+                    remote
+                } else {
+                    val local = DownloadedTracks.scan()
+                        .filter { it.state != DownloadedTracks.State.PARTIAL }
+                        .map { it.track }
+                        .shuffled()
+                        .take(Settings.maxSongs)
+                    if (local.isNotEmpty()) usedLocalFallback = true
+                    local
                 }
             }
 
             if (songs.isEmpty()) {
                 Util.toast(R.string.home_idle_hint, context = context)
                 return@launch
+            }
+
+            if (usedLocalFallback) {
+                Util.toast(R.string.car_fallback_shuffle_cached, context = context)
             }
 
             mediaPlayerManager.addToPlaylist(
@@ -924,12 +1013,14 @@ class HomeFragment : ScopeFragment() {
         /** Skip the server playlist refresh if the cache was fetched less than this long ago. */
         private const val PLAYLIST_REFRESH_TTL_MS = 10 * 60 * 1000L
 
+        /** Timeout for interactive home actions before falling back to local cache. */
+        private const val NETWORK_ACTION_TIMEOUT_MS = 8_000L
+
         /** Portrait: one big row per entry, the way the parked layout is designed. */
         private const val PORTRAIT_COLUMNS = 1
-        private const val PORTRAIT_CARD_HEIGHT_DP = 104f
+        private const val PORTRAIT_CARD_HEIGHT_DP = 108f
         private const val PORTRAIT_COVER_DP = 78f
 
-        private const val TILE_GAP_DP = 12f
         private const val PRESS_ALPHA = 0x40
         private const val OPAQUE_WHITE = 0xFFFFFFFF.toInt()
         private val UPDATE_INTERVAL_MS = TimeUnit.SECONDS.toMillis(1)

@@ -210,16 +210,15 @@ class ImageLoader(
         if (id.isBlank()) return@launch
 
         withContext(Dispatchers.IO) {
-            // Return if have a cache hit
-            if (File(file).exists()) return@withContext
+            val targetFile = File(file)
+            // Return if we have a valid non-empty cache hit
+            if (targetFile.exists() && targetFile.length() > 0L) return@withContext
 
             // If another coroutine has started caching, abort
-            if (cacheInProgress[file] != null) return@withContext
+            if (cacheInProgress.putIfAbsent(file, CountDownLatch(1)) != null) return@withContext
 
             // Always download the large size..
             val size = config.largeSize
-
-            File(file).createNewFile()
 
             // Query the API
             Timber.d("Loading cover art for: %s", id)
@@ -231,22 +230,28 @@ class ImageLoader(
                 // Check for failure
                 if (response.stream == null) return@withContext
 
-                // Write Response stream to file
+                // Write Response stream to file only after network bytes are read
                 var inputStream: InputStream? = null
                 try {
                     inputStream = response.stream
                     val bytes = inputStream!!.readBytes()
-                    var outputStream: OutputStream? = null
-                    try {
-                        outputStream = FileOutputStream(file)
-                        outputStream.write(bytes)
-                    } finally {
-                        outputStream.safeClose()
+                    if (bytes.isNotEmpty()) {
+                        FileUtil.ensureAlbumArtDirectory()
+                        var outputStream: OutputStream? = null
+                        try {
+                            outputStream = FileOutputStream(targetFile)
+                            outputStream.write(bytes)
+                        } finally {
+                            outputStream.safeClose()
+                        }
                     }
                 } finally {
                     inputStream.safeClose()
                 }
             } catch (all: Exception) {
+                if (targetFile.exists() && targetFile.length() == 0L) {
+                    targetFile.delete()
+                }
                 Timber.w(all)
             } finally {
                 cacheInProgress.remove(file)?.countDown()
@@ -262,7 +267,8 @@ class ImageLoader(
         return if (width > 1) width.coerceAtMost(NO_LARGER_THAN_PX) else 0
     }
 
-    private fun resolveSize(requested: Int, large: Boolean): Int {        return if (requested <= 0) {
+    private fun resolveSize(requested: Int, large: Boolean): Int {
+        return if (requested <= 0) {
             if (large) config.largeSize else config.defaultSize
         } else {
             requested

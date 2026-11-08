@@ -31,12 +31,15 @@ import org.moire.ultrasonic.domain.SearchResult
 import org.moire.ultrasonic.domain.Share
 import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.domain.UserInfo
+import org.moire.ultrasonic.util.DownloadedTracks
+import org.moire.ultrasonic.util.EntryByDiscAndTrackComparator
 import org.moire.ultrasonic.util.LRUCache
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.TimeLimitedCache
 import org.moire.ultrasonic.util.Util
+import timber.log.Timber
 
-@Suppress("TooManyFunctions")
+@Suppress("TooManyFunctions", "TooGenericExceptionCaught")
 class CachedMusicService(private val musicService: MusicService) : MusicService, KoinComponent {
     private val activeServerProvider: ActiveServerProvider by inject()
     private var metaDatabase: MetaDatabase = activeServerProvider.getActiveMetaDatabase()
@@ -44,6 +47,7 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
     // Old style TimeLimitedCache
     private val cachedMusicDirectories: LRUCache<String, TimeLimitedCache<MusicDirectory?>>
     private val cachedAlbum: LRUCache<String, TimeLimitedCache<MusicDirectory?>>
+    private val cachedPlaylistTracks: LRUCache<String, TimeLimitedCache<MusicDirectory?>>
     private val cachedUserInfo: LRUCache<String, TimeLimitedCache<UserInfo?>>
     private val cachedLicenseValid = TimeLimitedCache<Boolean>(120, TimeUnit.SECONDS)
     private val cachedPlaylists = TimeLimitedCache<List<Playlist>?>(3600, TimeUnit.SECONDS)
@@ -54,6 +58,7 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
     // New Room Database
     private var cachedArtists = metaDatabase.artistDao()
     private var cachedAlbums = metaDatabase.albumDao()
+    private var cachedTracks = metaDatabase.trackDao()
     private var cachedIndexes = metaDatabase.indexDao()
     private val cachedMusicFolders = metaDatabase.musicFoldersDao()
 
@@ -69,85 +74,118 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
     @Throws(Exception::class)
     override fun isLicenseValid(): Boolean {
         checkSettingsChanged()
-        var isValid = cachedLicenseValid.get()
-        if (isValid == null) {
-            isValid = musicService.isLicenseValid()
-            cachedLicenseValid.set(isValid)
+        return cachedLicenseValid.get() ?: try {
+            musicService.isLicenseValid().also { cachedLicenseValid.set(it) }
+        } catch (e: Exception) {
+            cachedLicenseValid.getStale() ?: throw e
         }
-        return isValid
     }
 
     @Throws(Exception::class)
     override fun getMusicFolders(refresh: Boolean): List<MusicFolder> {
         checkSettingsChanged()
-        if (refresh) {
-            cachedMusicFolders.clear()
+        val existing = cachedMusicFolders.get()
+        if (!refresh && existing.isNotEmpty()) {
+            return existing
         }
-        var result = cachedMusicFolders.get()
-
-        if (result.isEmpty()) {
-            result = musicService.getMusicFolders(refresh)
+        return try {
+            val result = musicService.getMusicFolders(refresh)
+            if (refresh) {
+                cachedMusicFolders.clear()
+            }
             cachedMusicFolders.set(result)
+            result
+        } catch (e: Exception) {
+            if (existing.isNotEmpty()) {
+                Timber.w(e, "Network failed in getMusicFolders, using cached Room data")
+                existing
+            } else {
+                throw e
+            }
         }
-        return result
     }
 
     @Throws(Exception::class)
     override fun getIndexes(musicFolderId: String?, refresh: Boolean): List<Index> {
         checkSettingsChanged()
 
-        if (refresh) {
-            cachedIndexes.clear()
-            cachedMusicDirectories.clear()
-        }
-
-        var indexes: List<Index>
-
-        indexes = if (musicFolderId == null) {
+        val existing = if (musicFolderId == null) {
             cachedIndexes.get()
         } else {
             cachedIndexes.get(musicFolderId)
         }
 
-        if (indexes.isEmpty()) {
-            indexes = musicService.getIndexes(musicFolderId, refresh)
-            cachedIndexes.upsert(indexes)
+        if (!refresh && existing.isNotEmpty()) {
+            return existing
         }
 
-        return indexes
+        return try {
+            val indexes = musicService.getIndexes(musicFolderId, refresh)
+            if (refresh) {
+                cachedIndexes.clear()
+                cachedMusicDirectories.clear()
+            }
+            cachedIndexes.upsert(indexes)
+            indexes
+        } catch (e: Exception) {
+            if (existing.isNotEmpty()) {
+                Timber.w(e, "Network failed in getIndexes, using cached Room data")
+                existing
+            } else {
+                throw e
+            }
+        }
     }
 
     @Throws(Exception::class)
     override fun getArtists(refresh: Boolean): List<Artist> {
         checkSettingsChanged()
 
-        if (refresh) {
-            cachedArtists.clear()
+        val existing = cachedArtists.get()
+        if (!refresh && existing.isNotEmpty()) {
+            return existing
         }
 
-        var result = cachedArtists.get()
-
-        if (result.isEmpty()) {
-            result = musicService.getArtists(refresh)
+        return try {
+            val result = musicService.getArtists(refresh)
+            if (refresh) {
+                cachedArtists.clear()
+            }
             cachedArtists.set(result)
+            result
+        } catch (e: Exception) {
+            if (existing.isNotEmpty()) {
+                Timber.w(e, "Network failed in getArtists, using cached Room data")
+                existing
+            } else {
+                throw e
+            }
         }
-        return result
     }
 
     @Throws(Exception::class)
     override fun getMusicDirectory(id: String, name: String?, refresh: Boolean): MusicDirectory {
         checkSettingsChanged()
-        var cache = if (refresh) null else cachedMusicDirectories[id]
-        var dir = cache?.get()
-        if (dir == null) {
-            dir = musicService.getMusicDirectory(id, name, refresh)
-            cache = TimeLimitedCache(
+        val existingCache = cachedMusicDirectories[id]
+        val fresh = if (refresh) null else existingCache?.get()
+        if (fresh != null) return fresh
+        return try {
+            val fetched = musicService.getMusicDirectory(id, name, refresh)
+            val cache = TimeLimitedCache<MusicDirectory?>(
                 Settings.directoryCacheTime.toLong(), TimeUnit.SECONDS
             )
-            cache.set(dir)
+            cache.set(fetched)
             cachedMusicDirectories.put(id, cache)
+            fetched
+        } catch (e: Exception) {
+            val stale = existingCache?.getStale()
+            if (stale != null) {
+                Timber.w(e, "Network failed in getMusicDirectory, using stale cache")
+                stale
+            } else {
+                throw e
+            }
         }
-        return dir
     }
 
     /*
@@ -159,36 +197,62 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
         List<Album> {
         checkSettingsChanged()
 
-        var result: List<Album>
-
-        result = if (refresh) {
-            cachedAlbums.clearByArtist(id)
-            listOf()
-        } else {
-            cachedAlbums.byArtist(id)
+        val existing = cachedAlbums.byArtist(id)
+        if (!refresh && existing.isNotEmpty()) {
+            return existing
         }
 
-        if (result.isEmpty()) {
-            result = musicService.getAlbumsOfArtist(id, name, refresh)
+        return try {
+            val result = musicService.getAlbumsOfArtist(id, name, refresh)
+            if (refresh) {
+                cachedAlbums.clearByArtist(id)
+            }
             cachedAlbums.upsert(result)
+            result
+        } catch (e: Exception) {
+            if (existing.isNotEmpty()) {
+                Timber.w(e, "Network failed in getAlbumsOfArtist, using cached Room data")
+                existing
+            } else {
+                throw e
+            }
         }
-        return result
     }
 
     @Throws(Exception::class)
     override fun getAlbumAsDir(id: String, name: String?, refresh: Boolean): MusicDirectory {
         checkSettingsChanged()
-        var cache = if (refresh) null else cachedAlbum[id]
-        var dir = cache?.get()
-        if (dir == null) {
-            dir = musicService.getAlbumAsDir(id, name, refresh)
-            cache = TimeLimitedCache(
+        val existingCache = cachedAlbum[id]
+        val fresh = if (refresh) null else existingCache?.get()
+        if (fresh != null) return fresh
+        return try {
+            val fetched = musicService.getAlbumAsDir(id, name, refresh)
+            val cache = TimeLimitedCache<MusicDirectory?>(
                 Settings.directoryCacheTime.toLong(), TimeUnit.SECONDS
             )
-            cache.set(dir)
+            cache.set(fetched)
             cachedAlbum.put(id, cache)
+            fetched
+        } catch (e: Exception) {
+            val stale = existingCache?.getStale()
+            if (stale != null) {
+                Timber.w(e, "Network failed in getAlbumAsDir, using stale cache")
+                stale
+            } else {
+                val roomTracks = cachedTracks
+                    .byAlbum(id)
+                    .sortedWith(EntryByDiscAndTrackComparator())
+                if (roomTracks.isNotEmpty()) {
+                    Timber.w(e, "Network failed in getAlbumAsDir, using Room tracks")
+                    MusicDirectory().apply {
+                        this.name = name
+                        addAll(roomTracks)
+                    }
+                } else {
+                    throw e
+                }
+            }
         }
-        return dir
     }
 
     @Throws(Exception::class)
@@ -199,6 +263,7 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
             try {
                 cache = musicService.getAlbum(id, name, refresh)
             } catch (ignored: Exception) {
+                cache = cachedAlbums.get(id)
             }
 
             cache?.let { cachedAlbums.upsert(it) }
@@ -213,18 +278,40 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
 
     @Throws(Exception::class)
     override fun getPlaylist(id: String, name: String): MusicDirectory {
-        return musicService.getPlaylist(id, name)
+        checkSettingsChanged()
+        val existingCache = cachedPlaylistTracks[id]
+        val fresh = existingCache?.get()
+        if (fresh != null) return fresh
+
+        return try {
+            val dir = musicService.getPlaylist(id, name)
+            val cache = TimeLimitedCache<MusicDirectory?>(
+                Settings.directoryCacheTime.toLong(), TimeUnit.SECONDS
+            )
+            cache.set(dir)
+            cachedPlaylistTracks.put(id, cache)
+            dir
+        } catch (e: Exception) {
+            val stale = existingCache?.getStale()
+            if (stale != null) {
+                Timber.w(e, "Network failed in getPlaylist, using stale cache for %s", name)
+                stale
+            } else {
+                throw e
+            }
+        }
     }
 
     @Throws(Exception::class)
     override fun getPodcastsChannels(refresh: Boolean): List<PodcastsChannel> {
         checkSettingsChanged()
-        var result = if (refresh) null else cachedPodcastsChannels.get()
-        if (result == null) {
-            result = musicService.getPodcastsChannels(refresh)
-            cachedPodcastsChannels.set(result)
+        val fresh = if (refresh) null else cachedPodcastsChannels.get()
+        if (fresh != null) return fresh
+        return try {
+            musicService.getPodcastsChannels(refresh).also { cachedPodcastsChannels.set(it) }
+        } catch (e: Exception) {
+            cachedPodcastsChannels.getStale() ?: throw e
         }
-        return result
     }
 
     @Throws(Exception::class)
@@ -235,27 +322,31 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
     @Throws(Exception::class)
     override fun getPlaylists(refresh: Boolean): List<Playlist> {
         checkSettingsChanged()
-        var result = if (refresh) null else cachedPlaylists.get()
-        if (result == null) {
-            result = musicService.getPlaylists(refresh)
-            cachedPlaylists.set(result)
+        val fresh = if (refresh) null else cachedPlaylists.get()
+        if (fresh != null) return fresh
+        return try {
+            musicService.getPlaylists(refresh).also { cachedPlaylists.set(it) }
+        } catch (e: Exception) {
+            cachedPlaylists.getStale() ?: throw e
         }
-        return result
     }
 
     @Throws(Exception::class)
     override fun createPlaylist(id: String?, name: String?, tracks: List<Track>) {
         cachedPlaylists.clear()
+        id?.let { cachedPlaylistTracks.put(it, TimeLimitedCache()) }
         musicService.createPlaylist(id, name, tracks)
     }
 
     @Throws(Exception::class)
     override fun deletePlaylist(id: String) {
+        cachedPlaylists.clear()
         musicService.deletePlaylist(id)
     }
 
     @Throws(Exception::class)
     override fun updatePlaylist(id: String, name: String?, comment: String?, pub: Boolean) {
+        cachedPlaylists.clear()
         musicService.updatePlaylist(id, name, comment, pub)
     }
 
@@ -290,12 +381,40 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
         offset: Int,
         musicFolderId: String?
     ): List<Album> {
-        return musicService.getAlbumList2(type, size, offset, musicFolderId)
+        return try {
+            musicService.getAlbumList2(type, size, offset, musicFolderId)
+        } catch (e: Exception) {
+            val fallback = when (type) {
+                AlbumListType.NEWEST -> cachedAlbums.orderedByAge(size, offset)
+                AlbumListType.SORTED_BY_ARTIST -> cachedAlbums.orderedByArtist(size, offset)
+                else -> cachedAlbums.orderedByName(size, offset)
+            }
+            if (fallback.isNotEmpty()) {
+                Timber.w(e, "Network failed in getAlbumList2, using Room cached albums")
+                fallback
+            } else {
+                throw e
+            }
+        }
     }
 
     @Throws(Exception::class)
     override fun getRandomSongs(size: Int): MusicDirectory {
-        return musicService.getRandomSongs(size)
+        return try {
+            musicService.getRandomSongs(size)
+        } catch (e: Exception) {
+            val localDownloaded = DownloadedTracks.scan()
+                .filter { it.state != DownloadedTracks.State.PARTIAL }
+                .map { it.track }
+                .shuffled()
+                .take(size)
+            if (localDownloaded.isNotEmpty()) {
+                Timber.w(e, "Network failed in getRandomSongs, falling back to downloaded tracks")
+                MusicDirectory().apply { addAll(localDownloaded) }
+            } else {
+                throw e
+            }
+        }
     }
 
     @Throws(Exception::class)
@@ -360,12 +479,14 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
             metaDatabase = activeServerProvider.getActiveMetaDatabase()
             cachedArtists = metaDatabase.artistDao()
             cachedAlbums = metaDatabase.albumDao()
+            cachedTracks = metaDatabase.trackDao()
             cachedIndexes = metaDatabase.indexDao()
 
             // Clear in memory caches
             cachedMusicDirectories.clear()
             cachedLicenseValid.clear()
             cachedPlaylists.clear()
+            cachedPlaylistTracks.clear()
             cachedGenres.clear()
             cachedAlbum.clear()
             cachedUserInfo.clear()
@@ -394,13 +515,10 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
     @Throws(Exception::class)
     override fun getGenres(refresh: Boolean): List<Genre> {
         checkSettingsChanged()
-        if (refresh) {
-            cachedGenres.clear()
-        }
-        var result = cachedGenres.get()
-        if (result == null) {
-            result = musicService.getGenres(refresh)
-            cachedGenres.set(result)
+        val result = (if (refresh) null else cachedGenres.get()) ?: try {
+            musicService.getGenres(refresh).also { cachedGenres.set(it) }
+        } catch (e: Exception) {
+            cachedGenres.getStale() ?: throw e
         }
 
         val sorted = result.toMutableList()
@@ -449,16 +567,20 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
     @Throws(Exception::class)
     override fun getVideos(refresh: Boolean): MusicDirectory? {
         checkSettingsChanged()
-        var cache =
-            if (refresh) null else cachedMusicDirectories[CACHE_KEY_VIDEOS]
-        var dir = cache?.get()
+        val existingCache = cachedMusicDirectories[CACHE_KEY_VIDEOS]
+        var dir = if (refresh) null else existingCache?.get()
         if (dir == null) {
-            dir = musicService.getVideos(refresh)
-            cache = TimeLimitedCache(
-                Settings.directoryCacheTime.toLong(), TimeUnit.SECONDS
-            )
-            cache.set(dir)
-            cachedMusicDirectories.put(CACHE_KEY_VIDEOS, cache)
+            dir = try {
+                val fetched = musicService.getVideos(refresh)
+                val cache = TimeLimitedCache<MusicDirectory?>(
+                    Settings.directoryCacheTime.toLong(), TimeUnit.SECONDS
+                )
+                cache.set(fetched)
+                cachedMusicDirectories.put(CACHE_KEY_VIDEOS, cache)
+                fetched
+            } catch (e: Exception) {
+                existingCache?.getStale() ?: throw e
+            }
         }
         return dir
     }
@@ -466,17 +588,20 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
     @Throws(Exception::class)
     override fun getUser(username: String): UserInfo {
         checkSettingsChanged()
-        var cache = cachedUserInfo[username]
-        var userInfo = cache?.get()
-        if (userInfo == null) {
-            userInfo = musicService.getUser(username)
-            cache = TimeLimitedCache(
+        val existingCache = cachedUserInfo[username]
+        val fresh = existingCache?.get()
+        if (fresh != null) return fresh
+        return try {
+            val fetched = musicService.getUser(username)
+            val cache = TimeLimitedCache<UserInfo?>(
                 Settings.directoryCacheTime.toLong(), TimeUnit.SECONDS
             )
-            cache.set(userInfo)
+            cache.set(fetched)
             cachedUserInfo.put(username, cache)
+            fetched
+        } catch (e: Exception) {
+            existingCache?.getStale() ?: throw e
         }
-        return userInfo
     }
 
     @Throws(Exception::class)
@@ -506,6 +631,7 @@ class CachedMusicService(private val musicService: MusicService) : MusicService,
     init {
         cachedMusicDirectories = LRUCache(MUSIC_DIR_CACHE_SIZE)
         cachedAlbum = LRUCache(MUSIC_DIR_CACHE_SIZE)
+        cachedPlaylistTracks = LRUCache(MUSIC_DIR_CACHE_SIZE)
         cachedUserInfo = LRUCache(MUSIC_DIR_CACHE_SIZE)
     }
 }

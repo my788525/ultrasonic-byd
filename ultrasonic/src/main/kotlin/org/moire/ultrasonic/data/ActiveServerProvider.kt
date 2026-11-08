@@ -31,9 +31,20 @@ import timber.log.Timber
 class ActiveServerProvider(
     private val repository: ServerSettingDao
 ) : CoroutineScope by CoroutineScope(Dispatchers.IO) {
+    @Volatile
     private var cachedServer: ServerSetting? = null
     private var cachedDatabase: MetaDatabase? = null
     private var cachedServerId: Int? = null
+
+    init {
+        // Pre-warm the active server cache in the background on startup to avoid blocking the UI
+        launch {
+            val id = getActiveServerId()
+            if (id > OFFLINE_DB_ID) {
+                cachedServer = repository.findById(id)
+            }
+        }
+    }
 
     /**
      * Get the settings of the current Active Server
@@ -42,7 +53,8 @@ class ActiveServerProvider(
     @JvmOverloads
     fun getActiveServer(serverId: Int = getActiveServerId()): ServerSetting {
         if (serverId > OFFLINE_DB_ID) {
-            if (cachedServer != null && cachedServer!!.id == serverId) return cachedServer!!
+            val currentCached = cachedServer
+            if (currentCached != null && currentCached.id == serverId) return currentCached
 
             // Ideally this is the only call where we block the thread while using the repository
             runBlocking {
@@ -118,6 +130,9 @@ class ActiveServerProvider(
 
         // Use a coroutine to post the server change to the end of the message queue
         launch {
+            if (serverId > OFFLINE_DB_ID) {
+                cachedServer = repository.findById(serverId)
+            }
             withContext(Dispatchers.Main) {
                 resetMusicService()
                 Settings.activeServer = serverId

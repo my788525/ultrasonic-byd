@@ -22,8 +22,8 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
-import timber.log.Timber
 import java.util.concurrent.CopyOnWriteArrayList
+import timber.log.Timber
 
 /** The packages that own the car's camera picture. Kept narrow: navigation must never match. */
 object CameraPackages {
@@ -74,7 +74,9 @@ object CameraSignalBus {
     private const val RELEASE_DELAY_MS = 2_000L
 
     private val listeners = CopyOnWriteArrayList<(Boolean) -> Unit>()
-    private val mainHandler = Handler(Looper.getMainLooper())
+    private val mainHandler: Handler? by lazy {
+        runCatching { Looper.getMainLooper()?.let(::Handler) }.getOrNull()
+    }
 
     @Volatile private var cameraWindowAt = 0L
     @Volatile private var foregroundCameraAt = 0L
@@ -144,7 +146,7 @@ object CameraSignalBus {
      */
     fun setCameraWindow(active: Boolean, reason: String) {
         if (active) {
-            mainHandler.removeCallbacks(releaseRunnable)
+            mainHandler?.removeCallbacks(releaseRunnable)
             releasePending = false
             cameraWindowAt = System.currentTimeMillis()
             note(reason)
@@ -153,7 +155,7 @@ object CameraSignalBus {
             // unrelated window events; re-arming on each one would postpone recovery.
             releasePending = true
             note("camera window closing ($reason)")
-            mainHandler.postDelayed(releaseRunnable, RELEASE_DELAY_MS)
+            mainHandler?.postDelayed(releaseRunnable, RELEASE_DELAY_MS)
         }
         publish()
     }
@@ -185,7 +187,7 @@ object CameraSignalBus {
         }
         cameraUsageActive = active
         if (active) {
-            mainHandler.removeCallbacks(releaseRunnable)
+            mainHandler?.removeCallbacks(releaseRunnable)
             releasePending = false
             note(reason)
         } else {
@@ -197,7 +199,7 @@ object CameraSignalBus {
             foregroundCameraAt = 0L
             fallbackAt = 0L
             releasePending = false
-            mainHandler.removeCallbacks(releaseRunnable)
+            mainHandler?.removeCallbacks(releaseRunnable)
             note(reason)
         }
         publish()
@@ -209,12 +211,13 @@ object CameraSignalBus {
      */
     fun setAudioFocus(active: Boolean, reason: String) {
         audioFocusLastEvent = reason
-        val wanted = active && Settings.floatingCameraAudioFocus
+        val enabled = runCatching { Settings.floatingCameraAudioFocus }.getOrDefault(false)
+        val wanted = active && enabled
         if (audioFocusActive == wanted) return
         audioFocusActive = wanted
         if (wanted) {
             note(reason)
-        } else if (Settings.floatingCameraAudioFocus) {
+        } else if (enabled) {
             note("audio focus restored ($reason)")
         }
         publish()
@@ -251,8 +254,8 @@ object CameraSignalBus {
         audioFocusActive = false
         lastPublished = null
         releasePending = false
-        mainHandler.removeCallbacks(recheckRunnable)
-        mainHandler.removeCallbacks(releaseRunnable)
+        mainHandler?.removeCallbacks(recheckRunnable)
+        mainHandler?.removeCallbacks(releaseRunnable)
     }
 
     fun isActive(now: Long = System.currentTimeMillis()): Boolean =
@@ -263,16 +266,21 @@ object CameraSignalBus {
     private fun fresh(at: Long, now: Long): Boolean = at > 0L && now - at < WINDOW_SIGNAL_TTL_MS
 
     private fun publish() {
-        mainHandler.removeCallbacks(recheckRunnable)
+        mainHandler?.removeCallbacks(recheckRunnable)
         val active = isActive()
         if (active != lastPublished) {
             lastPublished = active
             for (listener in listeners) {
-                mainHandler.post { listener(active) }
+                val handler = mainHandler
+                if (handler != null) {
+                    handler.post { listener(active) }
+                } else {
+                    listener(active)
+                }
             }
             Timber.i("Camera view gate: %s", if (active) "hidden" else "shown")
         }
-        if (active) mainHandler.postDelayed(recheckRunnable, WINDOW_SIGNAL_TTL_MS + 250L)
+        if (active) mainHandler?.postDelayed(recheckRunnable, WINDOW_SIGNAL_TTL_MS + 250L)
     }
 }
 

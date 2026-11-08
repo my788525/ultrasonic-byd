@@ -6,6 +6,9 @@
     a:layout_width="fill_parent"
     a:layout_height="72dp"
     a:minHeight="72dp"
+    a:gravity="center_vertical"
+    a:paddingStart="8dp"
+    a:paddingEnd="8dp"
     a:orientation="horizontal">
 
     <ImageView
@@ -101,7 +104,7 @@
 
     <ImageView
         a:id="@+id/song_star"
-        a:layout_width="38dp"
+        a:layout_width="42dp"
         a:layout_height="fill_parent"
         a:background="@android:color/transparent"
         a:contentDescription="@string/download.menu_star"

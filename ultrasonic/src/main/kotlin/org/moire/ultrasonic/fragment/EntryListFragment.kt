@@ -106,7 +106,7 @@ abstract class EntryListFragment<T : GenericEntry> : MultiListFragment<T>(), Koi
      */
     private val folderHeader: FolderSelectorBinder.FolderHeader by lazy {
         val header = FolderSelectorBinder.FolderHeader(
-            listModel.musicFolders.value!!,
+            listModel.musicFolders.value.orEmpty(),
             listModel.activeServer.musicFolderId
         )
 

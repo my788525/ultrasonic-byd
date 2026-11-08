@@ -119,6 +119,7 @@ class MediaPlayerManager(
     private val rxBusSubscription: CompositeDisposable = CompositeDisposable()
 
     private var mainScope = CoroutineScope(Dispatchers.Main)
+    private val ioScope = CoroutineScope(Dispatchers.IO)
 
     private var sessionToken = SessionToken(
         UApp.applicationContext(),
@@ -169,19 +170,19 @@ class MediaPlayerManager(
             publishPlaybackState()
         }
 
-    override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-        // A new song starts a fresh error budget; the previous one does not carry over.
-        playbackErrorRetries = 0
-        clearBookmark()
-        // TRANSITION_REASON_AUTO means that the previous track finished playing and a new one has started.
-        if (reason == MEDIA_ITEM_TRANSITION_REASON_AUTO && cachedMediaItem != null) {
-            scrobbler.scrobble(cachedMediaItem?.toTrack(), true)
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            // A new song starts a fresh error budget; the previous one does not carry over.
+            playbackErrorRetries = 0
+            clearBookmark()
+            // TRANSITION_REASON_AUTO means that the previous track finished playing and a new one has started.
+            if (reason == MEDIA_ITEM_TRANSITION_REASON_AUTO && cachedMediaItem != null) {
+                scrobbler.scrobble(cachedMediaItem?.toTrack(), true)
+            }
+            cachedMediaItem = mediaItem
+            // A playlist changes track: remember where we are so it can be resumed later.
+            savePlaylistResume()
+            publishPlaybackState()
         }
-        cachedMediaItem = mediaItem
-        // A playlist changes track: remember where we are so it can be resumed later.
-        savePlaylistResume()
-        publishPlaybackState()
-    }
 
         /*
          * If the same item is contained in a playlist multiple times directly after each
@@ -210,21 +211,27 @@ class MediaPlayerManager(
             // network/IO failures are retried, and only a few times, so a truly broken file is
             // left to the driver.
             if (!isJukeboxEnabled && controller?.playWhenReady == true &&
-                shouldAutoRetry(error) && playbackErrorRetries < MAX_PLAYBACK_ERROR_RETRIES
+                shouldAutoRetry(error)
             ) {
-                playbackErrorRetries++
-                val attempt = playbackErrorRetries
-                mainScope.launch {
-                    delay(PLAYBACK_ERROR_RETRY_DELAY_MS * attempt)
-                    // Bail out if the driver paused or the error was cleared while we waited.
-                    if (controller?.playWhenReady == true && controller?.playerError != null) {
-                        Timber.w(
-                            "Auto-retrying playback after error (attempt %d/%d)",
-                            attempt, MAX_PLAYBACK_ERROR_RETRIES
-                        )
-                        controller?.prepare()
-                        controller?.play()
+                if (playbackErrorRetries < MAX_PLAYBACK_ERROR_RETRIES) {
+                    playbackErrorRetries++
+                    val attempt = playbackErrorRetries
+                    mainScope.launch {
+                        delay(PLAYBACK_ERROR_RETRY_DELAY_MS * attempt)
+                        // Bail out if the driver paused or the error was cleared while we waited.
+                        if (controller?.playWhenReady == true && controller?.playerError != null) {
+                            Timber.w(
+                                "Auto-retrying playback after error (attempt %d/%d)",
+                                attempt, MAX_PLAYBACK_ERROR_RETRIES
+                            )
+                            controller?.prepare()
+                            controller?.play()
+                        }
                     }
+                } else {
+                    // Retries exhausted on a poor network: try falling back to the next cached
+                    // song in the current queue so the music keeps playing in tunnels.
+                    skipToNextCachedTrackIfAvailable()
                 }
             }
 
@@ -241,7 +248,7 @@ class MediaPlayerManager(
         }
 
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            val timeline: Timeline = controller!!.currentTimeline
+            val timeline: Timeline = controller?.currentTimeline ?: return
             var windowIndex = timeline.getFirstWindowIndex(true)
             var count = 0
             Timber.d("Shuffle: windowIndex: $windowIndex, at: $count")
@@ -251,6 +258,54 @@ class MediaPlayerManager(
                     windowIndex, REPEAT_MODE_OFF, true
                 )
                 Timber.d("Shuffle: windowIndex: $windowIndex, at: $count")
+            }
+        }
+    }
+
+    /**
+     * When a streaming track fails after all automatic retries during a network drop, checks if
+     * another song in the current queue is already cached on disk and skips to it so playback
+     * continues without driver intervention.
+     */
+    private fun skipToNextCachedTrackIfAvailable() {
+        val currentController = controller ?: return
+        val timeline = currentController.currentTimeline
+        val startIndex = currentMediaItemIndex
+        if (timeline.isEmpty || startIndex < 0) return
+
+        val candidateIndices = mutableListOf< Pair<Int, Track> >()
+        var cursor = startIndex
+        val visited = HashSet<Int>()
+        while (visited.add(cursor)) {
+            val next = timeline.getNextWindowIndex(
+                cursor,
+                currentController.repeatMode,
+                currentController.shuffleModeEnabled
+            )
+            if (next == C.INDEX_UNSET || next == startIndex || visited.contains(next)) break
+            val item = currentController.getMediaItemAt(next)
+            candidateIndices.add(next to item.toTrack())
+            cursor = next
+        }
+        if (candidateIndices.isEmpty()) return
+
+        mainScope.launch {
+            val cachedIndex = withContext(Dispatchers.IO) {
+                candidateIndices.firstOrNull { (_, track) ->
+                    val state = DownloadService.getDownloadState(track)
+                    state == DownloadState.DONE || state == DownloadState.PINNED
+                }?.first
+            }
+            if (cachedIndex != null &&
+                controller?.playWhenReady == true &&
+                controller?.playerError != null
+            ) {
+                Timber.i("Network unreachable; skipping to cached track at index %d", cachedIndex)
+                playbackErrorRetries = 0
+                controller?.seekTo(cachedIndex, 0L)
+                controller?.prepare()
+                controller?.play()
+                toast(R.string.car_fallback_playing_cached, true, UApp.applicationContext())
             }
         }
     }
@@ -386,12 +441,13 @@ class MediaPlayerManager(
     private fun clearBookmark() {
         // This method is called just before we update the cachedMediaItem,
         // so in fact cachedMediaItem will refer to the track that has just finished.
-        if (cachedMediaItem != null) {
-            val song = cachedMediaItem!!.toTrack()
-            if (song.bookmarkPosition > 0 && Settings.shouldClearBookmark) {
-                val musicService = getMusicService()
+        val previousItem = cachedMediaItem ?: return
+        val song = previousItem.toTrack()
+        if (song.bookmarkPosition > 0 && Settings.shouldClearBookmark) {
+            val songId = song.id
+            ioScope.launch {
                 try {
-                    musicService.deleteBookmark(song.id)
+                    getMusicService().deleteBookmark(songId)
                 } catch (ignored: Exception) {
                 }
             }
@@ -765,55 +821,72 @@ class MediaPlayerManager(
 
     @Synchronized
     fun seekToPrevious() {
-        // Use explicit index arithmetic instead of Player.seekToPrevious().
-        // After STATE_ENDED or a playback error, the internal "current item" reference
-        // is unreliable, so seekToPrevious() can silently no-op. Going back one index
-        // and seeking to position 0 is deterministic and works in every state.
         val controller = controller ?: return
+        val timeline = controller.currentTimeline
         val index = currentMediaItemIndex
-        if (index > 0) {
-            controller.seekTo(index - 1, 0L)
-            ensurePlaying()
-        } else if (index == 0) {
-            // Already at the first track: seek to the start of the current track instead
-            // of wrapping around (wrapping is ambiguous and surprising to a driver).
-            controller.seekTo(0, 0L)
-            ensurePlaying()
-        } else {
-            // No track selected yet — nothing to go back to.
+        if (timeline.isEmpty || index < 0) {
             Timber.w("seekToPrevious: no previous track available (index=$index)")
+            return
+        }
+        val prevIndex = timeline.getPreviousWindowIndex(
+            index,
+            controller.repeatMode,
+            controller.shuffleModeEnabled
+        )
+        when {
+            prevIndex != C.INDEX_UNSET -> {
+                controller.seekTo(prevIndex, 0L)
+                ensurePlaying()
+            }
+            index > 0 && !controller.shuffleModeEnabled -> {
+                controller.seekTo(index - 1, 0L)
+                ensurePlaying()
+            }
+            else -> {
+                controller.seekTo(index, 0L)
+                ensurePlaying()
+            }
         }
     }
 
     @Synchronized
     fun canSeekToPrevious(): Boolean {
-        return controller?.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS) == true
+        val controller = controller ?: return false
+        if (controller.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS)) return true
+        return !controller.currentTimeline.isEmpty && currentMediaItemIndex >= 0
     }
 
     /**
-     * Go to the next track using explicit index arithmetic instead of [Player.seekToNext].
+     * Go to the next track using timeline window resolution instead of [Player.seekToNext].
      *
      * After a playback error the internal "current item" reference is unreliable and Media3
      * disables [Player.COMMAND_SEEK_TO_NEXT], so a plain [Player.seekToNext] silently no-ops —
      * the steering-wheel / on-screen next button then does nothing while the player is stuck on
-     * the error banner, even though the app's own next button (which routes through here too)
-     * appears to work. Seeking to the next index directly keeps working in every state, and
-     * [ensurePlaying] clears the old error and starts the new track on its own.
+     * the error banner. Resolving the next window index from the timeline respects both shuffle
+     * and repeat modes while still working in error/idle states, and [ensurePlaying] clears the
+     * old error and starts the new track on its own.
      */
     @Synchronized
     fun seekToNext() {
         val controller = controller ?: return
+        val timeline = controller.currentTimeline
         val index = currentMediaItemIndex
         val count = controller.mediaItemCount
 
-        if (index < 0 || count <= 0) {
+        if (timeline.isEmpty || index < 0 || count <= 0) {
             Timber.w("seekToNext: no playlist available (index=$index, count=$count)")
             ensurePlaying()
             return
         }
 
-        // At the last track we don't wrap: keep the current one playing.
-        if (index < count - 1) {
+        val nextIndex = timeline.getNextWindowIndex(
+            index,
+            controller.repeatMode,
+            controller.shuffleModeEnabled
+        )
+        if (nextIndex != C.INDEX_UNSET) {
+            controller.seekTo(nextIndex, 0L)
+        } else if (index < count - 1 && !controller.shuffleModeEnabled) {
             controller.seekTo(index + 1, 0L)
         }
         ensurePlaying()
@@ -911,7 +984,16 @@ class MediaPlayerManager(
 
     @Synchronized
     fun canSeekToNext(): Boolean {
-        return controller?.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT) == true
+        val controller = controller ?: return false
+        if (controller.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT)) return true
+        val timeline = controller.currentTimeline
+        if (timeline.isEmpty || currentMediaItemIndex < 0) return false
+        val nextIndex = timeline.getNextWindowIndex(
+            currentMediaItemIndex,
+            controller.repeatMode,
+            controller.shuffleModeEnabled
+        )
+        return nextIndex != C.INDEX_UNSET
     }
 
     @Synchronized
@@ -1081,7 +1163,8 @@ class MediaPlayerManager(
         returnWindow: Boolean,
         searchClosure: (Int, Int) -> Boolean
     ): Int {
-        val timeline = controller?.currentTimeline!!
+        val timeline = controller?.currentTimeline ?: return C.INDEX_UNSET
+        if (timeline.isEmpty) return C.INDEX_UNSET
         var windowIndex = timeline.getFirstWindowIndex(true)
         var count = 0
 

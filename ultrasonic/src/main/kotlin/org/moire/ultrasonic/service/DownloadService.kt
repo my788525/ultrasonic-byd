@@ -332,15 +332,17 @@ class DownloadService : Service(), KoinComponent {
                 val pinnedFile = Storage.getFromPath(track.getPinnedFile())
                 val completeFile = Storage.getFromPath(track.getCompleteFile())
 
-                completeFile?.let {
-                    postState(track, DownloadState.DONE)
-                    false
+                when {
+                    completeFile != null -> {
+                        postState(track, DownloadState.DONE)
+                        false
+                    }
+                    pinnedFile != null -> {
+                        postState(track, DownloadState.PINNED)
+                        false
+                    }
+                    else -> true
                 }
-                pinnedFile?.let {
-                    postState(track, DownloadState.PINNED)
-                    false
-                }
-                true
             }
         }
 
@@ -352,30 +354,37 @@ class DownloadService : Service(), KoinComponent {
             // to the other state, rename it, but don't return it, thereby excluding it from
             // further processing.
             // If it is neither pinned nor saved, return it, so that it can be processed.
-            val filteredTracks: List<Track> = tracks.map { track ->
+            val filteredTracks: List<Track> = tracks.mapNotNull { track ->
                 val pinnedFile = Storage.getFromPath(track.getPinnedFile())
                 val completeFile = Storage.getFromPath(track.getCompleteFile())
 
                 if (shouldPin) {
-                    pinnedFile?.let {
-                        null
-                    }
-                    completeFile?.let {
-                        Storage.renameOrDeleteIfAlreadyExists(it, track.getPinnedFile())
-                        postState(track, DownloadState.PINNED)
-                        null
+                    when {
+                        pinnedFile != null -> null
+                        completeFile != null -> {
+                            Storage.renameOrDeleteIfAlreadyExists(
+                                completeFile,
+                                track.getPinnedFile()
+                            )
+                            postState(track, DownloadState.PINNED)
+                            null
+                        }
+                        else -> track
                     }
                 } else {
-                    completeFile?.let {
-                        null
-                    }
-                    pinnedFile?.let {
-                        Storage.renameOrDeleteIfAlreadyExists(it, track.getCompleteFile())
-                        postState(track, DownloadState.DONE)
-                        null
+                    when {
+                        completeFile != null -> null
+                        pinnedFile != null -> {
+                            Storage.renameOrDeleteIfAlreadyExists(
+                                pinnedFile,
+                                track.getCompleteFile()
+                            )
+                            postState(track, DownloadState.DONE)
+                            null
+                        }
+                        else -> track
                     }
                 }
-                track
             }
 
             // Update Pinned flag of items in progress
@@ -465,14 +474,12 @@ class DownloadService : Service(), KoinComponent {
 
         @Suppress("ReturnCount")
         fun getDownloadState(track: Track): DownloadState {
-            if (activeDownloads.contains(track.id)) return DownloadState.QUEUED
-            if (downloadQueue.contains(track.id)) return DownloadState.QUEUED
-
             val downloadableTrack = activeDownloads[track.id]?.downloadTrack
             if (downloadableTrack != null) {
                 if (downloadableTrack.tryCount > 0) return DownloadState.RETRYING
                 return DownloadState.DOWNLOADING
             }
+            if (downloadQueue.contains(track.id)) return DownloadState.QUEUED
             if (failedList[track.id] != null) return DownloadState.FAILED
             if (Storage.isPathExists(track.getCompleteFile())) return DownloadState.DONE
             if (Storage.isPathExists(track.getPinnedFile())) return DownloadState.PINNED

@@ -4,19 +4,32 @@
     xmlns:tools="http://schemas.android.com/tools"
     a:id="@+id/now_playing"
     a:layout_width="fill_parent"
-    a:layout_height="wrap_content"
+    a:layout_height="76dp"
     a:background="?attr/colorSecondaryContainer"
+    a:gravity="center_vertical"
+    a:orientation="horizontal"
+    a:paddingStart="12dp"
+    a:paddingEnd="12dp"
     tools:ignore="Overdraw">
 
-    <ImageView
-        a:id="@+id/now_playing_image"
-        a:layout_width="72.0dip"
-        a:layout_height="72.0dip"
-        a:layout_marginStart="0dp"
-        a:elevation="4dp"
-        a:focusable="true"
-        a:gravity="center"
-        a:importantForAccessibility="no" />
+    <com.google.android.material.card.MaterialCardView
+        a:layout_width="56dp"
+        a:layout_height="56dp"
+        a:layout_gravity="center_vertical"
+        app:cardBackgroundColor="@color/pal_graphite_surface_alt"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="0dp"
+        app:strokeColor="@color/pal_graphite_outline"
+        app:strokeWidth="1dp">
+
+        <ImageView
+            a:id="@+id/now_playing_image"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent"
+            a:focusable="true"
+            a:importantForAccessibility="no"
+            a:scaleType="centerCrop" />
+    </com.google.android.material.card.MaterialCardView>
 
     <LinearLayout
         a:layout_width="0.0dp"
@@ -24,44 +37,72 @@
         a:layout_gravity="center_vertical"
         a:layout_weight="1.0"
         a:orientation="vertical"
-        a:paddingStart="11.0dip">
+        a:paddingStart="12dp"
+        a:paddingEnd="8dp">
 
         <TextView
             a:id="@+id/now_playing_title"
-            a:layout_width="wrap_content"
+            a:layout_width="match_parent"
             a:layout_height="wrap_content"
-            a:layout_gravity="start"
             a:ellipsize="marquee"
             a:singleLine="true"
             a:textAppearance="@style/TextAppearance.Material3.TitleLarge"
-            a:textSize="20sp"
+            a:textSize="18sp"
+            a:textStyle="bold"
             tools:text="Title" />
 
         <TextView
             a:id="@+id/now_playing_artist"
-            a:layout_width="wrap_content"
+            a:layout_width="match_parent"
             a:layout_height="wrap_content"
-            a:layout_gravity="start"
+            a:layout_marginTop="2dp"
             a:ellipsize="end"
             a:scrollHorizontally="true"
             a:singleLine="true"
-            tools:text="Artist"
-            a:textAppearance="@style/TextAppearance.Material3.BodyMedium" />
+            a:textAppearance="@style/TextAppearance.Material3.BodyMedium"
+            a:textSize="14sp"
+            tools:text="Artist" />
     </LinearLayout>
 
-    <Button
-        a:id="@+id/now_playing_control_play"
+    <com.google.android.material.button.MaterialButton
+        a:id="@+id/now_playing_control_prev"
         style="@style/Widget.Material3.Button.IconButton"
         a:layout_width="48dp"
         a:layout_height="48dp"
-        a:layout_gravity="center|end"
-        a:layout_marginEnd="16dip"
-        a:layout_weight="0.0"
+        a:layout_gravity="center_vertical"
+        a:layout_marginEnd="4dp"
+        a:contentDescription="@string/buttons.previous"
+        a:focusable="false"
+        app:icon="@drawable/media_backward"
+        app:iconGravity="textStart"
+        app:iconPadding="0dp"
+        app:iconSize="26dp" />
+
+    <com.google.android.material.button.MaterialButton
+        a:id="@+id/now_playing_control_play"
+        style="@style/Widget.Material3.Button.IconButton"
+        a:layout_width="52dp"
+        a:layout_height="52dp"
+        a:layout_gravity="center_vertical"
+        a:layout_marginEnd="4dp"
         a:contentDescription="@string/buttons.play"
         a:focusable="false"
-        a:scaleType="fitCenter"
         app:icon="@drawable/media_pause"
-        app:iconGravity="textEnd"
-        app:iconSize="42dp" />
+        app:iconGravity="textStart"
+        app:iconPadding="0dp"
+        app:iconSize="30dp" />
+
+    <com.google.android.material.button.MaterialButton
+        a:id="@+id/now_playing_control_next"
+        style="@style/Widget.Material3.Button.IconButton"
+        a:layout_width="48dp"
+        a:layout_height="48dp"
+        a:layout_gravity="center_vertical"
+        a:contentDescription="@string/buttons.next"
+        a:focusable="false"
+        app:icon="@drawable/media_forward"
+        app:iconGravity="textStart"
+        app:iconPadding="0dp"
+        app:iconSize="26dp" />
 
 </LinearLayout>

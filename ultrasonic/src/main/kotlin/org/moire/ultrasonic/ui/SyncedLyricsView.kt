@@ -41,6 +41,10 @@ class SyncedLyricsView(
 
     private var lines: List<TimedLyric> = emptyList()
     private var lineStarts: IntArray = IntArray(0)
+    private var cachedBuilder: SpannableStringBuilder? = null
+    private var activeColorSpan: ForegroundColorSpan? = null
+    private val activeStyleSpan = StyleSpan(Typeface.BOLD)
+    private val activeSizeSpan = RelativeSizeSpan(HIGHLIGHT_SCALE)
     private var currentIndex = -1
     private var accentColor = 0
     private var currentTrackId: String? = null
@@ -52,7 +56,11 @@ class SyncedLyricsView(
         get() = lines.isNotEmpty()
 
     fun setAccentColor(color: Int) {
+        if (accentColor == color) return
         accentColor = color
+        if (lines.isNotEmpty() && currentIndex in lines.indices) {
+            render(currentIndex)
+        }
     }
 
     fun trackId(): String? = currentTrackId
@@ -65,6 +73,7 @@ class SyncedLyricsView(
     fun showPlaceholder(text: CharSequence) {
         lines = emptyList()
         lineStarts = IntArray(0)
+        cachedBuilder = null
         currentIndex = -1
         restorePaddingIfNeeded()
         textView.text = text
@@ -97,6 +106,7 @@ class SyncedLyricsView(
         if (resolved.isEmpty()) {
             lines = emptyList()
             lineStarts = IntArray(0)
+            cachedBuilder = null
             currentIndex = -1
             restorePaddingIfNeeded()
             textView.text = raw.orEmpty()
@@ -105,6 +115,14 @@ class SyncedLyricsView(
         }
 
         lines = resolved
+        val builder = SpannableStringBuilder()
+        lineStarts = IntArray(lines.size)
+        lines.forEachIndexed { index, line ->
+            lineStarts[index] = builder.length
+            builder.append(line.text)
+            builder.append('\n')
+        }
+        cachedBuilder = builder
         currentIndex = -1
         render(-1)
         Timber.d("Loaded %d timed lyric lines", lines.size)
@@ -127,32 +145,35 @@ class SyncedLyricsView(
     }
 
     private fun render(highlight: Int) {
-        val builder = SpannableStringBuilder()
-        lineStarts = IntArray(lines.size)
-
-        lines.forEachIndexed { index, line ->
-            lineStarts[index] = builder.length
-            builder.append(line.text)
-            builder.append('\n')
+        val builder = cachedBuilder ?: run {
+            val fresh = SpannableStringBuilder()
+            lineStarts = IntArray(lines.size)
+            lines.forEachIndexed { index, line ->
+                lineStarts[index] = fresh.length
+                fresh.append(line.text)
+                fresh.append('\n')
+            }
+            cachedBuilder = fresh
+            fresh
         }
+
+        activeColorSpan?.let { builder.removeSpan(it) }
+        builder.removeSpan(activeStyleSpan)
+        builder.removeSpan(activeSizeSpan)
 
         if (highlight in lines.indices) {
             val start = lineStarts[highlight]
             val end = (start + lines[highlight].text.length).coerceAtMost(builder.length)
             if (end > start) {
-                builder.setSpan(
-                    ForegroundColorSpan(accentColor), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
-                builder.setSpan(
-                    StyleSpan(Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
-                builder.setSpan(
-                    RelativeSizeSpan(HIGHLIGHT_SCALE), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-                )
+                val colorSpan = ForegroundColorSpan(accentColor)
+                activeColorSpan = colorSpan
+                builder.setSpan(colorSpan, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                builder.setSpan(activeStyleSpan, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                builder.setSpan(activeSizeSpan, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
 
-        textView.text = builder
+        textView.setText(builder, TextView.BufferType.SPANNABLE)
         if (highlight >= 0) {
             // The layout of the new text is only valid after the next measure pass, so the
             // scroll has to wait one frame. Without this the lyrics never move on Android 7.
@@ -260,7 +281,7 @@ class SyncedLyricsView(
     }
 
     companion object {
-        private const val HIGHLIGHT_SCALE = 1.12f
+        private const val HIGHLIGHT_SCALE = 1.15f
 
         /** Where the current line sits inside the viewport: 0.5 = centre, 0.38 = slightly above. */
         private const val CURRENT_LINE_ANCHOR = 0.38f

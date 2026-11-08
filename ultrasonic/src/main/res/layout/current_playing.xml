@@ -1,38 +1,88 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    a:id="@+id/player_root"
     a:layout_width="fill_parent"
     a:layout_height="fill_parent"
-    a:orientation="vertical" >
-    
+    a:orientation="vertical"
+    a:paddingTop="8dp"
+    a:paddingBottom="8dp">
+
+    <LinearLayout
+        a:id="@+id/player_mode_bar"
+        a:layout_width="match_parent"
+        a:layout_height="40dp"
+        a:layout_marginStart="16dp"
+        a:layout_marginEnd="16dp"
+        a:layout_marginBottom="8dp"
+        a:gravity="center"
+        a:orientation="horizontal"
+        a:padding="3dp">
+
+        <TextView
+            a:id="@+id/player_tab_cover"
+            a:layout_width="0dp"
+            a:layout_height="match_parent"
+            a:layout_weight="1"
+            a:gravity="center"
+            a:text="@string/player_view_cover"
+            a:textColor="@color/pal_text_primary"
+            a:textSize="14sp"
+            a:textStyle="bold" />
+
+        <TextView
+            a:id="@+id/player_tab_lyrics"
+            a:layout_width="0dp"
+            a:layout_height="match_parent"
+            a:layout_weight="1"
+            a:gravity="center"
+            a:text="@string/player_view_lyrics"
+            a:textColor="@color/pal_text_secondary"
+            a:textSize="14sp"
+            a:textStyle="bold" />
+
+        <TextView
+            a:id="@+id/player_tab_queue"
+            a:layout_width="0dp"
+            a:layout_height="match_parent"
+            a:layout_weight="1"
+            a:gravity="center"
+            a:text="@string/player_view_queue"
+            a:textColor="@color/pal_text_secondary"
+            a:textSize="14sp"
+            a:textStyle="bold" />
+    </LinearLayout>
+
     <ViewFlipper
         a:id="@+id/current_playing_playlist_flipper"
         a:layout_width="fill_parent"
         a:layout_height="0dip"
-        a:layout_weight="1" >
+        a:layout_marginStart="12dp"
+        a:layout_marginEnd="12dp"
+        a:layout_weight="1">
 
         <RelativeLayout
             a:id="@+id/current_playing_album_art_layout"
             a:layout_width="fill_parent"
             a:layout_height="fill_parent"
             a:gravity="start"
-            a:orientation="vertical" >
+            a:orientation="vertical">
 
             <ImageView
                 a:id="@+id/current_playing_album_art_image"
                 a:layout_width="match_parent"
                 a:layout_height="match_parent"
-                a:scaleType="centerCrop"
                 a:layout_alignParentTop="true"
                 a:layout_centerInParent="true"
-                a:contentDescription="@string/albumArt"/>
+                a:contentDescription="@string/albumArt"
+                a:scaleType="centerCrop" />
 
             <LinearLayout
                 a:id="@+id/album_art_inside"
                 a:layout_width="fill_parent"
                 a:layout_height="fill_parent"
                 a:gravity="bottom"
-                a:orientation="vertical" >
+                a:orientation="vertical">
 
                 <LinearLayout
                     a:id="@+id/song_rating"
@@ -112,8 +162,13 @@
             </LinearLayout>
         </RelativeLayout>
 
-        <include layout="@layout/current_playlist" a:id="@+id/playlist"/>
-        <include layout="@layout/lyrics" a:id="@+id/lyrics_page"/>
+        <include
+            a:id="@+id/playlist"
+            layout="@layout/current_playlist" />
+
+        <include
+            a:id="@+id/lyrics_page"
+            layout="@layout/lyrics" />
     </ViewFlipper>
 
     <include layout="@layout/player_media_info" />

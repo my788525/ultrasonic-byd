@@ -9,11 +9,16 @@
 <LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    a:id="@+id/queue_row_root"
     a:layout_width="match_parent"
     a:layout_height="64dp"
+    a:layout_marginTop="2dp"
+    a:layout_marginBottom="2dp"
     a:background="?attr/selectableItemBackground"
     a:gravity="center_vertical"
-    a:orientation="horizontal">
+    a:orientation="horizontal"
+    a:paddingStart="10dp"
+    a:paddingEnd="4dp">
 
     <LinearLayout
         a:layout_width="0dp"
@@ -28,26 +33,31 @@
             a:ellipsize="end"
             a:maxLines="1"
             a:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+            a:textSize="16sp"
+            a:textStyle="bold"
             tools:text="Song title" />
 
         <TextView
             a:id="@+id/queue_artist"
             a:layout_width="match_parent"
             a:layout_height="wrap_content"
-            a:alpha="0.7"
+            a:layout_marginTop="2dp"
+            a:alpha="0.75"
             a:ellipsize="end"
             a:maxLines="1"
             a:textAppearance="@style/TextAppearance.Material3.BodySmall"
+            a:textSize="13sp"
             tools:text="Artist" />
 
     </LinearLayout>
 
     <ImageButton
         a:id="@+id/queue_remove"
-        a:layout_width="56dp"
-        a:layout_height="56dp"
+        a:layout_width="52dp"
+        a:layout_height="52dp"
         a:background="?attr/selectableItemBackgroundBorderless"
         a:contentDescription="@string/queue_remove"
+        a:padding="14dp"
         a:scaleType="fitCenter"
         a:src="@drawable/ic_menu_close"
         app:tint="?attr/colorControlNormal" />

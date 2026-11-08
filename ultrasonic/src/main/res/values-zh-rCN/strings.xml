@@ -690,4 +690,9 @@ adb shell settings put secure accessibility_enabled 1</string>
     <string name="floating_camera_audio_focus_summary">默认关闭。车机短暂抢占音频焦点时隐藏浮窗并暂停音乐。高德导航播报同样会抢占焦点，开启后可能每次转弯提示都隐藏浮窗，请仅在确认车机只为影像抢占焦点时启用。</string>
     <string name="floating_manual_toggle_title">显示 / 隐藏浮窗</string>
     <string name="floating_manual_toggle_summary">无需任何权限、始终可用的一键隐藏。浮窗内的小按钮、隐藏后屏幕边缘的小圆点、常驻通知栏动作都能触发；隐藏时音乐暂停，恢复时自动续播。</string>
+    <string name="car_fallback_playing_cached">网络不佳，已自动切换至已缓存曲目</string>
+    <string name="car_fallback_shuffle_cached">网络不佳，已为您随机播放本地缓存音乐</string>
+    <string name="player_view_cover">封面</string>
+    <string name="player_view_lyrics">歌词</string>
+    <string name="player_view_queue">队列</string>
 </resources>

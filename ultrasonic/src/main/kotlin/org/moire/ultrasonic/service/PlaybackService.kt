@@ -96,7 +96,6 @@ class PlaybackService :
      */
     private lateinit var carAudioFocusManager: CarAudioFocusManager
 
-
     /** Watches the network so that the music can continue after a tunnel. */
     private lateinit var networkMonitor: NetworkMonitor
 
@@ -189,11 +188,16 @@ class PlaybackService :
         instance = null
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private val resolver: ResolvingDataSource.Resolver = ResolvingDataSource.Resolver {
         val components = it.uri.toString().split('|')
         val id = components[0]
-        val bitrate = components[1].toInt()
-        val uri = getMusicService().getStreamUrl(id, bitrate, null)!!
+        val bitrate = components.getOrNull(1)?.toIntOrNull()
+        val uri = try {
+            getMusicService().getStreamUrl(id, bitrate, null)
+        } catch (e: Exception) {
+            throw java.io.IOException("Failed to resolve stream URL for $id", e)
+        } ?: throw java.io.IOException("Stream URL is null for $id")
         // AirSonic doesn't seem to stream correctly with the default
         // icy-metadata headers set by media3, so remove them.
         it.buildUpon().setUri(uri).setHttpRequestHeaders(emptyMap()).build()
@@ -305,9 +309,12 @@ class PlaybackService :
     }
 
     private fun getLocalPlayer(): Player {
-        // Create a new plain OkHttpClient
-        val builder = OkHttpClient.Builder()
-        val client = builder.build()
+        // Create an OkHttpClient tuned for car streaming with bounded timeouts
+        val client = OkHttpClient.Builder()
+            .connectTimeout(STREAM_CONNECT_TIMEOUT_SEC, TimeUnit.SECONDS)
+            .readTimeout(STREAM_READ_TIMEOUT_SEC, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .build()
 
         // Create the wrapped data sources:
         // CachedDataSource is the first. If it cannot find a file,
@@ -622,6 +629,7 @@ class PlaybackService :
      * The player may only be read on the thread its application looper runs on. This is used
      * from the background, where a direct call would make ExoPlayer throw.
      */
+    @Suppress("TooGenericExceptionCaught")
     private fun <T> runOnMain(block: () -> T): T {
         if (Looper.myLooper() == Looper.getMainLooper()) return block()
         var result: T? = null
@@ -767,7 +775,6 @@ class PlaybackService :
         UltrasonicAppWidgetProvider.notifyPlayerStateChange(context, isPlaying)
     }
 
-
     private inner class MediaSessionServiceListener : Listener {
 
         /**
@@ -847,5 +854,9 @@ class PlaybackService :
 
         /** How long a main thread call may take before it is given up on. */
         private const val MAIN_THREAD_CALL_TIMEOUT_MS = 2_000L
+
+        /** Bounds for the streaming OkHttpClient so a dead tunnel connection fails fast. */
+        private const val STREAM_CONNECT_TIMEOUT_SEC = 8L
+        private const val STREAM_READ_TIMEOUT_SEC = 15L
     }
 }

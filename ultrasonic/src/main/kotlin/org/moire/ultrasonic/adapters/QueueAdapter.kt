@@ -7,6 +7,7 @@
 
 package org.moire.ultrasonic.adapters
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -16,6 +17,8 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import org.moire.ultrasonic.R
 import org.moire.ultrasonic.domain.Track
+import org.moire.ultrasonic.ui.CarPalette
+import org.moire.ultrasonic.ui.CarTheme
 
 /**
  * The queue of the player, shown in the panel of the car UI.
@@ -77,12 +80,31 @@ class QueueAdapter(
 
     override fun onBindViewHolder(holder: QueueViewHolder, position: Int) {
         val track = items[position]
+        val ctx = holder.itemView.context
+        val isCurrent = position == currentIndex
+        val accent = CarTheme.accent(ctx, CarPalette.current())
+
         holder.title.text = track.title
         holder.artist.text = track.artist
 
-        // The song that is playing is marked, so the driver sees where in the queue he is.
-        holder.title.alpha = if (position == currentIndex) ALPHA_CURRENT else ALPHA_OTHER
-        holder.artist.alpha = if (position == currentIndex) ALPHA_CURRENT else ALPHA_OTHER
+        if (isCurrent) {
+            holder.title.setTextColor(accent)
+            holder.title.alpha = ALPHA_CURRENT
+            holder.artist.setTextColor(CarTheme.onSurface(ctx))
+            holder.artist.alpha = ALPHA_CURRENT
+            holder.itemView.background = CarTheme.roundedFill(
+                ctx,
+                CarTheme.withAlpha(accent, CURRENT_BG_ALPHA),
+                CarTheme.withAlpha(accent, CURRENT_BORDER_ALPHA),
+                12f
+            )
+        } else {
+            holder.title.setTextColor(CarTheme.onSurface(ctx))
+            holder.title.alpha = ALPHA_OTHER
+            holder.artist.setTextColor(CarTheme.onSurfaceSecondary(ctx))
+            holder.artist.alpha = ALPHA_OTHER
+            holder.itemView.setBackgroundColor(Color.TRANSPARENT)
+        }
 
         holder.itemView.setOnClickListener {
             if (holder.bindingAdapterPosition != RecyclerView.NO_POSITION) {
@@ -135,6 +157,8 @@ class QueueAdapter(
 
     private companion object {
         const val ALPHA_CURRENT = 1.0f
-        const val ALPHA_OTHER = 0.55f
+        const val ALPHA_OTHER = 0.78f
+        const val CURRENT_BG_ALPHA = 38
+        const val CURRENT_BORDER_ALPHA = 76
     }
 }

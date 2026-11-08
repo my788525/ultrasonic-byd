@@ -1,30 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    a:id="@+id/player_root"
     a:layout_width="fill_parent"
     a:layout_height="fill_parent"
     a:baselineAligned="false"
-    a:orientation="horizontal">
+    a:orientation="horizontal"
+    a:padding="12dp">
 
     <ViewFlipper
         a:id="@+id/current_playing_playlist_flipper"
         a:layout_width="0dp"
         a:layout_height="fill_parent"
-        a:layout_weight="1"
+        a:layout_marginEnd="12dp"
+        a:layout_weight="1.15"
         tools:ignore="UselessParent">
 
-        <FrameLayout
+        <RelativeLayout
             a:id="@+id/current_playing_album_art_layout"
             a:layout_width="fill_parent"
             a:layout_height="fill_parent"
             a:gravity="start"
-            a:orientation="horizontal">
+            a:orientation="vertical">
 
             <ImageView
                 a:id="@+id/current_playing_album_art_image"
                 a:layout_width="fill_parent"
                 a:layout_height="fill_parent"
-                a:alpha="0.2"
                 a:contentDescription="@string/albumArt"
                 a:scaleType="centerCrop" />
 
@@ -35,15 +37,14 @@
                 a:gravity="bottom"
                 a:orientation="vertical">
 
-                <include layout="@layout/player_media_info" />
-
                 <LinearLayout
                     a:id="@+id/song_rating"
                     a:layout_width="match_parent"
-                    a:layout_height="60dip"
+                    a:layout_height="52dip"
                     a:layout_gravity="center"
-                    a:layout_margin="10dip"
-                    a:orientation="horizontal">
+                    a:layout_margin="12dip"
+                    a:orientation="horizontal"
+                    tools:ignore="UselessParent">
 
                     <ImageView
                         a:id="@+id/song_five_star_1"
@@ -54,7 +55,7 @@
                         a:focusable="false"
                         a:gravity="center_vertical"
                         a:importantForAccessibility="no"
-                        a:padding="10dip"
+                        a:padding="8dip"
                         a:scaleType="fitCenter"
                         a:src="@drawable/star_hollow_outline" />
 
@@ -67,7 +68,7 @@
                         a:focusable="false"
                         a:gravity="center_vertical"
                         a:importantForAccessibility="no"
-                        a:padding="10dip"
+                        a:padding="8dip"
                         a:scaleType="fitCenter"
                         a:src="@drawable/star_hollow_outline" />
 
@@ -80,7 +81,7 @@
                         a:focusable="false"
                         a:gravity="center_vertical"
                         a:importantForAccessibility="no"
-                        a:padding="10dip"
+                        a:padding="8dip"
                         a:scaleType="fitCenter"
                         a:src="@drawable/star_hollow_outline" />
 
@@ -93,7 +94,7 @@
                         a:focusable="false"
                         a:gravity="center_vertical"
                         a:importantForAccessibility="no"
-                        a:padding="10dip"
+                        a:padding="8dip"
                         a:scaleType="fitCenter"
                         a:src="@drawable/star_hollow_outline" />
 
@@ -106,20 +107,80 @@
                         a:focusable="false"
                         a:gravity="center_vertical"
                         a:importantForAccessibility="no"
-                        a:padding="10dip"
+                        a:padding="8dip"
                         a:scaleType="fitCenter"
                         a:src="@drawable/star_hollow_outline" />
 
                 </LinearLayout>
-
-                <include layout="@layout/player_slider" />
-
-                <include layout="@layout/media_buttons" />
-
             </LinearLayout>
-        </FrameLayout>
+        </RelativeLayout>
 
-        <include layout="@layout/current_playlist" a:id="@+id/playlist"/>
+        <include
+            a:id="@+id/playlist"
+            layout="@layout/current_playlist" />
+
+        <include
+            a:id="@+id/lyrics_page"
+            layout="@layout/lyrics" />
     </ViewFlipper>
+
+    <LinearLayout
+        a:layout_width="0dp"
+        a:layout_height="match_parent"
+        a:layout_weight="1"
+        a:gravity="center_vertical"
+        a:orientation="vertical">
+
+        <LinearLayout
+            a:id="@+id/player_mode_bar"
+            a:layout_width="match_parent"
+            a:layout_height="40dp"
+            a:layout_marginStart="12dp"
+            a:layout_marginEnd="12dp"
+            a:layout_marginBottom="8dp"
+            a:gravity="center"
+            a:orientation="horizontal"
+            a:padding="3dp">
+
+            <TextView
+                a:id="@+id/player_tab_cover"
+                a:layout_width="0dp"
+                a:layout_height="match_parent"
+                a:layout_weight="1"
+                a:gravity="center"
+                a:text="@string/player_view_cover"
+                a:textColor="@color/pal_text_primary"
+                a:textSize="14sp"
+                a:textStyle="bold" />
+
+            <TextView
+                a:id="@+id/player_tab_lyrics"
+                a:layout_width="0dp"
+                a:layout_height="match_parent"
+                a:layout_weight="1"
+                a:gravity="center"
+                a:text="@string/player_view_lyrics"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="14sp"
+                a:textStyle="bold" />
+
+            <TextView
+                a:id="@+id/player_tab_queue"
+                a:layout_width="0dp"
+                a:layout_height="match_parent"
+                a:layout_weight="1"
+                a:gravity="center"
+                a:text="@string/player_view_queue"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="14sp"
+                a:textStyle="bold" />
+        </LinearLayout>
+
+        <include layout="@layout/player_media_info" />
+
+        <include layout="@layout/player_slider" />
+
+        <include layout="@layout/media_buttons" />
+    </LinearLayout>
 
 </LinearLayout>

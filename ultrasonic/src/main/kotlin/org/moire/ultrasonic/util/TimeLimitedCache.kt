@@ -16,12 +16,17 @@ class TimeLimitedCache<T>(expiresAfter: Long = 60L, timeUnit: TimeUnit = TimeUni
 
     fun get(): T? {
         return if (System.currentTimeMillis() < expires) {
-            value!!.get()
+            value?.get()
         } else {
-            clear()
             null
         }
     }
+
+    /**
+     * Returns the last cached value even if its TTL has expired, so callers can serve
+     * stale data as a fallback when the network is unreachable.
+     */
+    fun getStale(): T? = value?.get()
 
     @JvmOverloads
     fun set(value: T, ttl: Long = expiresMillis, timeUnit: TimeUnit = TimeUnit.MILLISECONDS) {

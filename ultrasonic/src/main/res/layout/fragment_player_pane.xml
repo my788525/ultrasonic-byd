@@ -2,10 +2,9 @@
 <!--
   The right hand panel of the two pane layout.
 
-  The driver looks at this panel while driving, so everything that is not the lyrics or a control
-  is removed: no cover, no title, no artist. The lyrics take all the room that is left, the seek
-  bar and the transport controls sit at the bottom and are kept as short as possible so the text
-  stays readable at a glance.
+  Combines a compact Now Playing header (cover, title, artist, status badge) at the top,
+  a central stage for synced lyrics or the playback queue, and a high-contrast car control
+  dock at the bottom.
 -->
 <LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -14,41 +13,115 @@
     a:layout_width="match_parent"
     a:layout_height="match_parent"
     a:orientation="vertical"
-    a:paddingStart="20dp"
-    a:paddingEnd="20dp"
-    a:paddingTop="10dp"
+    a:paddingStart="16dp"
+    a:paddingTop="8dp"
+    a:paddingEnd="16dp"
     a:paddingBottom="10dp">
 
-    <!-- A single slim line for the state of the playback. The cover, title and artist live in the
-         left list, so the panel does not repeat them. The line only appears while buffering or
-         after an error, so most of the time it costs no height at all. -->
-    <TextView
-        a:id="@+id/pane_status"
+    <!-- Compact Now Playing header so the driver always sees what is playing even when
+         browsing folders, albums, artists, or settings on the left pane. -->
+    <LinearLayout
+        a:id="@+id/pane_header_card"
         a:layout_width="match_parent"
         a:layout_height="wrap_content"
-        a:layout_marginBottom="4dp"
-        a:ellipsize="end"
-        a:maxLines="1"
-        a:textAppearance="@style/TextAppearance.Material3.BodySmall"
-        a:textColor="#FFC107"
-        a:visibility="gone"
-        tools:text="Buffering …"
-        tools:visibility="visible" />
+        a:layout_marginBottom="8dp"
+        a:clickable="true"
+        a:focusable="true"
+        a:gravity="center_vertical"
+        a:orientation="horizontal"
+        a:paddingStart="12dp"
+        a:paddingTop="8dp"
+        a:paddingEnd="12dp"
+        a:paddingBottom="8dp">
 
-    <!-- The lyrics and the queue share the same space. Only one of them is shown, so
+        <com.google.android.material.card.MaterialCardView
+            a:id="@+id/pane_cover_card"
+            a:layout_width="50dp"
+            a:layout_height="50dp"
+            app:cardBackgroundColor="#18000000"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="0dp"
+            app:strokeColor="#24FFFFFF"
+            app:strokeWidth="1dp">
+
+            <ImageView
+                a:id="@+id/pane_cover"
+                a:layout_width="match_parent"
+                a:layout_height="match_parent"
+                a:contentDescription="@null"
+                a:scaleType="centerCrop"
+                a:src="@drawable/unknown_album" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout
+            a:layout_width="0dp"
+            a:layout_height="wrap_content"
+            a:layout_marginStart="12dp"
+            a:layout_marginEnd="8dp"
+            a:layout_weight="1"
+            a:orientation="vertical">
+
+            <TextView
+                a:id="@+id/pane_title"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:ellipsize="end"
+                a:maxLines="1"
+                a:text="@string/player_pane_idle"
+                a:textColor="@color/pal_text_primary"
+                a:textSize="17sp"
+                a:textStyle="bold" />
+
+            <TextView
+                a:id="@+id/pane_artist"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:ellipsize="end"
+                a:maxLines="1"
+                a:text="@string/player_pane_idle_hint"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            a:id="@+id/pane_status"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:ellipsize="end"
+            a:maxLines="1"
+            a:paddingStart="8dp"
+            a:paddingTop="4dp"
+            a:paddingEnd="8dp"
+            a:paddingBottom="4dp"
+            a:textAppearance="@style/TextAppearance.Material3.LabelMedium"
+            a:textColor="#FFC107"
+            a:textSize="12sp"
+            a:textStyle="bold"
+            a:visibility="gone"
+            tools:text="Buffering …"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <!-- The lyrics and the queue share the same stage. Only one of them is shown, so
          the driver can switch between "what is playing" and "what comes next" without
-         leaving the panel and without losing the player. The lyrics get every free pixel. -->
+         leaving the panel and without losing the player. -->
     <FrameLayout
+        a:id="@+id/pane_stage_card"
         a:layout_width="match_parent"
         a:layout_height="0dp"
-        a:layout_weight="1">
+        a:layout_weight="1"
+        a:paddingStart="10dp"
+        a:paddingTop="6dp"
+        a:paddingEnd="10dp"
+        a:paddingBottom="6dp">
 
         <ScrollView
             a:id="@+id/pane_lyrics_scroll"
             a:layout_width="match_parent"
             a:layout_height="match_parent"
             a:fillViewport="true"
-            a:scrollbars="vertical">
+            a:scrollbars="none">
 
             <TextView
                 a:id="@+id/pane_lyrics"
@@ -56,10 +129,11 @@
                 a:layout_height="wrap_content"
                 a:alpha="0.92"
                 a:gravity="center_horizontal"
-                a:lineSpacingExtra="6dp"
-                a:paddingTop="8dp"
-                a:paddingBottom="8dp"
+                a:lineSpacingExtra="8dp"
+                a:paddingTop="12dp"
+                a:paddingBottom="12dp"
                 a:textAppearance="@style/TextAppearance.Material3.BodyLarge"
+                a:textColor="@color/pal_text_primary"
                 tools:text="Lyrics" />
 
         </ScrollView>
@@ -68,6 +142,7 @@
             a:id="@+id/pane_queue"
             a:layout_width="match_parent"
             a:layout_height="match_parent"
+            a:clipToPadding="false"
             a:scrollbars="vertical"
             a:visibility="gone"
             tools:visibility="visible" />
@@ -75,8 +150,7 @@
     </FrameLayout>
 
     <!-- The lyrics of many songs run ahead or behind the audio. This slim bar nudges the whole
-         block by half a second steps so the words line up with what is heard. It is tiny, so the
-         lyrics keep almost all the height. -->
+         block by half a second steps so the words line up with what is heard. -->
     <LinearLayout
         a:id="@+id/pane_lyric_offset"
         a:layout_width="match_parent"
@@ -92,31 +166,38 @@
             a:layout_width="0dp"
             a:layout_height="wrap_content"
             a:layout_weight="1"
-            a:alpha="0.7"
-            a:gravity="center"
+            a:alpha="0.75"
+            a:gravity="start|center_vertical"
+            a:paddingStart="4dp"
+            a:paddingEnd="4dp"
             a:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-            a:textSize="13sp"
+            a:textColor="@color/pal_text_secondary"
+            a:textSize="12sp"
             tools:text="歌词校准 0.0s" />
 
         <TextView
             a:id="@+id/pane_offset_back"
-            a:layout_width="64dp"
-            a:layout_height="36dp"
+            a:layout_width="60dp"
+            a:layout_height="34dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/lyric_offset_back"
             a:gravity="center"
             a:text="@string/lyric_offset_back_short"
-            a:textSize="14sp" />
+            a:textColor="@color/pal_text_primary"
+            a:textSize="13sp"
+            a:textStyle="bold" />
 
         <TextView
             a:id="@+id/pane_offset_forward"
-            a:layout_width="64dp"
-            a:layout_height="36dp"
+            a:layout_width="60dp"
+            a:layout_height="34dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/lyric_offset_forward"
             a:gravity="center"
             a:text="@string/lyric_offset_forward_short"
-            a:textSize="14sp" />
+            a:textColor="@color/pal_text_primary"
+            a:textSize="13sp"
+            a:textStyle="bold" />
 
     </LinearLayout>
 
@@ -131,22 +212,25 @@
             a:id="@+id/pane_elapsed"
             a:layout_width="wrap_content"
             a:layout_height="wrap_content"
-            a:minWidth="48dp"
+            a:minWidth="46dp"
             a:textAppearance="@style/TextAppearance.Material3.BodySmall"
-            a:textSize="14sp"
+            a:textColor="@color/pal_text_secondary"
+            a:textSize="13sp"
             tools:text="0:00" />
 
         <!-- Seeking by dragging a thumb is unreliable while driving, so the same distance is
              also available as a button on both sides of the bar. -->
         <TextView
             a:id="@+id/pane_seek_back"
-            a:layout_width="56dp"
-            a:layout_height="40dp"
+            a:layout_width="52dp"
+            a:layout_height="38dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/seek_backward_15"
             a:gravity="center"
             a:text="@string/seek_label_back_15"
-            a:textSize="15sp" />
+            a:textColor="@color/pal_text_primary"
+            a:textSize="14sp"
+            a:textStyle="bold" />
 
         <SeekBar
             a:id="@+id/pane_seek"
@@ -157,22 +241,25 @@
 
         <TextView
             a:id="@+id/pane_seek_forward"
-            a:layout_width="56dp"
-            a:layout_height="40dp"
+            a:layout_width="52dp"
+            a:layout_height="38dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/seek_forward_15"
             a:gravity="center"
             a:text="@string/seek_label_forward_15"
-            a:textSize="15sp" />
+            a:textColor="@color/pal_text_primary"
+            a:textSize="14sp"
+            a:textStyle="bold" />
 
         <TextView
             a:id="@+id/pane_total"
             a:layout_width="wrap_content"
             a:layout_height="wrap_content"
             a:gravity="end"
-            a:minWidth="48dp"
+            a:minWidth="46dp"
             a:textAppearance="@style/TextAppearance.Material3.BodySmall"
-            a:textSize="14sp"
+            a:textColor="@color/pal_text_secondary"
+            a:textSize="13sp"
             tools:text="0:00" />
 
     </LinearLayout>
@@ -180,7 +267,7 @@
     <LinearLayout
         a:layout_width="match_parent"
         a:layout_height="wrap_content"
-        a:layout_marginTop="2dp"
+        a:layout_marginTop="4dp"
         a:gravity="center"
         a:orientation="horizontal">
 
@@ -190,37 +277,40 @@
             a:layout_height="44dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/buttons.shuffle"
+            a:padding="10dp"
             a:scaleType="fitCenter"
             a:src="@drawable/media_shuffle" />
 
         <ImageButton
             a:id="@+id/pane_previous"
-            a:layout_width="56dp"
-            a:layout_height="56dp"
+            a:layout_width="54dp"
+            a:layout_height="54dp"
             a:layout_marginStart="6dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/buttons.previous"
+            a:padding="12dp"
             a:scaleType="fitCenter"
             a:src="@drawable/media_backward" />
 
         <ImageButton
             a:id="@+id/pane_play"
-            a:layout_width="64dp"
-            a:layout_height="64dp"
-            a:layout_marginStart="6dp"
-            a:layout_marginEnd="6dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
+            a:layout_width="62dp"
+            a:layout_height="62dp"
+            a:layout_marginStart="8dp"
+            a:layout_marginEnd="8dp"
             a:contentDescription="@string/buttons.play"
+            a:padding="16dp"
             a:scaleType="fitCenter"
             a:src="@drawable/media_pause" />
 
         <ImageButton
             a:id="@+id/pane_next"
-            a:layout_width="56dp"
-            a:layout_height="56dp"
+            a:layout_width="54dp"
+            a:layout_height="54dp"
             a:layout_marginEnd="6dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/buttons.next"
+            a:padding="12dp"
             a:scaleType="fitCenter"
             a:src="@drawable/media_forward" />
 
@@ -230,6 +320,7 @@
             a:layout_height="44dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/buttons.repeat"
+            a:padding="10dp"
             a:scaleType="fitCenter"
             a:src="@drawable/media_repeat_off" />
 
@@ -242,6 +333,7 @@
             a:layout_marginStart="6dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/queue_title"
+            a:padding="10dp"
             a:scaleType="fitCenter"
             a:src="@drawable/ic_queue" />
 
@@ -254,6 +346,7 @@
             a:layout_marginStart="6dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/sleep_timer"
+            a:padding="10dp"
             a:scaleType="fitCenter"
             a:src="@drawable/ic_sleep" />
 

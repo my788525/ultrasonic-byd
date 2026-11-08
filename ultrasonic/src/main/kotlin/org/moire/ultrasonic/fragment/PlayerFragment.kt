@@ -8,16 +8,17 @@
 package org.moire.ultrasonic.fragment
 
 import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.content.Context
+import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color.argb
 import android.graphics.Point
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
-import android.os.Build
-import android.app.AlertDialog
-import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -61,6 +62,7 @@ import androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_DRAG
 import androidx.recyclerview.widget.ItemTouchHelper.ACTION_STATE_IDLE
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.R as RM
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.progressindicator.CircularProgressIndicator
@@ -82,6 +84,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.koin.core.component.KoinScopeComponent
@@ -112,8 +115,8 @@ import org.moire.ultrasonic.ui.SyncedLyricsView
 import org.moire.ultrasonic.util.CancellationToken
 import org.moire.ultrasonic.util.CommunicationError
 import org.moire.ultrasonic.util.ConfirmationDialog
-import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.LyricsParser
+import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.TimedLyric
 import org.moire.ultrasonic.util.Util
 import org.moire.ultrasonic.util.Util.toast
@@ -171,6 +174,11 @@ class PlayerFragment :
     private lateinit var fiveStar4ImageView: ImageView
     private lateinit var fiveStar5ImageView: ImageView
     private lateinit var playlistFlipper: ViewFlipper
+    private var playerModeBar: View? = null
+    private var tabCover: TextView? = null
+    private var tabLyrics: TextView? = null
+    private var tabQueue: TextView? = null
+    private var lyricsRefresh: SwipeRefreshLayout? = null
     private var lyricsTextView: TextView? = null
     private var lyricsTrackId: String? = null
     private var syncedLyrics: SyncedLyricsView? = null
@@ -227,6 +235,11 @@ class PlayerFragment :
     // TODO: Switch them all over to use the view binding
     private fun findViews(view: View) {
         playlistFlipper = view.findViewById(R.id.current_playing_playlist_flipper)
+        playerModeBar = view.findViewById(R.id.player_mode_bar)
+        tabCover = view.findViewById(R.id.player_tab_cover)
+        tabLyrics = view.findViewById(R.id.player_tab_lyrics)
+        tabQueue = view.findViewById(R.id.player_tab_queue)
+        lyricsRefresh = view.findViewById(R.id.lyrics_refresh)
         lyricsTextView = view.findViewById(R.id.lyrics_text)
         lyricsTextView?.let { lyrics ->
             syncedLyrics = SyncedLyricsView(
@@ -330,6 +343,14 @@ class PlayerFragment :
             toggleFullScreenAlbumArt()
         }
 
+        tabCover?.setOnClickListener { showPage(COVER_PAGE) }
+        tabLyrics?.setOnClickListener { showPage(LYRICS_PAGE) }
+        tabQueue?.setOnClickListener { showPage(QUEUE_PAGE) }
+        lyricsRefresh?.setOnRefreshListener {
+            lyricsTrackId = null
+            loadLyrics(currentSong)
+        }
+
         previousButton.setOnClickListener {
             networkAndStorageChecker.warnIfNetworkOrStorageUnavailable()
             launch(CommunicationError.getHandler(context)) {
@@ -414,6 +435,7 @@ class PlayerFragment :
         })
 
         initPlaylistDisplay()
+        applyPalette(view)
 
         EqualizerController.get().observe(
             requireActivity()
@@ -471,6 +493,73 @@ class PlayerFragment :
         view.setOnTouchListener { _, event -> gestureScanner.onTouchEvent(event) }
     }
 
+    private fun applyPalette(root: View) {
+        val ctx = context ?: return
+        val palette = CarPalette.current()
+        val accent = CarTheme.accent(ctx, palette)
+        root.setBackgroundColor(CarTheme.surfaceColor(ctx, palette))
+        playerModeBar?.background = CarTheme.cardBackground(
+            ctx,
+            palette,
+            cornerDp = 999f
+        )
+        progressBar.progressTintList = ColorStateList.valueOf(accent)
+        progressBar.thumbTintList = ColorStateList.valueOf(accent)
+        syncedLyrics?.setAccentColor(accent)
+        lyricsRefresh?.setColorSchemeColors(accent)
+        updateModeTabs()
+    }
+
+    private fun showPage(page: Int, animate: Boolean = false) {
+        if (page >= playlistFlipper.childCount) return
+        if (animate) {
+            if (page == COVER_PAGE) {
+                playlistFlipper.inAnimation =
+                    AnimationUtils.loadAnimation(context, R.anim.push_down_in)
+                playlistFlipper.outAnimation =
+                    AnimationUtils.loadAnimation(context, R.anim.push_down_out)
+            } else {
+                playlistFlipper.inAnimation =
+                    AnimationUtils.loadAnimation(context, R.anim.push_up_in)
+                playlistFlipper.outAnimation =
+                    AnimationUtils.loadAnimation(context, R.anim.push_up_out)
+            }
+        } else {
+            playlistFlipper.inAnimation = null
+            playlistFlipper.outAnimation = null
+        }
+        playlistFlipper.displayedChild = page
+        updateModeTabs()
+        when (page) {
+            LYRICS_PAGE -> loadLyrics(currentSong)
+            QUEUE_PAGE -> scrollToCurrent()
+        }
+    }
+
+    private fun updateModeTabs() {
+        val ctx = context ?: return
+        val palette = CarPalette.current()
+        val accent = CarTheme.accent(ctx, palette)
+        val primary = CarTheme.onSurface(ctx)
+        val secondary = CarTheme.onSurfaceSecondary(ctx)
+        val current = playlistFlipper.displayedChild
+
+        fun styleTab(tab: TextView?, active: Boolean) {
+            tab ?: return
+            if (active) {
+                tab.background = CarTheme.roundedFill(ctx, accent, cornerDp = 999f)
+                tab.setTextColor(primary)
+            } else {
+                tab.background = null
+                tab.setTextColor(secondary)
+            }
+        }
+
+        styleTab(tabCover, current == COVER_PAGE)
+        styleTab(tabLyrics, current == LYRICS_PAGE)
+        styleTab(tabQueue, current == QUEUE_PAGE)
+    }
+
     private fun updateShuffleButtonState(isEnabled: Boolean) {
         if (isEnabled) {
             shuffleButton.alpha = ALPHA_FULL
@@ -514,15 +603,17 @@ class PlayerFragment :
 
     override fun onResume() {
         super.onResume()
+        view?.let { applyPalette(it) }
         // The lyrics font size is a global setting; re-apply it so a change made in the settings
         // (while this fragment was in the background) is reflected without restarting playback.
         syncedLyrics?.setFontSizeSp(Settings.lyricsFontSizeSp)
         if (mediaPlayerManager.currentMediaItem == null) {
-            playlistFlipper.displayedChild = 1
+            showPage(QUEUE_PAGE)
         } else {
             // Download list and Album art must be updated when resumed
             onPlaylistChanged()
             onTrackChanged()
+            updateModeTabs()
         }
 
         val handler = Handler(Looper.getMainLooper())
@@ -731,9 +822,9 @@ class PlayerFragment :
                 // Lyrics are shown inside the player page, flipping between cover, queue
                 // and lyrics keeps everything on one screen.
                 if (playlistFlipper.displayedChild == LYRICS_PAGE) {
-                    playlistFlipper.displayedChild = COVER_PAGE
+                    showPage(COVER_PAGE)
                 } else {
-                    playlistFlipper.displayedChild = LYRICS_PAGE
+                    showPage(LYRICS_PAGE)
                     loadLyrics(track)
                 }
                 return true
@@ -905,15 +996,23 @@ class PlayerFragment :
      * track id, so flipping back and forth does not hit the server again.
      */
     private fun loadLyrics(track: Track?) {
-        val synced = syncedLyrics ?: return
+        val synced = syncedLyrics
+        if (synced == null) {
+            lyricsRefresh?.isRefreshing = false
+            return
+        }
 
         if (track == null) {
             synced.showPlaceholder(getString(R.string.player_pane_lyrics_empty))
             lyricsTrackId = null
+            lyricsRefresh?.isRefreshing = false
             return
         }
 
-        if (lyricsTrackId == track.id) return
+        if (lyricsTrackId == track.id) {
+            lyricsRefresh?.isRefreshing = false
+            return
+        }
         lyricsTrackId = track.id
         synced.reset()
 
@@ -928,15 +1027,18 @@ class PlayerFragment :
                 // The endpoint with the time axis is asked first, because the plain one drops
                 // every timestamp and the lyrics would not move along with the song. A server
                 // that does not know the endpoint throws, and the plain one is used instead.
-                runCatching { getMusicService().getSyncedLyrics(targetId) }.getOrNull()
-                    ?.takeIf { it.timedLines.isNotEmpty() }
-                    ?: getMusicService().getLyrics(artist, title)
+                withTimeoutOrNull(8_000L) {
+                    runCatching { getMusicService().getSyncedLyrics(targetId) }.getOrNull()
+                        ?.takeIf { it.timedLines.isNotEmpty() }
+                        ?: getMusicService().getLyrics(artist, title)
+                }
             } catch (all: Exception) {
                 Timber.w(all, "Could not load lyrics for %s", title)
                 null
             }
 
             launch(Dispatchers.Main) {
+                lyricsRefresh?.isRefreshing = false
                 if (lyricsTrackId != targetId || !isAdded) return@launch
 
                 val text = lyrics?.text
@@ -1001,20 +1103,12 @@ class PlayerFragment :
     }
 
     private fun toggleFullScreenAlbumArt() {
-        if (playlistFlipper.displayedChild == 1) {
-            playlistFlipper.inAnimation =
-                AnimationUtils.loadAnimation(context, R.anim.push_down_in)
-            playlistFlipper.outAnimation =
-                AnimationUtils.loadAnimation(context, R.anim.push_down_out)
-            playlistFlipper.displayedChild = 0
+        val target = if (playlistFlipper.displayedChild == QUEUE_PAGE) {
+            COVER_PAGE
         } else {
-            playlistFlipper.inAnimation =
-                AnimationUtils.loadAnimation(context, R.anim.push_up_in)
-            playlistFlipper.outAnimation =
-                AnimationUtils.loadAnimation(context, R.anim.push_up_out)
-            playlistFlipper.displayedChild = 1
+            QUEUE_PAGE
         }
-        scrollToCurrent()
+        showPage(target, animate = true)
     }
 
     private fun initPlaylistDisplay() {
@@ -1095,14 +1189,17 @@ class PlayerFragment :
             @SuppressLint("NotifyDataSetChanged")
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val viewPos = viewHolder.bindingAdapterPosition
+                if (viewPos == RecyclerView.NO_POSITION) return
                 val pos = mediaPlayerManager.getUnshuffledIndexOf(viewPos)
                 val item = mediaPlayerManager.getMediaItemAt(pos)
 
-                // Remove the item from the list quickly
+                // Remove the item from the displayed (possibly shuffled) list at viewPos
                 val items = viewAdapter.getCurrentList().toMutableList()
-                items.removeAt(pos)
-                viewAdapter.setList(items)
-                viewAdapter.notifyItemRemoved(pos)
+                if (viewPos in items.indices) {
+                    items.removeAt(viewPos)
+                    viewAdapter.setList(items)
+                    viewAdapter.notifyItemRemoved(viewPos)
+                }
 
                 val songRemoved = String.format(
                     resources.getString(R.string.download_song_removed),
@@ -1111,7 +1208,7 @@ class PlayerFragment :
 
                 toast(songRemoved)
 
-                // Remove the item from the playlist
+                // Remove the item from the underlying playlist at unshuffled pos
                 mediaPlayerManager.removeFromPlaylist(pos)
             }
 
@@ -1515,6 +1612,7 @@ class PlayerFragment :
 
     companion object {
         private const val COVER_PAGE = 0
+        private const val QUEUE_PAGE = 1
         private const val LYRICS_PAGE = 2
 
         private const val PERCENTAGE_OF_SCREEN_FOR_SWIPE = 5

@@ -7,6 +7,9 @@
 
 package org.moire.ultrasonic.fragment
 
+import android.content.res.ColorStateList
+import android.graphics.Color
+import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -14,18 +17,20 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
-import android.content.res.ColorStateList
-import android.graphics.Color
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.core.widget.ImageViewCompat
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.lifecycle.lifecycleScope
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.moire.ultrasonic.R
@@ -35,6 +40,7 @@ import org.moire.ultrasonic.service.MediaPlayerManager
 import org.moire.ultrasonic.service.MusicServiceFactory
 import org.moire.ultrasonic.service.RxBus
 import org.moire.ultrasonic.service.plusAssign
+import org.moire.ultrasonic.subsonic.ImageLoaderProvider
 import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.ui.SyncedLyricsView
@@ -58,11 +64,18 @@ import timber.log.Timber
  * registered inside the NavigationActivity scope, so a plain Fragment would not be able to
  * resolve them and the app would crash while inflating the pane.
  */
+@Suppress("TooManyFunctions")
 class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     private val mediaPlayerManager: MediaPlayerManager by inject()
     private val sleepTimerManager: SleepTimerManager by inject()
+    private val imageLoaderProvider: ImageLoaderProvider by inject()
 
+    private var headerCard: View? = null
+    private var stageCard: View? = null
+    private var coverView: ImageView? = null
+    private var titleView: TextView? = null
+    private var artistView: TextView? = null
     private var lyricsView: TextView? = null
     private var lyricsScroll: View? = null
     private var offsetBar: View? = null
@@ -97,6 +110,8 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var waitingForNetwork = false
 
     private var currentTrack: Track? = null
+    private var lastQueueIndex = -2
+    private var lastPlayingState: Boolean? = null
     private var stateInitialized = false
     private var currentLyricsTrackId: String? = null
     private var syncedLyrics: SyncedLyricsView? = null
@@ -122,6 +137,11 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        headerCard = view.findViewById(R.id.pane_header_card)
+        stageCard = view.findViewById(R.id.pane_stage_card)
+        coverView = view.findViewById(R.id.pane_cover)
+        titleView = view.findViewById(R.id.pane_title)
+        artistView = view.findViewById(R.id.pane_artist)
         lyricsView = view.findViewById(R.id.pane_lyrics)
         lyricsScroll = view.findViewById(R.id.pane_lyrics_scroll)
         seekBar = view.findViewById(R.id.pane_seek)
@@ -147,6 +167,15 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         view.findViewById<View>(R.id.pane_offset_forward).setOnClickListener {
             adjustLyricOffset(-LYRIC_OFFSET_STEP_MS)
         }
+
+        headerCard?.setOnClickListener {
+            runCatching {
+                Navigation.findNavController(requireActivity(), R.id.nav_host_fragment)
+                    .navigate(R.id.playerFragment)
+            }
+        }
+
+        decoratePane()
 
         lyricsView?.let { lyrics ->
             syncedLyrics = SyncedLyricsView(lyricsScroll, lyrics).apply {
@@ -207,8 +236,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             }
         )
 
-        // The driver has to know that the music waits for the server. A panel that just
-        // sits there looks like a frozen app.
         // The queue changes when a song is added or taken away, not only when the song
         // changes. Without this the list would keep showing a song that is gone.
         disposables += RxBus.playlistObservable.subscribe {
@@ -223,12 +250,42 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         updateState()
     }
 
+    private fun decoratePane() {
+        val ctx = context ?: return
+        val palette = CarPalette.current()
+        val accent = CarTheme.accent(ctx, palette)
+
+        headerCard?.background = CarTheme.cardBackground(ctx, palette, cornerDp = 16f)
+        stageCard?.background = CarTheme.roundedFill(
+            ctx,
+            CarTheme.withAlpha(CarTheme.surfaceColor(ctx, palette), 0xB8),
+            CarTheme.withAlpha(accent, 0x26),
+            16f
+        )
+
+        playButton?.let { play ->
+            val playBg = CarTheme.accentButton(ctx, palette)
+            play.background = RippleDrawable(
+                ColorStateList.valueOf(CarTheme.withAlpha(Color.WHITE, 0x40)),
+                playBg,
+                playBg
+            )
+            ImageViewCompat.setImageTintList(
+                play,
+                ColorStateList.valueOf(ContextCompat.getColor(ctx, R.color.pal_on_accent))
+            )
+        }
+
+        seekBar?.progressTintList = ColorStateList.valueOf(accent)
+        seekBar?.thumbTintList = ColorStateList.valueOf(accent)
+    }
+
     override fun onResume() {
         super.onResume()
+        decoratePane()
         handler.post(updateRunnable)
         sleepTimerManager.addListener(this)
-        // The lyrics font size is a global setting; re-apply it so a change made in the settings
-        // (while this pane was in the background) is reflected without restarting the player.
+        syncedLyrics?.setAccentColor(CarTheme.color(requireContext(), CarPalette.current().accent))
         syncedLyrics?.setFontSizeSp(Settings.lyricsFontSizeSp)
     }
 
@@ -241,6 +298,13 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     override fun onDestroyView() {
         handler.removeCallbacks(updateRunnable)
         disposables.clear()
+        headerCard = null
+        stageCard = null
+        coverView = null
+        titleView = null
+        artistView = null
+        lastPlayingState = null
+        lastQueueIndex = -2
         super.onDestroyView()
     }
 
@@ -248,11 +312,15 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         if (!isAdded) return
 
         val track = mediaPlayerManager.currentMediaItem?.toTrack()
+        val shuffleIdx = mediaPlayerManager.getCurrentShuffleIndex()
 
         if (!stateInitialized || track?.id != currentTrack?.id) {
             stateInitialized = true
             currentTrack = track
             showTrack(track)
+            if (showQueue) refreshQueue()
+        } else if (showQueue && shuffleIdx != lastQueueIndex) {
+            refreshQueue()
         }
 
         val duration = mediaPlayerManager.playerDuration
@@ -262,7 +330,11 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         syncedLyrics?.update(lyricSearchPosition())
 
         // The calibration bar only makes sense when the lyrics carry a time axis
-        offsetBar?.visibility = if (syncedLyrics?.hasTimedLyrics == true) View.VISIBLE else View.GONE
+        offsetBar?.visibility = if (syncedLyrics?.hasTimedLyrics == true && !showQueue) {
+            View.VISIBLE
+        } else {
+            View.GONE
+        }
         updateOffsetLabel()
 
         if (!seekBarTracking) {
@@ -272,14 +344,14 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         }
         totalView?.text = formatTime(duration)
 
-        playButton?.setImageResource(
-            if (mediaPlayerManager.isPlaying) R.drawable.media_pause else R.drawable.media_start
-        )
+        val playing = mediaPlayerManager.isPlaying
+        if (lastPlayingState != playing) {
+            lastPlayingState = playing
+            playButton?.setImageResource(
+                if (playing) R.drawable.media_pause else R.drawable.media_start
+            )
+        }
         updateStatus()
-
-        // The song that is playing moves through the queue, so the marker has to follow
-        // it even when the queue itself did not change.
-        if (showQueue) refreshQueue()
 
         // The previous button restarts the current song, so it is only dead at the
         // beginning of the first song of the queue.
@@ -295,16 +367,32 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             if (mediaPlayerManager.canSeekToNext()) ALPHA_ACTIVE else ALPHA_DISABLED
 
         applyToggleTint(shuffleButton, mediaPlayerManager.isShufflePlayEnabled)
+        applyToggleTint(queueButton, showQueue)
 
         updateRepeatButton()
     }
 
     private fun showTrack(track: Track?) {
-        // The cover, title and artist are shown in the left list, so the panel only carries the
-        // lyrics. An empty pane still says what to do, though.
+        if (track == null) {
+            titleView?.text = getString(R.string.player_pane_idle)
+            artistView?.text = getString(R.string.player_pane_idle_hint)
+            coverView?.setImageResource(R.drawable.unknown_album)
+        } else {
+            titleView?.text = track.title.orEmpty()
+            val subtitle = listOfNotNull(track.artist, track.album)
+                .filter { it.isNotBlank() }
+                .joinToString(" · ")
+            artistView?.text = subtitle.ifBlank { getString(R.string.player_pane_idle_hint) }
+            coverView?.let { target ->
+                imageLoaderProvider.executeOn { loader ->
+                    if (isAdded) loader.loadImage(target, track, false, 0)
+                }
+            }
+        }
         loadLyrics(track)
     }
 
+    @Suppress("TooGenericExceptionCaught")
     private fun loadLyrics(track: Track?) {
         val synced = syncedLyrics ?: return
 
@@ -325,16 +413,18 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
         viewLifecycleOwner.lifecycleScope.launch {
             val lyrics = withContext(Dispatchers.IO) {
-                try {
-                    // The endpoint with the time axis is asked first, because the plain one drops
-                    // every timestamp and the lyrics would not move along with the song.
-                    val service = MusicServiceFactory.getMusicService()
-                    runCatching { service.getSyncedLyrics(track.id) }.getOrNull()
-                        ?.takeIf { it.timedLines.isNotEmpty() }
-                        ?: service.getLyrics(artist, title)
-                } catch (all: Exception) {
-                    Timber.w(all, "Could not load lyrics for %s", title)
-                    null
+                withTimeoutOrNull(LYRICS_FETCH_TIMEOUT_MS) {
+                    try {
+                        // The endpoint with the time axis is asked first, because the plain one drops
+                        // every timestamp and the lyrics would not move along with the song.
+                        val service = MusicServiceFactory.getMusicService()
+                        runCatching { service.getSyncedLyrics(track.id) }.getOrNull()
+                            ?.takeIf { it.timedLines.isNotEmpty() }
+                            ?: service.getLyrics(artist, title)
+                    } catch (all: Exception) {
+                        Timber.w(all, "Could not load lyrics for %s", title)
+                        null
+                    }
                 }
             }
 
@@ -372,7 +462,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         showQueue = !showQueue
         queueView?.visibility = if (showQueue) View.VISIBLE else View.GONE
         lyricsScroll?.visibility = if (showQueue) View.GONE else View.VISIBLE
-        queueButton?.alpha = if (showQueue) ALPHA_ACTIVE else ALPHA_INACTIVE
+        applyToggleTint(queueButton, showQueue)
         if (showQueue) refreshQueue()
     }
 
@@ -385,6 +475,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private fun refreshQueue() {
         val tracks = mediaPlayerManager.playlistInPlayOrder.map { it.toTrack() }
         val current = mediaPlayerManager.getCurrentShuffleIndex()
+        lastQueueIndex = current
         queueAdapter?.submit(tracks, current)
     }
 
@@ -460,15 +551,22 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             view.text = ""
             return
         }
+        val statusColor = when (state) {
+            CarTransport.VisualState.ERROR, CarTransport.VisualState.WAITING_FOR_NETWORK ->
+                STATUS_COLOR_ERROR
+            else -> STATUS_COLOR_WARNING
+        }
         view.text = message
         view.visibility = View.VISIBLE
-        view.setTextColor(
-            when (state) {
-                CarTransport.VisualState.ERROR, CarTransport.VisualState.WAITING_FOR_NETWORK ->
-                    STATUS_COLOR_ERROR
-                else -> STATUS_COLOR_WARNING
-            }
-        )
+        view.setTextColor(statusColor)
+        context?.let { ctx ->
+            view.background = CarTheme.roundedFill(
+                ctx,
+                CarTheme.withAlpha(statusColor, 0x26),
+                CarTheme.withAlpha(statusColor, 0x66),
+                10f
+            )
+        }
     }
 
     private fun cycleRepeatMode() {
@@ -574,15 +672,11 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     override fun onSleepTimerTick(remainingMillis: Long) {
         if (!isAdded) return
-        // The visible cue is the tint; the remaining time goes into the content description so
-        // it is spoken and shown on long-press without adding a moving number to the bar.
         val minutes = (remainingMillis / 60_000L).toInt().coerceAtLeast(1)
         sleepButton?.contentDescription = getString(R.string.sleep_timer_minutes, minutes)
     }
 
     override fun onSleepTimerFired() {
-        // Stop the music but keep the queue and the position, so the driver can resume in the
-        // morning exactly where the car left off.
         mediaPlayerManager.pause()
     }
 
@@ -590,11 +684,11 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     companion object {
         private const val UPDATE_INTERVAL_MS = 500L
+        private const val LYRICS_FETCH_TIMEOUT_MS = 8_000L
         private const val ALPHA_DISABLED = 0.35f
         private const val STATUS_COLOR_WARNING = 0xFFFFC107.toInt()
         private const val STATUS_COLOR_ERROR = 0xFFFF534D.toInt()
         private const val ALPHA_ACTIVE = 1.0f
-        private const val ALPHA_INACTIVE = 0.4f
         private const val SEEK_STEP_MS = 15_000
 
         /** One tap on the calibration bar shifts the lyrics by this many milliseconds. */

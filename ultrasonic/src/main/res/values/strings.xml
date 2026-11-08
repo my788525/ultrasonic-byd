@@ -714,4 +714,9 @@ adb shell settings put secure accessibility_enabled 1</string>
     <string name="floating_camera_audio_focus_summary">Off by default. When the car takes audio focus briefly, hide the window and pause music. Navigation voice prompts take the same focus, so this can hide the window at every turn instruction - only enable it if your car takes focus exclusively for the camera view.</string>
     <string name="floating_manual_toggle_title">Show / hide floating window</string>
     <string name="floating_manual_toggle_summary">Reliable one-tap hide that needs no permission. Also available as a small button inside the floating window, as an edge dot after hiding, and in the ongoing notification. Music pauses with the window and resumes when it comes back.</string>
+    <string name="car_fallback_playing_cached">Poor network: switched to cached track</string>
+    <string name="car_fallback_shuffle_cached">Poor network: shuffling downloaded music</string>
+    <string name="player_view_cover">Cover</string>
+    <string name="player_view_lyrics">Lyrics</string>
+    <string name="player_view_queue">Queue</string>
 </resources>

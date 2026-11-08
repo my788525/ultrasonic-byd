@@ -33,7 +33,7 @@
         <FrameLayout
             a:id="@+id/home_continue_card"
             a:layout_width="match_parent"
-            a:layout_height="96dp"
+            a:layout_height="104dp"
             a:clickable="true"
             a:focusable="true"
             a:paddingStart="6dp"
@@ -45,16 +45,18 @@
                 a:gravity="center_vertical"
                 a:orientation="horizontal"
                 a:paddingStart="14dp"
-                a:paddingEnd="14dp">
+                a:paddingEnd="14dp"
+                a:paddingBottom="4dp">
 
                 <com.google.android.material.card.MaterialCardView
                     a:id="@+id/home_cover_card"
-                    a:layout_width="62dp"
-                    a:layout_height="62dp"
-                    app:cardBackgroundColor="#14000000"
-                    app:cardCornerRadius="14dp"
+                    a:layout_width="68dp"
+                    a:layout_height="68dp"
+                    app:cardBackgroundColor="#18000000"
+                    app:cardCornerRadius="16dp"
                     app:cardElevation="0dp"
-                    app:strokeWidth="0dp">
+                    app:strokeColor="#26FFFFFF"
+                    app:strokeWidth="1dp">
 
                     <ImageView
                         a:id="@+id/home_cover"
@@ -67,7 +69,8 @@
                 <LinearLayout
                     a:layout_width="0dp"
                     a:layout_height="wrap_content"
-                    a:layout_marginStart="18dp"
+                    a:layout_marginStart="16dp"
+                    a:layout_marginEnd="8dp"
                     a:layout_weight="1"
                     a:orientation="vertical">
 
@@ -75,12 +78,13 @@
                         a:id="@+id/home_continue_label"
                         a:layout_width="wrap_content"
                         a:layout_height="wrap_content"
-                        a:letterSpacing="0.08"
                         a:ellipsize="end"
+                        a:letterSpacing="0.08"
                         a:maxLines="1"
                         a:text="@string/home_continue_playing"
                         a:textColor="@color/pal_text_secondary"
-                        a:textSize="13sp" />
+                        a:textSize="12sp"
+                        a:textStyle="bold" />
 
                     <TextView
                         a:id="@+id/home_title"
@@ -98,7 +102,7 @@
                         a:id="@+id/home_artist"
                         a:layout_width="match_parent"
                         a:layout_height="wrap_content"
-                        a:layout_marginTop="1dp"
+                        a:layout_marginTop="2dp"
                         a:ellipsize="end"
                         a:maxLines="1"
                         a:text="@string/home_idle_hint"
@@ -110,7 +114,7 @@
                     a:id="@+id/home_nav_mode"
                     a:layout_width="44dp"
                     a:layout_height="44dp"
-                    a:layout_marginEnd="6dp"
+                    a:layout_marginEnd="4dp"
                     a:background="?attr/selectableItemBackgroundBorderless"
                     a:contentDescription="@string/settings_nav_floating_title"
                     a:padding="10dp"
@@ -119,23 +123,45 @@
 
                 <ImageButton
                     a:id="@+id/home_shuffle"
-                    a:layout_width="48dp"
-                    a:layout_height="48dp"
-                    a:layout_marginEnd="10dp"
+                    a:layout_width="44dp"
+                    a:layout_height="44dp"
+                    a:layout_marginEnd="4dp"
                     a:background="?attr/selectableItemBackgroundBorderless"
                     a:contentDescription="@string/home_play_all_shuffled"
-                    a:padding="12dp"
+                    a:padding="10dp"
                     a:scaleType="fitCenter"
                     a:src="@drawable/media_shuffle" />
 
                 <ImageButton
+                    a:id="@+id/home_prev"
+                    a:layout_width="46dp"
+                    a:layout_height="46dp"
+                    a:layout_marginEnd="4dp"
+                    a:background="?attr/selectableItemBackgroundBorderless"
+                    a:contentDescription="@string/buttons.previous"
+                    a:padding="10dp"
+                    a:scaleType="fitCenter"
+                    a:src="@drawable/media_backward" />
+
+                <ImageButton
                     a:id="@+id/home_play"
-                    a:layout_width="54dp"
-                    a:layout_height="54dp"
+                    a:layout_width="56dp"
+                    a:layout_height="56dp"
+                    a:layout_marginEnd="4dp"
                     a:contentDescription="@string/home_play_pause"
-                    a:padding="16dp"
+                    a:padding="15dp"
                     a:scaleType="fitCenter"
                     a:src="@drawable/media_start" />
+
+                <ImageButton
+                    a:id="@+id/home_next"
+                    a:layout_width="46dp"
+                    a:layout_height="46dp"
+                    a:background="?attr/selectableItemBackgroundBorderless"
+                    a:contentDescription="@string/buttons.next"
+                    a:padding="10dp"
+                    a:scaleType="fitCenter"
+                    a:src="@drawable/media_forward" />
 
             </LinearLayout>
 
@@ -147,9 +173,9 @@
                 a:layout_width="match_parent"
                 a:layout_height="4dp"
                 a:layout_gravity="bottom"
-                a:layout_marginStart="14dp"
-                a:layout_marginEnd="14dp"
-                a:layout_marginBottom="8dp"
+                a:layout_marginStart="16dp"
+                a:layout_marginEnd="16dp"
+                a:layout_marginBottom="7dp"
                 a:max="1000"
                 a:progress="0" />
         </FrameLayout>
@@ -168,7 +194,7 @@
             <LinearLayout
                 a:layout_width="match_parent"
                 a:layout_height="wrap_content"
-                a:layout_marginTop="18dp"
+                a:layout_marginTop="16dp"
                 a:layout_marginBottom="2dp"
                 a:gravity="center_vertical"
                 a:orientation="horizontal">
@@ -176,20 +202,27 @@
                 <TextView
                     a:layout_width="wrap_content"
                     a:layout_height="wrap_content"
-                    a:letterSpacing="0.12"
+                    a:letterSpacing="0.10"
                     a:text="@string/home_playlists_title"
-                    a:textColor="@color/pal_text_secondary"
-                    a:textSize="14sp" />
+                    a:textColor="@color/pal_text_primary"
+                    a:textSize="15sp"
+                    a:textStyle="bold" />
 
                 <TextView
+                    a:id="@+id/home_playlists_more"
                     a:layout_width="0dp"
                     a:layout_height="wrap_content"
                     a:layout_weight="1"
-                    a:gravity="end"
+                    a:background="?attr/selectableItemBackgroundBorderless"
+                    a:clickable="true"
+                    a:focusable="true"
+                    a:gravity="end|center_vertical"
                     a:letterSpacing="0.04"
+                    a:paddingTop="4dp"
+                    a:paddingBottom="4dp"
                     a:text="@string/home_playlists_hint"
                     a:textColor="@color/pal_text_secondary"
-                    a:textSize="12sp" />
+                    a:textSize="13sp" />
             </LinearLayout>
 
             <!-- 横向滚动：所有歌单都能左右滑到；高度在代码里按设置的行数精确指定，
@@ -199,7 +232,7 @@
                 a:id="@+id/home_playlists_grid"
                 a:layout_width="match_parent"
                 a:layout_height="@dimen/home_playlist_tile_height"
-                a:layout_marginTop="10dp"
+                a:layout_marginTop="8dp"
                 a:clipToPadding="false"
                 a:nestedScrollingEnabled="false"
                 a:overScrollMode="ifContentScrolls"
@@ -209,18 +242,19 @@
         <TextView
             a:layout_width="wrap_content"
             a:layout_height="wrap_content"
-            a:layout_marginTop="18dp"
+            a:layout_marginTop="16dp"
             a:layout_marginBottom="2dp"
-            a:letterSpacing="0.12"
+            a:letterSpacing="0.10"
             a:text="@string/home_library"
-            a:textColor="@color/pal_text_secondary"
-            a:textSize="14sp" />
+            a:textColor="@color/pal_text_primary"
+            a:textSize="15sp"
+            a:textStyle="bold" />
 
         <androidx.recyclerview.widget.RecyclerView
             a:id="@+id/home_grid"
             a:layout_width="match_parent"
             a:layout_height="wrap_content"
-            a:layout_marginTop="10dp"
+            a:layout_marginTop="8dp"
             a:nestedScrollingEnabled="false" />
     </LinearLayout>
 </ScrollView>

@@ -8,18 +8,21 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.isGone
 import androidx.core.view.isVisible
 import androidx.lifecycle.MutableLiveData
 import androidx.media3.common.HeartRating
 import androidx.media3.common.StarRating
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.color.MaterialColors
 import com.google.android.material.progressindicator.CircularProgressIndicator
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.moire.ultrasonic.R
 import org.moire.ultrasonic.data.ActiveServerProvider
@@ -29,6 +32,8 @@ import org.moire.ultrasonic.service.DownloadService
 import org.moire.ultrasonic.service.DownloadState
 import org.moire.ultrasonic.service.RxBus
 import org.moire.ultrasonic.service.plusAssign
+import org.moire.ultrasonic.ui.CarPalette
+import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.Util
 
@@ -41,11 +46,14 @@ const val INDICATOR_THICKNESS_DEFINITE = 10
 class TrackViewHolder(val view: View) :
     RecyclerView.ViewHolder(view),
     Checkable,
-    KoinComponent,
-    CoroutineScope by CoroutineScope(Dispatchers.IO) {
+    KoinComponent {
 
     companion object {
         val COLOR_HIGHLIGHT = com.google.android.material.R.attr.colorSecondaryContainer
+        private const val PLAYING_BG_ALPHA = 38
+        private const val PLAYING_BORDER_ALPHA = 76
+        private const val PLAYING_CORNER_DP = 12f
+        private val sharedIoScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     }
 
     var entry: Track? = null
@@ -77,6 +85,7 @@ class TrackViewHolder(val view: View) :
     private var isPlayingCached = false
 
     private var rxBusSubscription: CompositeDisposable? = null
+    private var statusJob: Job? = null
 
     @Suppress("ComplexMethod")
     fun setSong(
@@ -85,6 +94,13 @@ class TrackViewHolder(val view: View) :
         draggable: Boolean,
         isSelected: Boolean = false
     ) {
+        // Dispose any previous subscriptions and cancel any in-flight status lookup
+        rxBusSubscription?.dispose()
+        statusJob?.cancel()
+
+        val ctx = view.context
+        val textPrimary = CarTheme.onSurface(ctx)
+        val textSecondary = CarTheme.onSurfaceSecondary(ctx)
         val useFiveStarRating = Settings.useFiveStarRating
         entry = song
 
@@ -94,8 +110,16 @@ class TrackViewHolder(val view: View) :
         title.text = entryDescription.title
         duration.text = entryDescription.duration
 
+        if (!isPlayingCached) {
+            title.setTextColor(textPrimary)
+        }
+        artist.setTextColor(textSecondary)
+        duration.setTextColor(textSecondary)
+        track.setTextColor(textSecondary)
+
         if (Settings.shouldShowTrackNumber && song.track != null && song.track!! > 0) {
             track.text = entryDescription.trackNumber
+            if (track.isGone) track.isVisible = true
         } else {
             if (!track.isGone) track.isGone = true
         }
@@ -111,13 +135,15 @@ class TrackViewHolder(val view: View) :
             setupStarButtons(song, useFiveStarRating)
         }
 
-        // Instead of blocking the UI thread while looking up the current state,
-        // launch the request in an IO thread and propagate the result through RX
-        launch {
+        // Look up the current download state in the background and update ONLY this ViewHolder
+        // instead of broadcasting to all rows on RxBus.
+        statusJob = sharedIoScope.launch {
             val state = DownloadService.getDownloadState(song)
-            RxBus.trackDownloadStatePublisher.onNext(
-                RxBus.TrackDownloadState(song.id, state, null)
-            )
+            withContext(Dispatchers.Main) {
+                if (entry?.id == song.id) {
+                    updateStatus(state, null)
+                }
+            }
         }
 
         if (useFiveStarRating) {
@@ -129,24 +155,27 @@ class TrackViewHolder(val view: View) :
         if (song.isVideo) {
             artist.isGone = true
             progressIndicator.isGone = true
+        } else if (artist.isGone) {
+            artist.isVisible = true
         }
 
         // Create new Disposable for the new Subscriptions
-        rxBusSubscription = CompositeDisposable()
-        rxBusSubscription!! += RxBus.playerStateObservable.subscribe {
+        val disposable = CompositeDisposable()
+        rxBusSubscription = disposable
+
+        disposable += RxBus.playerStateObservable.subscribe {
             setPlayIcon(it.track?.id == song.id && it.index == bindingAdapterPosition)
         }
 
-        rxBusSubscription!! += RxBus.trackDownloadStateObservable.subscribe {
+        disposable += RxBus.trackDownloadStateObservable.subscribe {
             if (it.id != song.id) return@subscribe
             updateStatus(it.state, it.progress)
         }
 
         // Listen for rating updates
-        rxBusSubscription!! += RxBus.ratingPublishedObservable.subscribe {
-            launch(Dispatchers.Main) {
-                // Ignore updates which are not for the current song
-                if (it.id != song.id) return@launch
+        disposable += RxBus.ratingPublishedObservable.subscribe {
+            view.post {
+                if (it.id != entry?.id) return@post
 
                 if (it.rating is HeartRating) {
                     updateSingleStar(it.rating.isHeart)
@@ -159,28 +188,40 @@ class TrackViewHolder(val view: View) :
 
     // This is called when the Holder is recycled and receives a new Song
     fun dispose() {
+        statusJob?.cancel()
+        statusJob = null
         rxBusSubscription?.dispose()
+        rxBusSubscription = null
     }
 
     private val playingIcon by lazy {
-        ContextCompat.getDrawable(view.context, R.drawable.ic_stat_play)!!
+        ContextCompat.getDrawable(view.context, R.drawable.ic_stat_play)!!.mutate()
     }
 
     @Suppress("MagicNumber")
     private fun setPlayIcon(isPlaying: Boolean) {
+        val ctx = view.context
+        val accent = CarTheme.accent(ctx, CarPalette.current())
         if (isPlaying && !isPlayingCached) {
             isPlayingCached = true
+            DrawableCompat.setTint(playingIcon, accent)
             title.setCompoundDrawablesWithIntrinsicBounds(
                 playingIcon, null, null, null
             )
-            val color = MaterialColors.getColor(view, COLOR_HIGHLIGHT)
-            songLayout.setBackgroundColor(color)
-            songLayout.elevation = 3F
+            title.setTextColor(accent)
+            songLayout.background = CarTheme.roundedFill(
+                ctx,
+                CarTheme.withAlpha(accent, PLAYING_BG_ALPHA),
+                CarTheme.withAlpha(accent, PLAYING_BORDER_ALPHA),
+                PLAYING_CORNER_DP
+            )
+            songLayout.elevation = 2F
         } else if (!isPlaying && isPlayingCached) {
             isPlayingCached = false
             title.setCompoundDrawablesWithIntrinsicBounds(
                 0, 0, 0, 0
             )
+            title.setTextColor(CarTheme.onSurface(ctx))
             songLayout.setBackgroundColor(Color.TRANSPARENT)
             songLayout.elevation = 0F
         }
@@ -191,8 +232,8 @@ class TrackViewHolder(val view: View) :
             // Hide single star
             star.isGone = true
             rating.isVisible = true
-            val rating = if (track.userRating == null) 0 else track.userRating!!
-            updateFiveStars(rating)
+            val ratingValue = track.userRating ?: 0
+            updateFiveStars(ratingValue)
 
             // Five star rating has no click handler because in the
             // track view theres not enough space
@@ -270,10 +311,11 @@ class TrackViewHolder(val view: View) :
 
     private fun showStatusImage(image: Int?) {
         progressIndicator.isGone = true
-        statusImage.isVisible = true
         if (image != null) {
+            statusImage.isVisible = true
             statusImage.setImageResource(image)
         } else {
+            statusImage.isGone = true
             statusImage.setImageDrawable(null)
         }
     }

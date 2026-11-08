@@ -5,6 +5,7 @@
      stay fully visible instead of being clipped by a too-short, single-line tile.
      The accent/background is applied in code (CarTheme), keyed off the selected palette. -->
 <LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     a:layout_width="@dimen/home_playlist_tile_width"
     a:layout_height="@dimen/home_playlist_tile_height"
     a:layout_margin="@dimen/home_grid_tile_gap"
@@ -15,27 +16,38 @@
     a:paddingStart="8dp"
     a:paddingTop="10dp"
     a:paddingEnd="8dp"
-    a:paddingBottom="10dp">
+    a:paddingBottom="8dp">
 
-    <ImageView
-        a:id="@+id/home_tile_icon"
+    <com.google.android.material.card.MaterialCardView
         a:layout_width="64dp"
         a:layout_height="64dp"
-        a:contentDescription="@null"
-        a:scaleType="centerCrop" />
+        app:cardBackgroundColor="#18FFFFFF"
+        app:cardCornerRadius="14dp"
+        app:cardElevation="0dp"
+        app:strokeColor="#22FFFFFF"
+        app:strokeWidth="1dp">
+
+        <ImageView
+            a:id="@+id/home_tile_icon"
+            a:layout_width="match_parent"
+            a:layout_height="match_parent"
+            a:contentDescription="@null"
+            a:scaleType="centerCrop" />
+    </com.google.android.material.card.MaterialCardView>
 
     <TextView
         a:id="@+id/home_tile_label"
         a:layout_width="match_parent"
         a:layout_height="0dp"
-        a:layout_weight="1"
-        a:layout_marginTop="8dp"
         a:layout_marginStart="2dp"
+        a:layout_marginTop="7dp"
         a:layout_marginEnd="2dp"
+        a:layout_weight="1"
         a:ellipsize="end"
         a:gravity="center"
+        a:lineSpacingExtra="2dp"
         a:maxLines="2"
         a:textColor="@color/pal_text_primary"
         a:textSize="13sp"
-        a:lineSpacingExtra="2dp" />
+        a:textStyle="bold" />
 </LinearLayout>

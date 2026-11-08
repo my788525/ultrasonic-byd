@@ -12,7 +12,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 import okio.Buffer
-import okio.source
 import org.moire.ultrasonic.api.subsonic.SubsonicAPIClient
 import org.moire.ultrasonic.util.FileUtil
 import org.moire.ultrasonic.util.FileUtil.SUFFIX_LARGE
@@ -42,13 +41,15 @@ class CoverArtRequestHandler(private val client: SubsonicAPIClient) : RequestHan
         // because scaling down a larger size image on the device is quicker than
         // requesting the down-sized image from the network.
         val key = request.stableKey!!
-        val largeKey = key.replace(SUFFIX_SMALL, SUFFIX_LARGE)
-        var cache = getAlbumArtBitmapFromDisk(largeKey, size?.toInt())
-        if (cache == null && key != largeKey) {
-            cache = getAlbumArtBitmapFromDisk(key, size?.toInt())
-        }
-        if (cache != null) {
-            return Result(cache, DISK)
+        if (key != "-1") {
+            val largeKey = key.replace(SUFFIX_SMALL, SUFFIX_LARGE)
+            var cache = getAlbumArtBitmapFromDisk(largeKey, size?.toInt())
+            if (cache == null && key != largeKey) {
+                cache = getAlbumArtBitmapFromDisk(key, size?.toInt())
+            }
+            if (cache != null) {
+                return Result(cache, DISK)
+            }
         }
 
         // Cancel early if we are offline
@@ -84,11 +85,11 @@ class CoverArtRequestHandler(private val client: SubsonicAPIClient) : RequestHan
      * [getAlbumArtBitmapFromDisk], which looks the file up by the same [stableKey].
      */
     private fun writeAlbumArtToDisk(stableKey: String, bytes: ByteArray) {
-        if (stableKey.isBlank() || bytes.isEmpty()) return
+        if (stableKey.isBlank() || stableKey == "-1" || bytes.isEmpty()) return
         try {
             val file = File(FileUtil.getAlbumArtFile(stableKey))
             // Already cached on disk (e.g. written by a concurrent fetch) — skip I/O.
-            if (file.exists()) return
+            if (file.exists() && file.length() > 0L) return
             FileUtil.ensureAlbumArtDirectory()
             var output: OutputStream? = null
             try {
@@ -109,7 +110,8 @@ class CoverArtRequestHandler(private val client: SubsonicAPIClient) : RequestHan
     ): Bitmap? {
         val albumArtFile = FileUtil.getAlbumArtFile(filename)
         val bitmap: Bitmap? = null
-        if (File(albumArtFile).exists()) {
+        val file = File(albumArtFile)
+        if (file.exists() && file.length() > 0L) {
             return getBitmapFromDisk(albumArtFile, size, bitmap)
         }
         return null

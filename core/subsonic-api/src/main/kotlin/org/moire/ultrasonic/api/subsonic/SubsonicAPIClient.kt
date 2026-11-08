@@ -21,7 +21,9 @@ import org.moire.ultrasonic.api.subsonic.response.StreamResponse
 import retrofit2.Response
 import retrofit2.Retrofit
 
-private const val READ_TIMEOUT = 60_000L
+private const val CONNECT_TIMEOUT = 8_000L
+private const val READ_TIMEOUT = 15_000L
+private const val WRITE_TIMEOUT = 15_000L
 
 /**
  * Subsonic API client that provides api access.
@@ -65,7 +67,10 @@ class SubsonicAPIClient(
 
     val okHttpClient: OkHttpClient = baseOkClient.newBuilder()
         // Disable HTTP2 because OkHttp with Exoplayer causes a bug. See https://github.com/square/okhttp/issues/6749
+        .connectTimeout(CONNECT_TIMEOUT, MILLISECONDS)
         .readTimeout(READ_TIMEOUT, MILLISECONDS)
+        .writeTimeout(WRITE_TIMEOUT, MILLISECONDS)
+        .retryOnConnectionFailure(true)
         .apply { if (config.allowSelfSignedCertificate) allowSelfSignedCertificates() }
         .addInterceptor { chain ->
             // Adds default request params
