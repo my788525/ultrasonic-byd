@@ -115,18 +115,27 @@ class SettingsFragment :
         setupFloatingPreferences()
     }
 
-    /** Online lyrics settings: the driver can drop the cache without leaving the car UI. */
+    /** Online lyrics settings: show how many songs are saved and let the driver clear them. */
     private fun setupLyricsPreferences() {
-        findPreference<Preference>(getString(R.string.setting_key_lyrics_cache_clear))
-            ?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-                val removed = org.moire.ultrasonic.util.LyricsAutoSearch.clearCache(requireContext())
-                android.widget.Toast.makeText(
-                    requireContext(),
-                    getString(R.string.lyrics_cache_cleared, removed),
-                    android.widget.Toast.LENGTH_SHORT
-                ).show()
-                true
-            }
+        val clear = findPreference<Preference>(getString(R.string.setting_key_lyrics_cache_clear))
+
+        fun refreshCount() {
+            val count = org.moire.ultrasonic.util.LyricsAutoSearch.savedCount(requireContext())
+            clear?.summary = getString(R.string.lyrics_cache_clear_summary) + " " +
+                getString(R.string.lyrics_saved_count, count)
+        }
+
+        refreshCount()
+        clear?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+            val removed = org.moire.ultrasonic.util.LyricsAutoSearch.clearCache(requireContext())
+            android.widget.Toast.makeText(
+                requireContext(),
+                getString(R.string.lyrics_cache_cleared, removed),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            refreshCount()
+            true
+        }
     }
 
     /**

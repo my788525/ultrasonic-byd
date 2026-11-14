@@ -31,7 +31,9 @@ data class LyricsLoadResult(
     val labelRes: Int,
     val wordSynced: Boolean,
     /** True when the time axis was invented by spreading plain text over the song length. */
-    val synthetic: Boolean
+    val synthetic: Boolean,
+    /** True when the result came from a permanently saved online copy. */
+    val saved: Boolean = false
 ) {
     val isEmpty: Boolean get() = lines.isEmpty() && text.isNullOrBlank()
 }
@@ -39,11 +41,11 @@ data class LyricsLoadResult(
 /**
  * One place that decides which lyrics a song gets.
  *
- * The Subsonic / Navidrome server is always asked first, because it works offline and answers
- * fast. When it has no lyrics, or only line synced ones while the driver asked for word by word
- * lyrics, [LyricsAutoSearch] looks the track up on LRCLIB. A result with real word timings always
- * wins over a line synced one; a plain text result is still spread over the song length so the
- * view keeps moving.
+ * A lyrics record that was downloaded once is saved on the device and takes priority over
+ * everything else: it is read from disk with no server call and no network, so the car keeps
+ * showing the same word by word lyrics even fully offline. Only songs without a saved copy go
+ * through the Subsonic / Navidrome server, and only when that has no usable time axis does
+ * [LyricsAutoSearch] look the track up on LRCLIB. Any successful download is saved immediately.
  *
  * Both the full screen player and the permanent car panel use this loader, so they always show
  * exactly the same lyrics and the same source label.
@@ -68,6 +70,26 @@ object LyricsLoader {
             (track.duration ?: 0) * 1_000L
         }
 
+        // A saved copy wins before the server is even asked. forceRefresh (pull to refresh or a
+        // tap on the source label) still goes through the full lookup so the driver can replace
+        // a wrong record.
+        if (!forceRefresh && Settings.preferSavedLyrics &&
+            title.isNotBlank() && artist.isNotBlank()
+        ) {
+            val saved = runCatching {
+                LyricsAutoSearch.readSaved(
+                    context.applicationContext,
+                    title,
+                    artist,
+                    album,
+                    effectiveDuration
+                )
+            }.getOrNull()
+            if (saved != null) {
+                return@withContext toResult(fromOnline(saved, effectiveDuration))
+            }
+        }
+
         val server = withTimeoutOrNull(SERVER_TIMEOUT_MS) {
             runCatching {
                 val service = MusicServiceFactory.getMusicService()
@@ -83,7 +105,8 @@ object LyricsLoader {
 
         val wantsOnline = Settings.autoSearchLyrics &&
             title.isNotBlank() && artist.isNotBlank() &&
-            (serverCandidate.rank == 0 ||
+            (forceRefresh ||
+                serverCandidate.rank == 0 ||
                 (Settings.preferWordLyrics && !serverCandidate.wordSynced))
 
         val online = if (wantsOnline) {
@@ -95,7 +118,8 @@ object LyricsLoader {
                         artist,
                         album,
                         effectiveDuration,
-                        forceRefresh
+                        forceRefresh,
+                        Settings.preferSavedLyrics
                     )
                 }.onFailure { Timber.w(it, "Online lyrics search failed for %s", title) }
                     .getOrNull()
@@ -105,34 +129,42 @@ object LyricsLoader {
         }
         val onlineCandidate = online?.let { fromOnline(it, effectiveDuration) }
 
-        // Equal ranks keep the server result: it is local, works offline, and the online
-        // lookup has already been cached for the next time this song is played.
-        val chosen = if (onlineCandidate != null && onlineCandidate.rank > serverCandidate.rank) {
-            onlineCandidate
-        } else {
-            serverCandidate
+        // A saved copy always wins. Otherwise equal ranks keep the server result: it is local
+        // and works offline, and the online lookup has already been saved for later plays.
+        val chosen = when {
+            onlineCandidate != null && onlineCandidate.saved &&
+                !onlineCandidate.isEmpty && Settings.preferSavedLyrics -> onlineCandidate
+            onlineCandidate != null && onlineCandidate.rank > serverCandidate.rank ->
+                onlineCandidate
+            else -> serverCandidate
         }
 
+        toResult(chosen)
+    }
+
+    private fun toResult(candidate: Candidate): LyricsLoadResult {
         val label = when {
-            chosen.isEmpty -> R.string.lyrics_source_not_found
-            chosen.source == LyricsSource.ONLINE && chosen.wordSynced ->
+            candidate.isEmpty -> R.string.lyrics_source_not_found
+            candidate.saved && candidate.wordSynced -> R.string.lyrics_source_saved_word
+            candidate.saved -> R.string.lyrics_source_saved
+            candidate.source == LyricsSource.ONLINE && candidate.wordSynced ->
                 R.string.lyrics_source_online_word
-            chosen.source == LyricsSource.ONLINE && chosen.fromCache ->
+            candidate.source == LyricsSource.ONLINE && candidate.fromCache ->
                 R.string.lyrics_source_cached
-            chosen.source == LyricsSource.ONLINE ->
-                R.string.lyrics_source_online_synced
-            chosen.wordSynced -> R.string.lyrics_source_server_word
-            chosen.synthetic -> R.string.lyrics_source_plain
+            candidate.source == LyricsSource.ONLINE -> R.string.lyrics_source_online_synced
+            candidate.wordSynced -> R.string.lyrics_source_server_word
+            candidate.synthetic -> R.string.lyrics_source_plain
             else -> R.string.lyrics_source_server_synced
         }
 
-        LyricsLoadResult(
-            text = chosen.text,
-            lines = chosen.lines,
-            source = chosen.source,
+        return LyricsLoadResult(
+            text = candidate.text,
+            lines = candidate.lines,
+            source = candidate.source,
             labelRes = label,
-            wordSynced = chosen.wordSynced,
-            synthetic = chosen.synthetic
+            wordSynced = candidate.wordSynced,
+            synthetic = candidate.synthetic,
+            saved = candidate.saved
         )
     }
 
@@ -143,7 +175,8 @@ object LyricsLoader {
         val rank: Int,
         val wordSynced: Boolean,
         val synthetic: Boolean,
-        val fromCache: Boolean = false
+        val fromCache: Boolean = false,
+        val saved: Boolean = false
     ) {
         val isEmpty: Boolean get() = lines.isEmpty() && text.isNullOrBlank()
     }
@@ -202,7 +235,8 @@ object LyricsLoader {
             rank = rank,
             wordSynced = record.wordSynced,
             synthetic = synthetic,
-            fromCache = record.fromCache
+            fromCache = record.fromCache,
+            saved = record.saved
         )
     }
 }

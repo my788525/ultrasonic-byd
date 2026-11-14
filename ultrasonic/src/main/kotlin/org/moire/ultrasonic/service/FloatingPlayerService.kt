@@ -1681,51 +1681,65 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
         lyricsView?.setText(R.string.player_pane_lyrics_loading)
 
-        val artist = track.artist.orEmpty()
-        val title = track.title.orEmpty()
+        val artist = track.artist.orEmpty().trim()
+        val title = track.title.orEmpty().trim()
+        val album = track.album.orEmpty().trim()
         val targetId = track.id
+        val durationMs = (controller?.duration ?: 0L).coerceAtLeast(0L)
 
         Thread {
-            val lyrics = try {
-                // The endpoint with the time axis is asked first, because the plain one drops
-                // every timestamp and the lyrics would not move along with the song.
-                val service = MusicServiceFactory.getMusicService()
-                runCatching { service.getSyncedLyrics(targetId) }.getOrNull()
-                    ?.takeIf { it.timedLines.isNotEmpty() }
-                    ?: service.getLyrics(artist, title)
+            val found: Pair<String?, List<TimedLyric>> = try {
+                // A lyrics copy downloaded earlier wins over anything the server has. It lives
+                // on the device, so the floating window keeps its word timings while offline.
+                val saved = if (Settings.preferSavedLyrics) {
+                    org.moire.ultrasonic.util.LyricsAutoSearch.readSaved(
+                        applicationContext, title, artist, album, durationMs
+                    )
+                } else {
+                    null
+                }
+                if (saved != null) {
+                    saved.rawText to saved.lines
+                } else {
+                    // The endpoint with the time axis is asked first, because the plain one
+                    // drops every timestamp and the lyrics would not move along with the song.
+                    val service = MusicServiceFactory.getMusicService()
+                    val lyrics = runCatching { service.getSyncedLyrics(targetId) }.getOrNull()
+                        ?.takeIf { it.timedLines.isNotEmpty() }
+                        ?: service.getLyrics(artist, title)
+                    val text = lyrics?.text
+                    val timed = lyrics?.timedLines?.map { TimedLyric(it.startMs, it.text) }
+                        ?: emptyList()
+                    text to timed
+                }
             } catch (all: Exception) {
                 Timber.w(all, "Could not load lyrics for the floating window")
-                null
+                null to emptyList()
+            }
+
+            val text = found.first
+            val timed = if (found.second.isNotEmpty()) {
+                found.second
+            } else {
+                // Without a time axis the lines are spread over the length of the song, so the
+                // lyrics still move along with the music instead of freezing on the first lines.
+                LyricsParser.spreadPlainLyrics(text, durationMs)
             }
 
             handler.post {
                 if (lyricsTrackId != targetId) return@post
-                val text = lyrics?.text
-                val timed = lyrics?.timedLines?.map { TimedLyric(it.startMs, it.text) }
-                    ?: emptyList()
                 if (timed.isNotEmpty()) {
                     timedLyrics = timed
                     lyricIndex = -1
                     updateFloatingLyrics(controller?.currentPosition ?: 0L)
                 } else {
-                    // The server has no time axis for this song. The lines are spread over
-                    // the length of the song, so the lyrics still move along with the music
-                    // instead of freezing on the first three lines.
-                    val duration = controller?.duration ?: 0L
-                    val spread = LyricsParser.spreadPlainLyrics(text, duration)
-                    if (spread.isEmpty()) {
-                        val fallback = if (text.isNullOrBlank()) {
-                            getString(R.string.player_pane_lyrics_empty)
-                        } else {
-                            text
-                        }
-                        lyricsView?.text = fallback
-                        lyricsMinView?.text = fallback
+                    val fallback = if (text.isNullOrBlank()) {
+                        getString(R.string.player_pane_lyrics_empty)
                     } else {
-                        timedLyrics = spread
-                        lyricIndex = -1
-                        updateFloatingLyrics(controller?.currentPosition ?: 0L)
+                        text
                     }
+                    lyricsView?.text = fallback
+                    lyricsMinView?.text = fallback
                 }
             }
         }.start()

@@ -127,6 +127,16 @@ object Settings {
         getKey(R.string.setting_key_prefer_word_lyrics), true
     )
 
+    /**
+     * Lyrics downloaded from LRCLIB are kept permanently on the device and take priority over
+     * the server copy on every later playback. Downloads still happen when this is off, but the
+     * server is asked first as it was before.
+     */
+    @JvmStatic
+    var preferSavedLyrics by BooleanSetting(
+        getKey(R.string.setting_key_prefer_saved_lyrics), true
+    )
+
     /** Side of the song/controls panel inside a banner floating window ("left" or "right"). */
     @JvmStatic
     var floatingBannerPanelSide by StringSetting(

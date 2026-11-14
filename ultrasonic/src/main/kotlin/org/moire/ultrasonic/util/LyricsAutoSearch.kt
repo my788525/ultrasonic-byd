@@ -13,6 +13,7 @@ import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.abs
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -31,10 +32,15 @@ import timber.log.Timber
  *
  * No API key is needed, but the service requires an identifying User-Agent and asks clients to
  * send requests sequentially and to honour `Retry-After` on HTTP 429. Both are implemented here.
- * Results (and "not found" results) are cached on disk so a song played again never hits the
- * service twice, and a car with a weak connection is not left waiting on every track change.
  *
- * This is a regular blocking client: callers must invoke it from Dispatchers.IO.
+ * A successfully downloaded record is saved permanently under [Context.getFilesDir], not in the
+ * reclaimable cache: the next time the song plays it is read straight from disk, without any
+ * server or network call. Only "not found" results expire, so a title added to LRCLIB later can
+ * still be picked up. A second, normalised key is written alongside the exact one so small
+ * metadata edits (album spelling, corrected duration) do not lose a saved copy.
+ *
+ * This is a regular blocking client: callers must invoke it from Dispatchers.IO or a worker
+ * thread.
  */
 object LyricsAutoSearch {
 
@@ -46,14 +52,17 @@ object LyricsAutoSearch {
         val durationSec: Double,
         val trackName: String,
         val artistName: String,
-        val fromCache: Boolean
+        val fromCache: Boolean,
+        /** True when this is a permanently saved on-device copy rather than a fresh download. */
+        val saved: Boolean = false
     )
 
     private const val BASE_URL = "https://lrclib.net"
     private const val USER_AGENT =
         "NavMusic/4.8.0 (https://github.com/my788525/ultrasonic-byd)"
-    private const val CACHE_DIR = "lyrics_auto"
-    private const val POSITIVE_TTL_MS = 30L * 24 * 60 * 60 * 1000
+    private const val SAVED_DIR = "lyrics_saved"
+    private const val LEGACY_DIR = "lyrics_auto"
+    private const val ALIAS_SUFFIX = ".alias.json"
     private const val NEGATIVE_TTL_MS = 6 * 60 * 60 * 1000L
 
     private val PAREN_NOISE = Regex(
@@ -65,6 +74,9 @@ object LyricsAutoSearch {
     private val ARTIST_SPLIT = Regex(
         """(?i)\s*(?:feat\.?|ft\.?|featuring|&|,|/|、|with)\s*"""
     )
+    private val PUNCTUATION = Regex("""[^\p{L}\p{N}]+""")
+
+    private val migrated = AtomicBoolean(false)
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -75,11 +87,44 @@ object LyricsAutoSearch {
     }
 
     /**
+     * Reads the permanently saved lyrics for a track, with no server and no network access.
+     * Expired "not found" entries and corrupt files are ignored so the caller can fall back to
+     * the normal lookup.
+     */
+    fun readSaved(
+        context: Context,
+        title: String,
+        artist: String,
+        album: String,
+        durationMs: Long
+    ): LyricsRecord? {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) return null
+        migrateLegacy(context)
+
+        val durationSec = if (durationMs > 0) durationMs / 1000.0 else 0.0
+        val (exact, alias) = cacheFiles(context, cleanTitle, artist, album, durationSec)
+        val exactBody = readPositive(exact)
+        val body = exactBody ?: readPositive(alias)
+
+        // A record saved before the normalised key existed gets one on its first read.
+        if (exactBody != null && !alias.exists()) writePositive(alias, exactBody)
+
+        val record = body?.let { parseRecord(it, fromCache = true, saved = true) }
+        if (body != null && record == null) {
+            exact.delete()
+            alias.delete()
+        }
+        return record
+    }
+
+    /**
      * Finds the best lyrics for a track.
      *
      * The order is: exact signature -> structured search -> keyword search with cleaned
-     * metadata. A request is only made when there is no fresh cache entry. `forceRefresh`
-     * bypasses the cache (used by the pull-to-refresh gesture) but never bypasses 429.
+     * metadata. A saved copy (when [useSaved] is on) answers before any request; a valid result
+     * is written to disk immediately. `forceRefresh` re-queries the service and overwrites the
+     * saved copy, but a failed refresh keeps the existing copy instead of throwing it away.
      */
     fun search(
         context: Context,
@@ -87,32 +132,41 @@ object LyricsAutoSearch {
         artist: String,
         album: String,
         durationMs: Long,
-        forceRefresh: Boolean = false
+        forceRefresh: Boolean = false,
+        useSaved: Boolean = true
     ): LyricsRecord? {
         val cleanTitle = title.trim()
         if (cleanTitle.isEmpty()) return null
+        migrateLegacy(context)
 
         val durationSec = if (durationMs > 0) durationMs / 1000.0 else 0.0
-        val cache = cacheFile(context, cacheKey(cleanTitle, artist, album, durationSec.toInt()))
+        val (exact, alias) = cacheFiles(context, cleanTitle, artist, album, durationSec)
 
         if (!forceRefresh) {
-            val cached = readCache(cache)
-            if (cached != null) {
-                return cached.body?.let { parseRecord(it, fromCache = true) }
+            if (useSaved) {
+                val body = readPositive(exact) ?: readPositive(alias)
+                if (body != null) return parseRecord(body, fromCache = true, saved = true)
             }
+            if (hasFreshNegative(exact)) return null
         }
 
         var body: String? = null
 
-        val exact = get(buildGetUrl(cleanTitle, artist, album, durationSec))
-        val exactBody = exact?.second
-        if (exact != null && exact.first == 200 && !exactBody.isNullOrBlank()) {
+        val exactResponse = get(buildGetUrl(cleanTitle, artist, album, durationSec))
+        val exactBody = exactResponse?.second
+        if (exactResponse != null && exactResponse.first == 200 && !exactBody.isNullOrBlank()) {
             body = exactBody
-        } else if (exact?.first == 429) {
-            // The docs require honouring Retry-After. Skipping this round and caching the
-            // negative result for a short while is the polite behaviour on a car network.
+        } else if (exactResponse?.first == 429) {
+            // The docs require honouring Retry-After. Rate limiting must never erase a copy
+            // that was already saved for this song.
             Timber.i("LRCLIB rate limited, skipping this lyrics lookup")
-            writeCache(cache, null)
+            if (useSaved) {
+                val existing = readPositive(exact) ?: readPositive(alias)
+                if (existing != null) {
+                    return parseRecord(existing, fromCache = true, saved = true)
+                }
+            }
+            writeNegative(exact)
             return null
         }
 
@@ -135,18 +189,46 @@ object LyricsAutoSearch {
             }
         }
 
-        writeCache(cache, body)
-        return body?.let { parseRecord(it, fromCache = false) }
+        // Only a record that really carries lyrics becomes permanent. An instrumental or an
+        // empty response is a short lived negative result instead.
+        val record = body?.let { parseRecord(it, fromCache = false) }
+        if (record != null && body != null) {
+            writePositive(exact, body)
+            writePositive(alias, body)
+            return record
+        }
+
+        if (useSaved) {
+            val existing = readPositive(exact) ?: readPositive(alias)
+            if (existing != null) {
+                Timber.i("Online lyrics refresh failed, keeping the saved copy")
+                return parseRecord(existing, fromCache = true, saved = true)
+            }
+        }
+        writeNegative(exact)
+        return null
     }
 
-    /** Number of cached lookups, shown in the settings screen. */
-    fun cacheCount(context: Context): Int = cacheDir(context).listFiles()?.size ?: 0
+    /** Number of songs with a permanently saved lyrics record. */
+    fun savedCount(context: Context): Int {
+        migrateLegacy(context)
+        val files = savedDir(context).listFiles()
+            ?.filter { it.name.endsWith(".json") && !it.name.endsWith(ALIAS_SUFFIX) }
+            ?: return 0
+        return files.count { readPositive(it) != null }
+    }
 
-    /** Removes cached online lyrics so the next lookup starts fresh. */
+    /** Removes every saved and legacy cached record, returning the number of songs cleared. */
     fun clearCache(context: Context): Int {
-        val files = cacheDir(context).listFiles() ?: return 0
         var removed = 0
-        files.forEach { if (it.delete()) removed++ }
+        listOf(savedDir(context), File(context.cacheDir, LEGACY_DIR)).forEach { dir ->
+            dir.listFiles()?.forEach { file ->
+                val counted = file.name.endsWith(".json") &&
+                    !file.name.endsWith(ALIAS_SUFFIX) &&
+                    readPositive(file) != null
+                if (file.delete() && counted) removed++
+            }
+        }
         return removed
     }
 
@@ -236,7 +318,7 @@ object LyricsAutoSearch {
         return value
     }
 
-    private fun parseRecord(json: String, fromCache: Boolean): LyricsRecord? = try {
+    private fun parseRecord(json: String, fromCache: Boolean, saved: Boolean = false): LyricsRecord? = try {
         val record = JSONObject(json)
         if (record.optBoolean("instrumental", false)) null
         else {
@@ -262,7 +344,8 @@ object LyricsAutoSearch {
                 durationSec = record.optDouble("duration", 0.0),
                 trackName = record.optString("trackName"),
                 artistName = record.optString("artistName"),
-                fromCache = fromCache
+                fromCache = fromCache,
+                saved = saved
             )
         }
     } catch (all: Exception) {
@@ -286,42 +369,107 @@ object LyricsAutoSearch {
 
     private fun enc(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
 
-    private class CacheEntry(val body: String?)
-
-    private fun cacheDir(context: Context): File = File(context.cacheDir, CACHE_DIR)
-
-    private fun cacheFile(context: Context, key: String): File {
-        val dir = cacheDir(context)
+    private fun savedDir(context: Context): File {
+        val dir = File(context.filesDir, SAVED_DIR)
         if (!dir.exists()) dir.mkdirs()
-        return File(dir, "$key.json")
+        return dir
     }
 
-    private fun readCache(file: File): CacheEntry? {
+    /**
+     * The exact key keeps the old (4.8.0-byd.43) cache format so existing records can be moved
+     * over unchanged. The normalised alias ignores album and duration so edited metadata still
+     * resolves to the saved copy.
+     */
+    private fun cacheFiles(
+        context: Context,
+        title: String,
+        artist: String,
+        album: String,
+        durationSec: Double
+    ): Pair<File, File> {
+        val dir = savedDir(context)
+        val exactKey = cacheKey(title, artist, album, durationSec.toInt())
+        val aliasKey = cacheKey("v2", normalizeTitle(title), normalizeArtist(artist))
+        return File(dir, "$exactKey.json") to File(dir, "$aliasKey$ALIAS_SUFFIX")
+    }
+
+    private fun normalizeTitle(value: String): String = PUNCTUATION.replace(
+        BRACKET_NOISE.replace(PAREN_NOISE.replace(value.lowercase(Locale.ROOT), " "), " "),
+        " "
+    ).trim()
+
+    private fun normalizeArtist(value: String): String = PUNCTUATION.replace(
+        ARTIST_SPLIT.split(value.lowercase(Locale.ROOT)).firstOrNull().orEmpty(), " "
+    ).trim()
+
+    /** Positive records never expire; that is the point of keeping a local library of lyrics. */
+    private fun readPositive(file: File): String? {
         if (!file.exists()) return null
         return try {
             val entry = JSONObject(file.readText())
-            val negative = entry.optBoolean("negative", false)
-            val ttl = if (negative) NEGATIVE_TTL_MS else POSITIVE_TTL_MS
-            if (System.currentTimeMillis() - entry.optLong("ts", 0L) > ttl) {
-                file.delete()
-                null
-            } else {
-                CacheEntry(if (negative) null else entry.optString("body", "").ifBlank { null })
-            }
+            if (entry.optBoolean("negative", false)) null
+            else entry.optString("body", "").ifBlank { null }
         } catch (all: Exception) {
             null
         }
     }
 
-    private fun writeCache(file: File, body: String?) {
+    private fun hasFreshNegative(file: File): Boolean {
+        if (!file.exists()) return false
+        return try {
+            val entry = JSONObject(file.readText())
+            if (!entry.optBoolean("negative", false)) return false
+            val fresh = System.currentTimeMillis() - entry.optLong("ts", 0L) <= NEGATIVE_TTL_MS
+            if (!fresh) file.delete()
+            fresh
+        } catch (all: Exception) {
+            false
+        }
+    }
+
+    private fun writePositive(file: File, body: String) {
         try {
             val entry = JSONObject()
             entry.put("ts", System.currentTimeMillis())
-            entry.put("negative", body == null)
-            entry.put("body", body.orEmpty())
+            entry.put("negative", false)
+            entry.put("body", body)
             file.writeText(entry.toString())
         } catch (all: Exception) {
-            Timber.w(all, "Could not cache online lyrics")
+            Timber.w(all, "Could not save online lyrics")
+        }
+    }
+
+    private fun writeNegative(file: File) {
+        try {
+            val entry = JSONObject()
+            entry.put("ts", System.currentTimeMillis())
+            entry.put("negative", true)
+            entry.put("body", "")
+            file.writeText(entry.toString())
+        } catch (all: Exception) {
+            Timber.w(all, "Could not cache a missing lyrics result")
+        }
+    }
+
+    /** One-off move of the reclaimable cache used by 4.8.0-byd.43 into permanent storage. */
+    private fun migrateLegacy(context: Context) {
+        if (!migrated.compareAndSet(false, true)) return
+        try {
+            val legacy = File(context.cacheDir, LEGACY_DIR)
+            val files = legacy.listFiles() ?: return
+            val dir = savedDir(context)
+            files.forEach { file ->
+                if (!file.name.endsWith(".json")) return@forEach
+                val body = readPositive(file)
+                if (body != null) {
+                    val text = file.readText()
+                    File(dir, file.name).writeText(text)
+                }
+                file.delete()
+            }
+            Timber.i("Migrated legacy online lyrics cache into permanent storage")
+        } catch (all: Exception) {
+            Timber.w(all, "Could not migrate the legacy lyrics cache")
         }
     }
 
