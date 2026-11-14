@@ -110,7 +110,22 @@ object Settings {
      * floating window. 12 sp is comfortable on the small pane, 30 sp fills a wide banner.
      */
     @JvmStatic
-    var lyricsFontSizeSp by IntSetting(getKey(R.string.setting_key_lyrics_font_size), 16)
+    var lyricsFontSizeSp by IntSetting(getKey(R.string.setting_key_lyrics_font_size), 20)
+
+    /**
+     * Automatically look a track up on LRCLIB when the server has no timed lyrics.
+     * Enabled by default: a personal car library almost never ships synced lyrics.
+     */
+    @JvmStatic
+    var autoSearchLyrics by BooleanSetting(
+        getKey(R.string.setting_key_auto_search_lyrics), true
+    )
+
+    /** Prefer an online result with real word timings over the server's line synced lyrics. */
+    @JvmStatic
+    var preferWordLyrics by BooleanSetting(
+        getKey(R.string.setting_key_prefer_word_lyrics), true
+    )
 
     /** Side of the song/controls panel inside a banner floating window ("left" or "right"). */
     @JvmStatic

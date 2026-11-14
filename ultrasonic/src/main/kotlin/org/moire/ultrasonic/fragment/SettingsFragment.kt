@@ -111,7 +111,22 @@ class SettingsFragment :
         setupBluetoothDevicePreferences()
         setupUpdatePreferences()
         setupHomePlaylistPreferences()
+        setupLyricsPreferences()
         setupFloatingPreferences()
+    }
+
+    /** Online lyrics settings: the driver can drop the cache without leaving the car UI. */
+    private fun setupLyricsPreferences() {
+        findPreference<Preference>(getString(R.string.setting_key_lyrics_cache_clear))
+            ?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+                val removed = org.moire.ultrasonic.util.LyricsAutoSearch.clearCache(requireContext())
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    getString(R.string.lyrics_cache_cleared, removed),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                true
+            }
     }
 
     /**

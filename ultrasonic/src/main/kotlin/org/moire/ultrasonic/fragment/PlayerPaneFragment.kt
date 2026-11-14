@@ -30,14 +30,12 @@ import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.moire.ultrasonic.R
 import org.moire.ultrasonic.adapters.QueueAdapter
 import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.service.MediaPlayerManager
-import org.moire.ultrasonic.service.MusicServiceFactory
 import org.moire.ultrasonic.service.RxBus
 import org.moire.ultrasonic.service.plusAssign
 import org.moire.ultrasonic.subsonic.ImageLoaderProvider
@@ -45,10 +43,9 @@ import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.ui.SyncedLyricsView
 import org.moire.ultrasonic.util.CarTransport
-import org.moire.ultrasonic.util.LyricsParser
+import org.moire.ultrasonic.util.LyricsLoader
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.SleepTimerManager
-import org.moire.ultrasonic.util.TimedLyric
 import org.moire.ultrasonic.util.Util
 import org.moire.ultrasonic.util.toTrack
 import timber.log.Timber
@@ -93,6 +90,9 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var queueButton: ImageButton? = null
     private var queueAdapter: QueueAdapter? = null
     private var sleepButton: ImageButton? = null
+
+    /** The track whose lyrics are being shown, kept for the badge retry gesture. */
+    private var lyricsTrack: Track? = null
 
     /** True while the queue is shown instead of the lyrics. */
     private var showQueue = false
@@ -178,10 +178,20 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         decoratePane()
 
         lyricsView?.let { lyrics ->
-            syncedLyrics = SyncedLyricsView(lyricsScroll, lyrics).apply {
+            syncedLyrics = SyncedLyricsView(
+                lyricsScroll,
+                lyrics,
+                view.findViewById(R.id.pane_lyrics_source)
+            ).apply {
                 setAccentColor(CarTheme.color(requireContext(), CarPalette.current().accent))
                 setFontSizeSp(Settings.lyricsFontSizeSp)
             }
+        }
+
+        // Tapping the source badge forces a fresh online lookup, which is the only gesture a
+        // driver needs when a search missed on a weak connection.
+        view.findViewById<TextView>(R.id.pane_lyrics_source)?.setOnClickListener {
+            loadLyrics(lyricsTrack, forceRefresh = true)
         }
 
         playButton?.setOnClickListener { mediaPlayerManager.togglePlayPause() }
@@ -392,62 +402,47 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         loadLyrics(track)
     }
 
-    @Suppress("TooGenericExceptionCaught")
-    private fun loadLyrics(track: Track?) {
+    /** Loads lyrics from the server and, when needed, from the automatic online search. */
+    private fun loadLyrics(track: Track?, forceRefresh: Boolean = false) {
         val synced = syncedLyrics ?: return
+        lyricsTrack = track
 
         if (track == null) {
+            synced.setSourceLabel(null)
             synced.showPlaceholder(getString(R.string.player_pane_idle_hint))
             currentLyricsTrackId = null
             return
         }
 
-        if (currentLyricsTrackId == track.id) return
+        if (!forceRefresh && currentLyricsTrackId == track.id) return
         currentLyricsTrackId = track.id
         synced.reset()
-
+        synced.setSourceLabel(getString(R.string.player_pane_lyrics_loading))
         synced.showPlaceholder(getString(R.string.player_pane_lyrics_loading))
 
-        val artist = track.artist.orEmpty()
-        val title = track.title.orEmpty()
+        val context = requireContext().applicationContext
+        val durationMs = mediaPlayerManager.playerDuration.toLong()
 
         viewLifecycleOwner.lifecycleScope.launch {
-            val lyrics = withContext(Dispatchers.IO) {
-                withTimeoutOrNull(LYRICS_FETCH_TIMEOUT_MS) {
-                    try {
-                        // The endpoint with the time axis is asked first, because the plain one drops
-                        // every timestamp and the lyrics would not move along with the song.
-                        val service = MusicServiceFactory.getMusicService()
-                        runCatching { service.getSyncedLyrics(track.id) }.getOrNull()
-                            ?.takeIf { it.timedLines.isNotEmpty() }
-                            ?: service.getLyrics(artist, title)
-                    } catch (all: Exception) {
-                        Timber.w(all, "Could not load lyrics for %s", title)
-                        null
-                    }
-                }
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    LyricsLoader.load(context, track, durationMs, forceRefresh)
+                }.getOrNull()
             }
 
             if (!isAdded || currentLyricsTrackId != track.id) return@launch
 
-            val text = lyrics?.text
-            val timed = lyrics?.timedLines?.map { TimedLyric(it.startMs, it.text) }
-                .orEmpty()
-            if (text.isNullOrBlank() && timed.isEmpty()) {
+            if (result == null || result.isEmpty) {
+                synced.setSourceLabel(
+                    if (result != null && result.labelRes != 0) getString(result.labelRes) else null
+                )
                 synced.showPlaceholder(getString(R.string.player_pane_lyrics_empty))
             } else {
-                // A song without a time axis still gets one: the lines are spread over
-                // the length of the song, so the lyrics move along with the music.
-                val effective = if (timed.isEmpty()) {
-                    LyricsParser.spreadPlainLyrics(
-                        text,
-                        mediaPlayerManager.playerDuration.toLong()
-                    )
-                } else {
-                    timed
-                }
-                synced.setLyrics(text, effective)
-                synced.update(mediaPlayerManager.playerPosition.toLong())
+                synced.setSourceLabel(
+                    if (result.labelRes != 0) getString(result.labelRes) else null
+                )
+                synced.setLyrics(result.text, result.lines)
+                synced.update(lyricSearchPosition())
             }
         }
     }

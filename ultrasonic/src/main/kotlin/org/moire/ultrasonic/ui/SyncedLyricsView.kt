@@ -7,6 +7,7 @@
 
 package org.moire.ultrasonic.ui
 
+import android.graphics.Color
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -21,33 +22,48 @@ import androidx.core.widget.NestedScrollView
 import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.util.LyricsParser
 import org.moire.ultrasonic.util.TimedLyric
+import org.moire.ultrasonic.util.WordLyricsParser
 import timber.log.Timber
 
 /**
- * Shows lyrics that follow the song.
+ * Shows lyrics that follow the song, one line at a time or word by word.
  *
- * Servers with LRC lyrics return timed lines; those are highlighted line by line and scrolled so
- * that the current line stays slightly above the middle of the view. Servers that only return
- * plain text are shown as before, without any scrolling, because there is nothing to synchronise
- * to.
+ * Servers with LRC lyrics return timed lines; those are highlighted line by line and scrolled
+ * so that the current line stays slightly above the middle of the view. When a line carries
+ * word timings (Enhanced LRC, or the Lyricsfile YAML returned by the automatic LRCLIB search)
+ * the sung part of the line is painted in the accent colour and the rest stays grey, so the
+ * words light up as they are heard. Lines without word timings keep the old line highlight.
+ *
+ * The visual language follows what works at arm's length in a car: the active line is bright
+ * and larger, already sung lines recede, and lines that are still far away dim further. That is
+ * the same hierarchy SimpMusic uses for its Apple Music style lyrics sheet.
+ *
+ * Colour spans are pooled and updated in place. A word change only invalidates the TextView,
+ * it does not call setText(): a full measure/layout pass every couple of hundred milliseconds
+ * would stutter on a head unit and would also restart the smooth scroll.
  *
  * The same helper drives the lyrics page of the player, the right hand pane and the floating
  * window, so all three behave identically.
  */
 class SyncedLyricsView(
     private val scroll: View?,
-    private val textView: TextView
+    private val textView: TextView,
+    /** Optional small badge showing where the lyrics came from (server / online / word sync). */
+    private val sourceBadge: TextView? = null
 ) {
 
     private var lines: List<TimedLyric> = emptyList()
     private var lineStarts: IntArray = IntArray(0)
     private var cachedBuilder: SpannableStringBuilder? = null
-    private var activeColorSpan: ForegroundColorSpan? = null
-    private val activeStyleSpan = StyleSpan(Typeface.BOLD)
-    private val activeSizeSpan = RelativeSizeSpan(HIGHLIGHT_SCALE)
     private var currentIndex = -1
+    private var currentWordIndex = -1
     private var accentColor = 0
     private var currentTrackId: String? = null
+
+    /** Colour spans currently attached to the builder, by identity, so they can be removed. */
+    private val usedColorSpans = java.util.IdentityHashMap<ForegroundColorSpan, Boolean>()
+    private val colorSpanPools = HashMap<Int, ArrayList<ForegroundColorSpan>>()
+    private val emphasisSpans = ArrayList<Any>()
 
     /** The padding the layout started with, restored when there are no timed lyrics to centre. */
     private var originalPaddingBottom = -1
@@ -55,11 +71,17 @@ class SyncedLyricsView(
     val hasTimedLyrics: Boolean
         get() = lines.isNotEmpty()
 
+    /** True when at least one line carries real word timings. */
+    val hasWordTimedLyrics: Boolean
+        get() = lines.any { it.words.isNotEmpty() }
+
     fun setAccentColor(color: Int) {
         if (accentColor == color) return
         accentColor = color
-        if (lines.isNotEmpty() && currentIndex in lines.indices) {
-            render(currentIndex)
+        colorSpanPools.clear()
+        if (lines.isNotEmpty()) {
+            renderColors(currentIndex, currentWordIndex)
+            textView.invalidate()
         }
     }
 
@@ -69,12 +91,28 @@ class SyncedLyricsView(
         currentTrackId = id
     }
 
+    /** Shows where the lyrics came from. An empty label hides the badge. */
+    fun setSourceLabel(label: CharSequence?) {
+        val badge = sourceBadge ?: return
+        if (label.isNullOrBlank()) {
+            badge.visibility = View.GONE
+            return
+        }
+        val text = label.toString()
+        if (badge.visibility == View.VISIBLE && badge.text?.toString() == text) return
+        badge.text = text
+        badge.visibility = View.VISIBLE
+    }
+
     /** Shows a localised placeholder such as "loading" or "no lyrics". */
     fun showPlaceholder(text: CharSequence) {
         lines = emptyList()
         lineStarts = IntArray(0)
         cachedBuilder = null
         currentIndex = -1
+        currentWordIndex = -1
+        usedColorSpans.clear()
+        emphasisSpans.clear()
         restorePaddingIfNeeded()
         textView.text = text
         scroll?.scrollTo(0, 0)
@@ -83,6 +121,12 @@ class SyncedLyricsView(
     /** Sets the lyrics font size in sp. Applied to both timed and plain lyrics. */
     fun setFontSizeSp(sp: Int) {
         textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp.toFloat())
+        if (lines.isNotEmpty()) {
+            // Changing the size changes the line wrap, so the highlight has to be laid out again.
+            val builder = cachedBuilder ?: return
+            textView.setText(builder, TextView.BufferType.SPANNABLE)
+            if (currentIndex >= 0) scrollWhenLayoutReady(currentIndex)
+        }
     }
 
     /** Replaces the shown lyrics. Timed lines are detected, everything else is shown verbatim. */
@@ -108,6 +152,9 @@ class SyncedLyricsView(
             lineStarts = IntArray(0)
             cachedBuilder = null
             currentIndex = -1
+            currentWordIndex = -1
+            usedColorSpans.clear()
+            emphasisSpans.clear()
             restorePaddingIfNeeded()
             textView.text = raw.orEmpty()
             scroll?.scrollTo(0, 0)
@@ -123,63 +170,152 @@ class SyncedLyricsView(
             builder.append('\n')
         }
         cachedBuilder = builder
+        usedColorSpans.clear()
+        emphasisSpans.clear()
         currentIndex = -1
-        render(-1)
-        Timber.d("Loaded %d timed lyric lines", lines.size)
+        currentWordIndex = -1
+
+        renderColors(-1, -1)
+        textView.setText(builder, TextView.BufferType.SPANNABLE)
+        Timber.d(
+            "Loaded %d timed lyric lines (%d with word timings)",
+            lines.size,
+            lines.count { it.words.isNotEmpty() }
+        )
     }
 
-    /** Moves the highlight to the line that belongs to [positionMs]. */
+    /** Moves the highlight to the line and word that belong to [positionMs]. */
     fun update(positionMs: Long) {
         if (lines.isEmpty()) return
 
         val index = LyricsParser.lineIndexAt(lines, positionMs)
-        if (index == currentIndex) return
+        val wordIndex = if (index in lines.indices && lines[index].words.isNotEmpty()) {
+            WordLyricsParser.wordIndexAt(lines[index].words, positionMs)
+        } else {
+            -1
+        }
+        if (index == currentIndex && wordIndex == currentWordIndex) return
 
+        val lineChanged = index != currentIndex
         currentIndex = index
-        render(index)
+        currentWordIndex = wordIndex
+
+        renderColors(index, wordIndex)
+
+        if (lineChanged) {
+            val builder = cachedBuilder ?: return
+            clearEmphasis(builder)
+            if (index in lines.indices) {
+                val start = lineStarts[index]
+                val end = (start + lines[index].text.length).coerceAtMost(builder.length)
+                applyEmphasis(builder, start, end)
+            }
+            textView.setText(builder, TextView.BufferType.SPANNABLE)
+            if (index >= 0) scrollWhenLayoutReady(index)
+        } else {
+            // Only the colours changed. The Spannable is mutable and already installed on the
+            // TextView, so a repaint is enough and the scroll animation keeps running.
+            textView.invalidate()
+        }
     }
 
     /** Called when the track changes, so the next position does not reuse the old highlight. */
     fun reset() {
         currentIndex = -1
+        currentWordIndex = -1
     }
 
-    private fun render(highlight: Int) {
-        val builder = cachedBuilder ?: run {
-            val fresh = SpannableStringBuilder()
-            lineStarts = IntArray(lines.size)
-            lines.forEachIndexed { index, line ->
-                lineStarts[index] = fresh.length
-                fresh.append(line.text)
-                fresh.append('\n')
+    // -------------------------------------------------------------------------------------
+    // Span painting
+    // -------------------------------------------------------------------------------------
+
+    private fun renderColors(highlight: Int, wordIndex: Int) {
+        val builder = cachedBuilder ?: return
+        clearColorSpans(builder)
+
+        val base = baseRgb()
+        val active = if (accentColor != 0) accentColor else base
+        val inactive = withAlpha(base, INACTIVE_ALPHA)
+        val pending = withAlpha(base, PENDING_ALPHA)
+        val sungLine = withAlpha(active, SUNG_LINE_ALPHA)
+
+        for (index in lines.indices) {
+            val start = lineStarts[index]
+            val end = (start + lines[index].text.length).coerceAtMost(builder.length)
+            if (end <= start) continue
+
+            when {
+                index < highlight -> applyColor(builder, sungLine, start, end)
+                index > highlight -> applyColor(builder, inactive, start, end)
+                highlight < 0 -> applyColor(builder, inactive, start, end)
+                else -> {
+                    val words = lines[highlight].words
+                    if (words.isEmpty()) {
+                        applyColor(builder, active, start, end)
+                    } else {
+                        val sung = (start + WordLyricsParser.sungLength(words, wordIndex))
+                            .coerceIn(start, end)
+                        applyColor(builder, active, start, sung)
+                        applyColor(builder, pending, sung, end)
+                    }
+                }
             }
-            cachedBuilder = fresh
-            fresh
-        }
-
-        activeColorSpan?.let { builder.removeSpan(it) }
-        builder.removeSpan(activeStyleSpan)
-        builder.removeSpan(activeSizeSpan)
-
-        if (highlight in lines.indices) {
-            val start = lineStarts[highlight]
-            val end = (start + lines[highlight].text.length).coerceAtMost(builder.length)
-            if (end > start) {
-                val colorSpan = ForegroundColorSpan(accentColor)
-                activeColorSpan = colorSpan
-                builder.setSpan(colorSpan, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                builder.setSpan(activeStyleSpan, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                builder.setSpan(activeSizeSpan, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            }
-        }
-
-        textView.setText(builder, TextView.BufferType.SPANNABLE)
-        if (highlight >= 0) {
-            // The layout of the new text is only valid after the next measure pass, so the
-            // scroll has to wait one frame. Without this the lyrics never move on Android 7.
-            scrollWhenLayoutReady(highlight)
         }
     }
+
+    private fun clearColorSpans(builder: SpannableStringBuilder) {
+        usedColorSpans.keys.forEach { builder.removeSpan(it) }
+        usedColorSpans.clear()
+    }
+
+    private fun applyColor(
+        builder: SpannableStringBuilder,
+        color: Int,
+        start: Int,
+        end: Int
+    ) {
+        if (end <= start) return
+        val pool = colorSpanPools.getOrPut(color) { ArrayList() }
+        val span = pool.firstOrNull { !usedColorSpans.containsKey(it) }
+            ?: ForegroundColorSpan(color).also { pool.add(it) }
+        builder.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        usedColorSpans[span] = true
+    }
+
+    private fun clearEmphasis(builder: SpannableStringBuilder) {
+        emphasisSpans.forEach { builder.removeSpan(it) }
+        emphasisSpans.clear()
+    }
+
+    private fun applyEmphasis(
+        builder: SpannableStringBuilder,
+        start: Int,
+        end: Int
+    ) {
+        if (end <= start) return
+        val bold = StyleSpan(Typeface.BOLD)
+        val larger = RelativeSizeSpan(HIGHLIGHT_SCALE)
+        builder.setSpan(bold, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        builder.setSpan(larger, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        emphasisSpans.add(bold)
+        emphasisSpans.add(larger)
+    }
+
+    private fun baseRgb(): Int {
+        val color = textView.currentTextColor
+        return Color.rgb(Color.red(color), Color.green(color), Color.blue(color))
+    }
+
+    private fun withAlpha(color: Int, alpha: Float): Int = Color.argb(
+        (255 * alpha).toInt().coerceIn(0, 255),
+        Color.red(color),
+        Color.green(color),
+        Color.blue(color)
+    )
+
+    // -------------------------------------------------------------------------------------
+    // Scrolling (unchanged: a rotation or a wrapped bilingual line must not shift the anchor)
+    // -------------------------------------------------------------------------------------
 
     /**
      * Scrolls to the line once the text has been measured.
@@ -285,6 +421,11 @@ class SyncedLyricsView(
 
         /** Where the current line sits inside the viewport: 0.5 = centre, 0.38 = slightly above. */
         private const val CURRENT_LINE_ANCHOR = 0.38f
+
+        /** Lines far from the current one recede; the sung line stays the brightest thing. */
+        private const val INACTIVE_ALPHA = 0.42f
+        private const val PENDING_ALPHA = 0.75f
+        private const val SUNG_LINE_ALPHA = 0.58f
 
         /** Convenience factory which also remembers the track the lyrics belong to. */
         fun attach(scroll: View?, textView: TextView, accentColor: Int): SyncedLyricsView =

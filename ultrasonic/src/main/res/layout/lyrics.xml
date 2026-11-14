@@ -21,7 +21,7 @@
                     a:orientation="vertical"
                     a:layout_width="fill_parent"
                     a:layout_height="wrap_content"
-                    a:paddingVertical="32dip">
+                    a:paddingVertical="20dip">
                 <TextView
                         a:id="@+id/lyrics_artist"
                         a:textAppearance="?android:attr/textAppearanceMedium"
@@ -45,12 +45,29 @@
                         />
 
                 <TextView
+                        a:id="@+id/player_lyrics_source"
+                        a:layout_width="wrap_content"
+                        a:layout_height="wrap_content"
+                        a:layout_gravity="center_horizontal"
+                        a:background="@drawable/car_badge_bg"
+                        a:paddingStart="10dp"
+                        a:paddingEnd="10dp"
+                        a:paddingTop="4dp"
+                        a:paddingBottom="4dp"
+                        a:textColor="@color/pal_text_secondary"
+                        a:textSize="11sp"
+                        a:visibility="gone"
+                        />
+
+                <TextView
                         a:id="@+id/lyrics_text"
-                        a:textAppearance="?android:attr/textAppearanceSmall"
-                        a:gravity="center_horizontal"
+                        a:textAppearance="?android:attr/textAppearanceMedium"
+                        a:gravity="start"
+                        a:textSize="20sp"
+                        a:lineSpacingExtra="10dp"
                         a:layout_width="fill_parent"
                         a:layout_height="wrap_content"
-                        a:paddingTop="32dip"
+                        a:paddingTop="16dip"
                         a:paddingStart="10dip"
                         a:paddingEnd="10dip"
                         />

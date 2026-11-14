@@ -127,13 +127,14 @@
                 a:id="@+id/pane_lyrics"
                 a:layout_width="match_parent"
                 a:layout_height="wrap_content"
-                a:alpha="0.92"
-                a:gravity="center_horizontal"
-                a:lineSpacingExtra="8dp"
+                a:alpha="1.0"
+                a:gravity="start"
+                a:lineSpacingExtra="12dp"
                 a:paddingTop="12dp"
                 a:paddingBottom="12dp"
                 a:textAppearance="@style/TextAppearance.Material3.BodyLarge"
                 a:textColor="@color/pal_text_primary"
+                a:textSize="20sp"
                 tools:text="Lyrics" />
 
         </ScrollView>
@@ -145,6 +146,26 @@
             a:clipToPadding="false"
             a:scrollbars="vertical"
             a:visibility="gone"
+            tools:visibility="visible" />
+
+        <TextView
+            a:id="@+id/pane_lyrics_source"
+            a:layout_width="wrap_content"
+            a:layout_height="wrap_content"
+            a:layout_gravity="top|end"
+            a:layout_marginTop="4dp"
+            a:layout_marginEnd="6dp"
+            a:background="@drawable/car_badge_bg"
+            a:clickable="true"
+            a:focusable="true"
+            a:paddingStart="10dp"
+            a:paddingTop="4dp"
+            a:paddingEnd="10dp"
+            a:paddingBottom="4dp"
+            a:textColor="@color/pal_text_secondary"
+            a:textSize="11sp"
+            a:visibility="gone"
+            tools:text="Word by word lyrics"
             tools:visibility="visible" />
 
     </FrameLayout>
@@ -222,8 +243,8 @@
              also available as a button on both sides of the bar. -->
         <TextView
             a:id="@+id/pane_seek_back"
-            a:layout_width="52dp"
-            a:layout_height="38dp"
+            a:layout_width="56dp"
+            a:layout_height="44dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/seek_backward_15"
             a:gravity="center"
@@ -241,8 +262,8 @@
 
         <TextView
             a:id="@+id/pane_seek_forward"
-            a:layout_width="52dp"
-            a:layout_height="38dp"
+            a:layout_width="56dp"
+            a:layout_height="44dp"
             a:background="?attr/selectableItemBackgroundBorderless"
             a:contentDescription="@string/seek_forward_15"
             a:gravity="center"
@@ -273,9 +294,9 @@
 
         <ImageButton
             a:id="@+id/pane_shuffle"
-            a:layout_width="44dp"
-            a:layout_height="44dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
+            a:layout_width="52dp"
+            a:layout_height="52dp"
+            a:background="@drawable/car_control_bg"
             a:contentDescription="@string/buttons.shuffle"
             a:padding="10dp"
             a:scaleType="fitCenter"
@@ -283,10 +304,10 @@
 
         <ImageButton
             a:id="@+id/pane_previous"
-            a:layout_width="54dp"
-            a:layout_height="54dp"
+            a:layout_width="60dp"
+            a:layout_height="60dp"
             a:layout_marginStart="6dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
+            a:background="@drawable/car_control_bg"
             a:contentDescription="@string/buttons.previous"
             a:padding="12dp"
             a:scaleType="fitCenter"
@@ -294,10 +315,11 @@
 
         <ImageButton
             a:id="@+id/pane_play"
-            a:layout_width="62dp"
-            a:layout_height="62dp"
+            a:layout_width="68dp"
+            a:layout_height="68dp"
             a:layout_marginStart="8dp"
             a:layout_marginEnd="8dp"
+            a:background="@drawable/car_control_primary_bg"
             a:contentDescription="@string/buttons.play"
             a:padding="16dp"
             a:scaleType="fitCenter"
@@ -305,10 +327,10 @@
 
         <ImageButton
             a:id="@+id/pane_next"
-            a:layout_width="54dp"
-            a:layout_height="54dp"
+            a:layout_width="60dp"
+            a:layout_height="60dp"
             a:layout_marginEnd="6dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
+            a:background="@drawable/car_control_bg"
             a:contentDescription="@string/buttons.next"
             a:padding="12dp"
             a:scaleType="fitCenter"
@@ -316,9 +338,9 @@
 
         <ImageButton
             a:id="@+id/pane_repeat"
-            a:layout_width="44dp"
-            a:layout_height="44dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
+            a:layout_width="52dp"
+            a:layout_height="52dp"
+            a:background="@drawable/car_control_bg"
             a:contentDescription="@string/buttons.repeat"
             a:padding="10dp"
             a:scaleType="fitCenter"
@@ -328,10 +350,10 @@
              the queue still holds a song worth hearing. -->
         <ImageButton
             a:id="@+id/pane_queue_button"
-            a:layout_width="44dp"
-            a:layout_height="44dp"
+            a:layout_width="52dp"
+            a:layout_height="52dp"
             a:layout_marginStart="6dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
+            a:background="@drawable/car_control_bg"
             a:contentDescription="@string/queue_title"
             a:padding="10dp"
             a:scaleType="fitCenter"
@@ -341,10 +363,10 @@
              playing all night. -->
         <ImageButton
             a:id="@+id/pane_sleep"
-            a:layout_width="44dp"
-            a:layout_height="44dp"
+            a:layout_width="52dp"
+            a:layout_height="52dp"
             a:layout_marginStart="6dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
+            a:background="@drawable/car_control_bg"
             a:contentDescription="@string/sleep_timer"
             a:padding="10dp"
             a:scaleType="fitCenter"

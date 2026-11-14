@@ -84,7 +84,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.koin.core.component.KoinScopeComponent
@@ -115,9 +115,8 @@ import org.moire.ultrasonic.ui.SyncedLyricsView
 import org.moire.ultrasonic.util.CancellationToken
 import org.moire.ultrasonic.util.CommunicationError
 import org.moire.ultrasonic.util.ConfirmationDialog
-import org.moire.ultrasonic.util.LyricsParser
+import org.moire.ultrasonic.util.LyricsLoader
 import org.moire.ultrasonic.util.Settings
-import org.moire.ultrasonic.util.TimedLyric
 import org.moire.ultrasonic.util.Util
 import org.moire.ultrasonic.util.Util.toast
 import org.moire.ultrasonic.util.toTrack
@@ -244,7 +243,8 @@ class PlayerFragment :
         lyricsTextView?.let { lyrics ->
             syncedLyrics = SyncedLyricsView(
                 view.findViewById(R.id.lyrics_scrollview),
-                lyrics
+                lyrics,
+                view.findViewById(R.id.player_lyrics_source)
             ).apply {
                 setAccentColor(CarTheme.color(requireContext(), CarPalette.current().accent))
                 setFontSizeSp(Settings.lyricsFontSizeSp)
@@ -347,8 +347,7 @@ class PlayerFragment :
         tabLyrics?.setOnClickListener { showPage(LYRICS_PAGE) }
         tabQueue?.setOnClickListener { showPage(QUEUE_PAGE) }
         lyricsRefresh?.setOnRefreshListener {
-            lyricsTrackId = null
-            loadLyrics(currentSong)
+            loadLyrics(currentSong, forceRefresh = true)
         }
 
         previousButton.setOnClickListener {
@@ -992,10 +991,11 @@ class PlayerFragment :
     }
 
     /**
-     * Loads the lyrics of [track] into the lyrics page of the player. The text is cached per
-     * track id, so flipping back and forth does not hit the server again.
+     * Loads the lyrics of [track]. The server is asked first and the automatic online search
+     * fills the gaps. Both the full screen player and the car pane use LyricsLoader, so they
+     * always show the same version and the same source badge.
      */
-    private fun loadLyrics(track: Track?) {
+    private fun loadLyrics(track: Track?, forceRefresh: Boolean = false) {
         val synced = syncedLyrics
         if (synced == null) {
             lyricsRefresh?.isRefreshing = false
@@ -1003,63 +1003,49 @@ class PlayerFragment :
         }
 
         if (track == null) {
+            synced.setSourceLabel(null)
             synced.showPlaceholder(getString(R.string.player_pane_lyrics_empty))
             lyricsTrackId = null
             lyricsRefresh?.isRefreshing = false
             return
         }
 
-        if (lyricsTrackId == track.id) {
+        if (!forceRefresh && lyricsTrackId == track.id) {
             lyricsRefresh?.isRefreshing = false
             return
         }
         lyricsTrackId = track.id
         synced.reset()
-
+        synced.setSourceLabel(getString(R.string.player_pane_lyrics_loading))
         synced.showPlaceholder(getString(R.string.player_pane_lyrics_loading))
 
-        val artist = track.artist.orEmpty()
-        val title = track.title.orEmpty()
         val targetId = track.id
+        val context = requireContext().applicationContext
+        val durationMs = mediaPlayerManager.playerDuration.toLong()
 
         lifecycleScope.launch(Dispatchers.IO) {
-            val lyrics = try {
-                // The endpoint with the time axis is asked first, because the plain one drops
-                // every timestamp and the lyrics would not move along with the song. A server
-                // that does not know the endpoint throws, and the plain one is used instead.
-                withTimeoutOrNull(8_000L) {
-                    runCatching { getMusicService().getSyncedLyrics(targetId) }.getOrNull()
-                        ?.takeIf { it.timedLines.isNotEmpty() }
-                        ?: getMusicService().getLyrics(artist, title)
-                }
-            } catch (all: Exception) {
-                Timber.w(all, "Could not load lyrics for %s", title)
-                null
-            }
+            val result = runCatching {
+                LyricsLoader.load(context, track, durationMs, forceRefresh)
+            }.getOrNull()
 
-            launch(Dispatchers.Main) {
+            withContext(Dispatchers.Main) {
                 lyricsRefresh?.isRefreshing = false
-                if (lyricsTrackId != targetId || !isAdded) return@launch
+                if (lyricsTrackId != targetId || !isAdded) return@withContext
 
-                val text = lyrics?.text
-                val timed = lyrics?.timedLines?.map { TimedLyric(it.startMs, it.text) }
-                    .orEmpty()
-                if (text.isNullOrBlank() && timed.isEmpty()) {
+                if (result == null || result.isEmpty) {
+                    synced.setSourceLabel(
+                        if (result != null && result.labelRes != 0) getString(result.labelRes) else null
+                    )
                     synced.showPlaceholder(getString(R.string.player_pane_lyrics_empty))
                 } else {
-                    // A song without a time axis still gets one: the lines are spread over
-                    // the length of the song, so the lyrics move along with the music
-                    // instead of standing still.
-                    val effective = if (timed.isEmpty()) {
-                        LyricsParser.spreadPlainLyrics(
-                            text,
-                            mediaPlayerManager.playerDuration.toLong()
-                        )
-                    } else {
-                        timed
-                    }
-                    synced.setLyrics(text, effective)
-                    synced.update(mediaPlayerManager.playerPosition.toLong())
+                    synced.setSourceLabel(
+                        if (result.labelRes != 0) getString(result.labelRes) else null
+                    )
+                    synced.setLyrics(result.text, result.lines)
+                    synced.update(
+                        (mediaPlayerManager.playerPosition.toLong() - Settings.lyricsOffsetMs)
+                            .coerceAtLeast(0L)
+                    )
                 }
             }
         }

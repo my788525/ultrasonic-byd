@@ -7,8 +7,22 @@
 
 package org.moire.ultrasonic.util
 
+/**
+ * One sung segment (a word or a short group of characters) and the moment it starts.
+ *
+ * [text] keeps its trailing spaces and punctuation: concatenating the words of a line must
+ * produce exactly [TimedLyric.text], otherwise the wipe drawn by SyncedLyricsView would drift
+ * away from the characters on screen.
+ */
+data class TimedWord(val startMs: Long, val text: String)
+
 /** A single line of lyrics together with the moment it has to be shown. */
-data class TimedLyric(val startMs: Long, val text: String)
+data class TimedLyric(
+    val startMs: Long,
+    val text: String,
+    /** Word level timing when the source has it; empty for ordinary line synced lyrics. */
+    val words: List<TimedWord> = emptyList()
+)
 
 /**
  * Parser for the lyrics formats a Subsonic / Navidrome server returns.
@@ -17,6 +31,10 @@ data class TimedLyric(val startMs: Long, val text: String)
  * `[00:12.34]text`, sometimes with several timestamps in front of one line. Both are supported:
  * timed lyrics are returned as a list, untimed lyrics return an empty list and the caller falls
  * back to showing the text as it is.
+ *
+ * Enhanced LRC (the A2 extension) keeps an extra timestamp in front of every word:
+ * `[00:12.34]<00:12.34>Every <00:12.60>time`. Those lines additionally carry
+ * [TimedLyric.words], which is what makes the karaoke style wipe possible.
  */
 object LyricsParser {
 
@@ -28,7 +46,7 @@ object LyricsParser {
     private val TIME_TAG = Regex("""\[(?:(\d{1,3}):)?(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?]""")
 
     /**
-     * `[offset:±123]` or `[offset:±1.5]`. A negative value shifts the lyrics earlier, a positive
+     * `[offset:+-123]` or `[offset:+-1.5]`. A negative value shifts the lyrics earlier, a positive
      * one later. The LRC spec uses milliseconds, but a decimal point means seconds, which a lot of
      * editors emit, so both are supported. One such line anywhere in the file shifts every line.
      */
@@ -54,13 +72,22 @@ object LyricsParser {
             if (tags.isEmpty()) return@forEach
 
             val text = line.substring(tags.last().range.last + 1).trim()
+            // Word timings are absolute inside the file, so the same global offset applies.
+            val enhanced = WordLyricsParser.parseEnhanced(text)
             tags.forEach { match ->
                 val hours = match.groupValues[1].toLongOrNull() ?: 0L
                 val minutes = match.groupValues[2].toLongOrNull() ?: 0L
                 val seconds = match.groupValues[3].toLongOrNull() ?: 0L
                 val startMs = hours * MS_PER_HOUR + minutes * MS_PER_MINUTE +
-                    seconds * MS_PER_SECOND + fractionMs(match.groupValues[4])
-                timed.add(TimedLyric(startMs + globalOffsetMs, text))
+                    seconds * MS_PER_SECOND + fractionMs(match.groupValues[4]) + globalOffsetMs
+                if (enhanced != null) {
+                    val words = enhanced.second.map { word ->
+                        TimedWord(word.startMs + globalOffsetMs, word.text)
+                    }
+                    timed.add(TimedLyric(startMs, enhanced.first, words))
+                } else {
+                    timed.add(TimedLyric(startMs, text))
+                }
             }
         }
 

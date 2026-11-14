@@ -431,16 +431,6 @@
             a:summary="@string/floating_banner_panel_summary"
             a:title="@string/floating_banner_panel_title"
             app:iconSpaceReserved="false"/>
-        <SeekBarPreference
-            a:defaultValue="16"
-            a:key="@string/setting_key.lyrics_font_size"
-            a:max="30"
-            a:summary="@string/lyrics_font_size_summary"
-            a:title="@string/lyrics_font_size_title"
-            app:iconSpaceReserved="false"
-            app:min="12"
-            app:seekBarIncrement="1"
-            app:showSeekBarValue="true"/>
         <CheckBoxPreference
             a:defaultValue="false"
             a:key="@string/setting_key.nav_floating"
@@ -496,6 +486,37 @@
             a:key="@string/setting_key.car_preload"
             a:summary="@string/settings_car_preload_summary"
             a:title="@string/settings_car_preload_title"
+            app:iconSpaceReserved="false"/>
+    </PreferenceCategory>
+    <PreferenceCategory
+        a:title="@string/lyrics_category_title"
+        app:iconSpaceReserved="false">
+        <SeekBarPreference
+            a:defaultValue="20"
+            a:key="@string/setting_key.lyrics_font_size"
+            a:max="36"
+            a:summary="@string/lyrics_font_size_summary"
+            a:title="@string/lyrics_font_size_title"
+            app:iconSpaceReserved="false"
+            app:min="12"
+            app:seekBarIncrement="1"
+            app:showSeekBarValue="true"/>
+        <CheckBoxPreference
+            a:defaultValue="true"
+            a:key="@string/setting_key.auto_search_lyrics"
+            a:summary="@string/lyrics_auto_search_summary"
+            a:title="@string/lyrics_auto_search_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="true"
+            a:key="@string/setting_key.prefer_word_lyrics"
+            a:summary="@string/lyrics_prefer_word_summary"
+            a:title="@string/lyrics_prefer_word_title"
+            app:iconSpaceReserved="false"/>
+        <Preference
+            a:key="@string/setting_key.lyrics_cache_clear"
+            a:summary="@string/lyrics_cache_clear_summary"
+            a:title="@string/lyrics_cache_clear_title"
             app:iconSpaceReserved="false"/>
     </PreferenceCategory>
     <PreferenceCategory
