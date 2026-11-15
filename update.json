@@ -1,23 +1,20 @@
 {
-  "versionCode": 527,
-  "versionName": "4.8.0-byd.45",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.45.apk",
-  "sha256": "69b64c623d02da38727d25bc061af59a39a6a55274a03eeea9c1338dae46eb8d",
-  "size": 11536709,
-  "publishedAt": "2026-11-15T01:23:42Z",
+  "versionCode": 528,
+  "versionName": "4.8.0-byd.46",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.46.apk",
+  "sha256": "20ad0cb4d1295c9e88ef99d6675fb451b7507c7f5ed9408547a2019f7b806cf5",
+  "size": 11536491,
+  "publishedAt": "2026-11-15T01:55:22Z",
   "changelog": [
-    "LRCLIB 限流合规：请求间隔 250ms、按 Retry-After 进入冷却，429 不再写 6 小时负缓存；在线查找改为 14 秒整体硬时限，超时不再留下阻塞请求或后台写盘",
-    "接入 OpenSubsonic enhanced=true 服务端逐字歌词（cueLine 词级时间戳），服务器不支持时自动回退旧格式与 LRCLIB",
-    "服务端歌词 offset 生效（正值提前、负值延后）；多时间戳行的逐字时间轴随行平移；未知时长不再把整首歌词挤到开头",
-    "已保存歌词别名增加歌名/歌手/时长校验防止 Live/Remix 误命中；本地缓存限制为 3000 个文件并按最近使用清理",
-    "设置页歌词统计与清空移出主线程；修复更新包空 sha256 跳过校验、IOException 误判为存储不足；移除 Manifest 重复声明",
-    "悬浮窗改用统一 LyricsLoader（去掉每首歌一个 Thread，补齐在线搜索与超时）；新增队列下一首歌词预取开关（默认开启）",
-    "版本 bump 至 4.8.0-byd.45 (versionCode 527)"
+    "歌词来源优先级反转：在线歌词（LRCLIB）改为优先，仅在搜不到时才回退 Navidrome 服务端歌词",
+    "Navidrome 歌词不完整时不再用其覆盖在线完整歌词；已保存/下载的在线歌词仍离线优先读取",
+    "仅在在线为纯文本、且开启“优先逐字歌词”、且服务端确有逐字时间轴时，才回退服务端逐字歌词",
+    "版本 bump 至 4.8.0-byd.46 (versionCode 528)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.45.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.45/NavMusic-4.8.0-byd.45.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.45/NavMusic-4.8.0-byd.45.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.45/NavMusic-4.8.0-byd.45.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.46.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.46/NavMusic-4.8.0-byd.46.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.46/NavMusic-4.8.0-byd.46.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.46/NavMusic-4.8.0-byd.46.apk"
   ]
 }

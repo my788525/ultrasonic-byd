@@ -113,24 +113,29 @@ object Settings {
     var lyricsFontSizeSp by IntSetting(getKey(R.string.setting_key_lyrics_font_size), 20)
 
     /**
-     * Automatically look a track up on LRCLIB when the server has no timed lyrics.
-     * Enabled by default: a personal car library almost never ships synced lyrics.
+     * Online lyrics (LRCLIB) are the priority source and are looked up first on every play.
+     * Navidrome is used only as a fallback when LRCLIB has no record for the song, because a
+     * personal library often carries incomplete lyrics. Enabled by default.
      */
     @JvmStatic
     var autoSearchLyrics by BooleanSetting(
         getKey(R.string.setting_key_auto_search_lyrics), true
     )
 
-    /** Prefer an online result with real word timings over the server's line synced lyrics. */
+    /**
+     * When the online copy is only plain (line synced) text but Navidrome carries real
+     * word-level timings, prefer Navidrome's karaoke timings. Has no effect when the online
+     * record is already word synced, or when auto search is off.
+     */
     @JvmStatic
     var preferWordLyrics by BooleanSetting(
         getKey(R.string.setting_key_prefer_word_lyrics), true
     )
 
     /**
-     * Lyrics downloaded from LRCLIB are kept permanently on the device and take priority over
-     * the server copy on every later playback. Downloads still happen when this is off, but the
-     * server is asked first as it was before.
+     * Lyrics downloaded from LRCLIB are kept permanently on the device and answered straight
+     * from disk (no network) on later plays. When this is off, saved copies are ignored and a
+     * fresh download is always attempted; online lyrics still take priority over Navidrome.
      */
     @JvmStatic
     var preferSavedLyrics by BooleanSetting(

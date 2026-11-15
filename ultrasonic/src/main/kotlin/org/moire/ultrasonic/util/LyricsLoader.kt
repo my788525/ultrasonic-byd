@@ -46,12 +46,13 @@ data class LyricsLoadResult(
 /**
  * One place that decides which lyrics a song gets.
  *
- * A lyrics record that was downloaded once is saved on the device and takes priority over
- * everything else: it is read from disk with no server call and no network, so the car keeps
- * showing the same word by word lyrics even fully offline. Only songs without a saved copy go
- * through the Subsonic / Navidrome server (with `enhanced=true` word timings when available),
- * and only when that has no usable time axis does [LyricsAutoSearch] look the track up on
- * LRCLIB. Any successful download is saved immediately.
+ * The priority is **online first, server fallback**: a lyrics record downloaded from LRCLIB is
+ * the preferred source, because a personal Navidrome library often carries incomplete lyrics.
+ * A record that was saved once is read from disk with no network (and no server call), so the
+ * car keeps showing the same word by word lyrics even fully offline; when no saved copy exists
+ * a fresh LRCLIB download is attempted. Only when LRCLIB has no record for the song does the
+ * loader fall back to the Subsonic / Navidrome server (with `enhanced=true` word timings when
+ * available). Any successful online download is saved immediately for later plays.
  *
  * The full screen player, the permanent car panel and the floating window all use this loader,
  * so they always show exactly the same lyrics and the same source label. A small LRU keeps the
@@ -123,51 +124,17 @@ object LyricsLoader {
             memoryCache.get(track.id)?.let { return it }
         }
 
-        // A saved copy wins before the server is even asked. forceRefresh (pull to refresh or a
-        // tap on the source label) still goes through the full lookup so the driver can replace
-        // a wrong record.
-        if (!forceRefresh && Settings.preferSavedLyrics &&
-            title.isNotBlank() && artist.isNotBlank()
-        ) {
-            val saved = runCatching {
-                LyricsAutoSearch.readSaved(
-                    context,
-                    title,
-                    artist,
-                    album,
-                    effectiveDuration
-                )
-            }.getOrNull()
-            if (saved != null) {
-                return putCached(track.id, toResult(fromOnline(saved, effectiveDuration)))
-            }
-        }
-
-        // The REST client has its own socket timeouts; this deadline only stops the caller from
-        // waiting on a stalled server. A server lookup is read only and writes no cache, so an
-        // abandoned one cannot race with the next lookup.
-        val server = withTimeoutOrNull(SERVER_TIMEOUT_MS) {
-            runCatching {
-                val service = MusicServiceFactory.getMusicService()
-                // The endpoint with the time axis is asked first: the plain one drops every
-                // timestamp and the lyrics would not move along with the song.
-                runCatching { service.getSyncedLyrics(track.id) }.getOrNull()
-                    ?.takeIf { it.timedLines.isNotEmpty() }
-                    ?: service.getLyrics(artist, title)
-            }.onFailure { Timber.w(it, "Server lyrics lookup failed for %s", title) }
-                .getOrNull()
-        }
-        val serverCandidate = fromServer(server, effectiveDuration)
-
+        // Online lyrics are the priority source. A permanently saved (offline) copy is answered
+        // straight from disk with no network, and a fresh LRCLIB download is attempted whenever
+        // auto search is enabled. Navidrome is consulted only afterwards, as a fallback for the
+        // songs LRCLIB does not carry - the user's server lyrics are treated as secondary to the
+        // (usually more complete) online record.
         val wantsOnline = Settings.autoSearchLyrics &&
-            title.isNotBlank() && artist.isNotBlank() &&
-            (forceRefresh ||
-                serverCandidate.rank == 0 ||
-                (Settings.preferWordLyrics && !serverCandidate.wordSynced))
+            title.isNotBlank() && artist.isNotBlank()
 
-        // The online lookup owns its own hard deadline now. Every request is bounded by the
-        // remaining budget, so no socket stays open and no cache entry is written after the
-        // caller has stopped waiting (which used to happen with withTimeoutOrNull + blocking IO).
+        // The online lookup owns its own hard deadline: every request is bounded by the remaining
+        // budget, so no socket stays open and no cache entry is written after the caller has
+        // stopped waiting.
         val online = if (wantsOnline) {
             runCatching {
                 LyricsAutoSearch.search(
@@ -187,14 +154,41 @@ object LyricsLoader {
         }
         val onlineCandidate = online?.let { fromOnline(it, effectiveDuration) }
 
-        // A saved copy always wins. Otherwise equal ranks keep the server result: it is local
-        // and works offline, and the online lookup has already been saved for later plays.
-        val chosen = when {
-            onlineCandidate != null && onlineCandidate.saved &&
-                !onlineCandidate.isEmpty && Settings.preferSavedLyrics -> onlineCandidate
-            onlineCandidate != null && onlineCandidate.rank > serverCandidate.rank ->
+        // Reach out to Navidrome only when the online lookup gave us nothing, or when the online
+        // copy is merely plain text and the driver prefers real word timings that the server may
+        // carry. When the online record is already word synced there is nothing to gain.
+        val needServer = (onlineCandidate == null || onlineCandidate.isEmpty) ||
+            (!onlineCandidate.wordSynced && Settings.preferWordLyrics)
+        val server = if (needServer) {
+            // The REST client has its own socket timeouts; this deadline only stops the caller
+            // from waiting on a stalled server. A server lookup is read only and writes no cache.
+            withTimeoutOrNull(SERVER_TIMEOUT_MS) {
+                runCatching {
+                    val service = MusicServiceFactory.getMusicService()
+                    // The endpoint with the time axis is asked first: the plain one drops every
+                    // timestamp and the lyrics would not move along with the song.
+                    runCatching { service.getSyncedLyrics(track.id) }.getOrNull()
+                        ?.takeIf { it.timedLines.isNotEmpty() }
+                        ?: service.getLyrics(artist, title)
+                }.onFailure { Timber.w(it, "Server lyrics lookup failed for %s", title) }
+                    .getOrNull()
+            }
+        } else {
+            null
+        }
+        val serverCandidate = fromServer(server, effectiveDuration)
+
+        // Online wins whenever it produced usable lyrics. The only exception is a plain (non word
+        // synced) online copy while the server offers real word timings, and only when the driver
+        // asked to prefer word lyrics - then the server's karaoke timings are strictly better.
+        val chosen = if (onlineCandidate != null && !onlineCandidate.isEmpty) {
+            if (!onlineCandidate.wordSynced && Settings.preferWordLyrics && serverCandidate.wordSynced) {
+                serverCandidate
+            } else {
                 onlineCandidate
-            else -> serverCandidate
+            }
+        } else {
+            serverCandidate
         }
 
         return putCached(track.id, toResult(chosen))
