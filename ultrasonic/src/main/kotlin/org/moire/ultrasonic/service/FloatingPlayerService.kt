@@ -67,6 +67,7 @@ import org.moire.ultrasonic.util.LyricsLoader
 import org.moire.ultrasonic.util.LyricsParser
 import org.moire.ultrasonic.util.ReverseSafetyManager
 import org.moire.ultrasonic.activity.NavigationActivity
+import org.moire.ultrasonic.util.NowPlayingHint
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.SleepTimerManager
 import org.moire.ultrasonic.util.TimedLyric
@@ -199,6 +200,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      * missing track.
      */
     private var stateInitialized = false
+    private var showingNextHint = false
+    private var shownNextTrackId: String? = null
+    private var lastReloadToken = 0L
     private var lyricsTrackId: String? = null
     private var timedLyrics: List<TimedLyric> = emptyList()
     private var lyricIndex = -1
@@ -274,6 +278,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     override fun onCreate() {
         super.onCreate()
         instance = this
+        lastReloadToken = Settings.lyricsReloadToken
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForeground(NOTIFICATION_ID, buildNotification())
         connectController()
@@ -1547,13 +1552,13 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         val player = controller
         val track = player?.currentMediaItem?.toTrack()
 
-        if (!stateInitialized || track?.id != currentTrackId) {
+        val trackChanged = !stateInitialized || track?.id != currentTrackId
+        if (trackChanged) {
             stateInitialized = true
             currentTrackId = track?.id
             currentTrack = track
-            titleView?.text = track?.title ?: getString(R.string.player_pane_idle)
-            artistView?.text = track?.artist
-                ?: if (track == null) getString(R.string.player_pane_idle_hint) else ""
+            showingNextHint = false
+            shownNextTrackId = null
             imageLoaderProvider.executeOn { loader ->
                 val view = albumArt
                 if (view != null) loader.loadImage(view, track, true, 0)
@@ -1582,17 +1587,57 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         updateTransportAvailability(player)
 
         val duration = player?.duration ?: 0L
+        val position = player?.currentPosition ?: 0L
+        // A track change must start on the current song's name even if the player still
+        // reports the last position of the previous track for one frame.
+        renderHeaderHint(if (trackChanged) 0L else position, duration, force = trackChanged)
+
+        // "Search lyrics again" in settings bumps a token instead of putting a button over
+        // the words. Every lyrics surface watches it on its normal refresh.
+        val token = Settings.lyricsReloadToken
+        if (token != lastReloadToken) {
+            lastReloadToken = token
+            ensureLyrics(currentTrack, forceRefresh = true)
+        }
+
         // An empty progress track reads as a broken window, so it only appears with a song
         progressView?.visibility =
             if (progressAllowed && duration > 0) View.VISIBLE else View.GONE
         if (duration > 0) {
-            val position = player?.currentPosition ?: 0L
             progressView?.progress = (position * 1000L / duration).toInt().coerceIn(0, 1000)
             updateFloatingLyrics(position)
         } else if (waitingForNetwork) {
             // The song has no length, so the position cannot be read, but the driver still
             // has to know that the music is waiting for the network.
             updateFloatingLyrics(0L)
+        }
+    }
+
+    /**
+     * The title area shows the current song, except for 10-20 s after the start and the last
+     * 15 s of a song, when it announces what comes next. The floating window owns a Media3
+     * player, so its own "next" index is shuffle and repeat aware.
+     */
+    private fun renderHeaderHint(positionMs: Long, durationMs: Long, force: Boolean = false) {
+        val hint = if (currentTrack != null && Settings.showNextTrackHint &&
+            NowPlayingHint.shouldShowNext(positionMs.toInt(), durationMs.toInt())
+        ) {
+            runCatching { NowPlayingHint.nextTrack(controller) }.getOrNull()
+        } else {
+            null
+        }
+        if (!force && hint?.id == shownNextTrackId && (hint != null) == showingNextHint) return
+        showingNextHint = hint != null
+        shownNextTrackId = hint?.id
+
+        if (hint != null) {
+            titleView?.text = NowPlayingHint.title(this, hint)
+            artistView?.text = NowPlayingHint.subtitle(this, hint)
+        } else {
+            val track = currentTrack
+            titleView?.text = track?.title ?: getString(R.string.player_pane_idle)
+            artistView?.text = track?.artist
+                ?: if (track == null) getString(R.string.player_pane_idle_hint) else ""
         }
     }
 
@@ -1676,9 +1721,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         )
     }
 
-    private fun ensureLyrics(track: Track?) {
+    private fun ensureLyrics(track: Track?, forceRefresh: Boolean = false) {
         val id = track?.id
-        if (id == lyricsTrackId) return
+        if (id == lyricsTrackId && !forceRefresh) return
         lyricsTrackId = id
         timedLyrics = emptyList()
         lyricIndex = -1
@@ -1696,13 +1741,12 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         val appContext = applicationContext
 
         // The floating window uses the very same loader as the player pane and the full screen
-        // player: permanently saved copies first, then the server (including enhanced word
-        // timings), then LRCLIB with its deadline and rate limit handling. Duplicating that
-        // chain here used to mean a raw Thread on every song change, no online fallback and no
-        // timeout at all.
+        // player: online lyrics first, Navidrome only as a fallback (including enhanced word
+        // timings), with its deadline and rate limit handling. Duplicating that chain here
+        // used to mean a raw Thread on every song change, no online fallback and no timeout.
         lyricsScope.launch {
             val result = runCatching {
-                LyricsLoader.load(appContext, track, durationMs)
+                LyricsLoader.load(appContext, track, durationMs, forceRefresh)
             }.onFailure { Timber.w(it, "Could not load lyrics for the floating window") }
                 .getOrNull()
 
@@ -1763,9 +1807,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             return
         }
 
-        // Shift the position by the driver calibration so the highlighted line lines up with the
-        // audio. Positive offset delays the lyrics, negative ones show them earlier.
-        val index = LyricsParser.lineIndexAt(timedLyrics, positionMs - Settings.lyricsOffsetMs)
+        // The lyrics follow the real playback position; calibration controls are gone.
+        val index = LyricsParser.lineIndexAt(timedLyrics, positionMs)
         if (index == lyricIndex) return
         lyricIndex = index
 

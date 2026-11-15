@@ -139,6 +139,22 @@ class SettingsFragment :
         }
 
         refreshCount()
+
+        // The old source badge doubled as a "search again" button. That gesture now lives
+        // here: bumping a token makes every running lyrics surface re-run the online lookup
+        // on its next refresh, without any cross-process event bus.
+        findPreference<Preference>(getString(R.string.setting_key_lyrics_reload_now))
+            ?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+            org.moire.ultrasonic.util.Settings.lyricsReloadToken =
+                org.moire.ultrasonic.util.Settings.lyricsReloadToken + 1L
+            android.widget.Toast.makeText(
+                appContext,
+                getString(R.string.lyrics_reload_done),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            true
+        }
+
         clear?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
             lifecycleScope.launch {
                 val removed = withContext(Dispatchers.IO) {

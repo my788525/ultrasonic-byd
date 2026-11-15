@@ -81,7 +81,11 @@
     <string name="setting_key.floating_idle_brightness" translatable="false">floatingIdleBrightness</string>
     <string name="setting_key.floating_text_color" translatable="false">floatingTextColor</string>
     <string name="setting_key.floating_text_shadow" translatable="false">floatingTextShadow</string>
-    <string name="setting_key.lyrics_offset" translatable="false">lyricsOffsetMs</string>
+    <string name="setting_key.word_by_word_lyrics" translatable="false">wordByWordLyrics</string>
+    <string name="setting_key.show_lyrics_source_badge" translatable="false">showLyricsSourceBadge</string>
+    <string name="setting_key.lyrics_reload_token" translatable="false">lyricsReloadToken</string>
+    <string name="setting_key.lyrics_reload_now" translatable="false">lyricsReloadNow</string>
+    <string name="setting_key.show_next_track_hint" translatable="false">showNextTrackHint</string>
     <string name="setting_key.lyrics_font_size" translatable="false">lyricsFontSizeSp</string>
     <string name="setting_key.auto_search_lyrics" translatable="false">autoSearchLyrics</string>
     <string name="setting_key.prefer_word_lyrics" translatable="false">preferWordLyrics</string>

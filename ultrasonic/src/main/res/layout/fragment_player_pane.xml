@@ -156,8 +156,6 @@
             a:layout_marginTop="4dp"
             a:layout_marginEnd="6dp"
             a:background="@drawable/car_badge_bg"
-            a:clickable="true"
-            a:focusable="true"
             a:paddingStart="10dp"
             a:paddingTop="4dp"
             a:paddingEnd="10dp"
@@ -165,62 +163,9 @@
             a:textColor="@color/pal_text_secondary"
             a:textSize="11sp"
             a:visibility="gone"
-            tools:text="Word by word lyrics"
-            tools:visibility="visible" />
+            tools:text="LRCLIB" />
 
     </FrameLayout>
-
-    <!-- The lyrics of many songs run ahead or behind the audio. This slim bar nudges the whole
-         block by half a second steps so the words line up with what is heard. -->
-    <LinearLayout
-        a:id="@+id/pane_lyric_offset"
-        a:layout_width="match_parent"
-        a:layout_height="wrap_content"
-        a:layout_marginTop="4dp"
-        a:gravity="center_vertical"
-        a:orientation="horizontal"
-        a:visibility="gone"
-        tools:visibility="visible">
-
-        <TextView
-            a:id="@+id/pane_offset_label"
-            a:layout_width="0dp"
-            a:layout_height="wrap_content"
-            a:layout_weight="1"
-            a:alpha="0.75"
-            a:gravity="start|center_vertical"
-            a:paddingStart="4dp"
-            a:paddingEnd="4dp"
-            a:textAppearance="@style/TextAppearance.Material3.LabelSmall"
-            a:textColor="@color/pal_text_secondary"
-            a:textSize="12sp"
-            tools:text="歌词校准 0.0s" />
-
-        <TextView
-            a:id="@+id/pane_offset_back"
-            a:layout_width="60dp"
-            a:layout_height="34dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
-            a:contentDescription="@string/lyric_offset_back"
-            a:gravity="center"
-            a:text="@string/lyric_offset_back_short"
-            a:textColor="@color/pal_text_primary"
-            a:textSize="13sp"
-            a:textStyle="bold" />
-
-        <TextView
-            a:id="@+id/pane_offset_forward"
-            a:layout_width="60dp"
-            a:layout_height="34dp"
-            a:background="?attr/selectableItemBackgroundBorderless"
-            a:contentDescription="@string/lyric_offset_forward"
-            a:gravity="center"
-            a:text="@string/lyric_offset_forward_short"
-            a:textColor="@color/pal_text_primary"
-            a:textSize="13sp"
-            a:textStyle="bold" />
-
-    </LinearLayout>
 
     <LinearLayout
         a:layout_width="match_parent"

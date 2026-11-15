@@ -44,6 +44,7 @@ import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.ui.SyncedLyricsView
 import org.moire.ultrasonic.util.CarTransport
 import org.moire.ultrasonic.util.LyricsLoader
+import org.moire.ultrasonic.util.NowPlayingHint
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.SleepTimerManager
 import org.moire.ultrasonic.util.Util
@@ -75,8 +76,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var artistView: TextView? = null
     private var lyricsView: TextView? = null
     private var lyricsScroll: View? = null
-    private var offsetBar: View? = null
-    private var offsetLabel: TextView? = null
     private var seekBar: SeekBar? = null
     private var elapsedView: TextView? = null
     private var totalView: TextView? = null
@@ -91,8 +90,15 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var queueAdapter: QueueAdapter? = null
     private var sleepButton: ImageButton? = null
 
-    /** The track whose lyrics are being shown, kept for the badge retry gesture. */
+    /** The track whose lyrics are being shown, kept for the "search again" action in settings. */
     private var lyricsTrack: Track? = null
+
+    /** Which header is on screen right now, so the title is not re-set twice a second. */
+    private var showingNextHint = false
+    private var shownNextTrackId: String? = null
+
+    /** Watches the settings action that asks for a fresh online lookup. */
+    private var lastReloadToken = 0L
 
     /** True while the queue is shown instead of the lyrics. */
     private var showQueue = false
@@ -159,14 +165,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         queueButton = view.findViewById(R.id.pane_queue_button)
         sleepButton = view.findViewById(R.id.pane_sleep)
 
-        offsetBar = view.findViewById(R.id.pane_lyric_offset)
-        offsetLabel = view.findViewById(R.id.pane_offset_label)
-        view.findViewById<View>(R.id.pane_offset_back).setOnClickListener {
-            adjustLyricOffset(+LYRIC_OFFSET_STEP_MS)
-        }
-        view.findViewById<View>(R.id.pane_offset_forward).setOnClickListener {
-            adjustLyricOffset(-LYRIC_OFFSET_STEP_MS)
-        }
+        lastReloadToken = Settings.lyricsReloadToken
 
         headerCard?.setOnClickListener {
             runCatching {
@@ -186,12 +185,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
                 setAccentColor(CarTheme.color(requireContext(), CarPalette.current().accent))
                 setFontSizeSp(Settings.lyricsFontSizeSp)
             }
-        }
-
-        // Tapping the source badge forces a fresh online lookup, which is the only gesture a
-        // driver needs when a search missed on a weak connection.
-        view.findViewById<TextView>(R.id.pane_lyrics_source)?.setOnClickListener {
-            loadLyrics(lyricsTrack, forceRefresh = true)
         }
 
         playButton?.setOnClickListener { mediaPlayerManager.togglePlayPause() }
@@ -301,12 +294,14 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     override fun onPause() {
         handler.removeCallbacks(updateRunnable)
+        syncedLyrics?.stopAnimation()
         sleepTimerManager.removeListener(this)
         super.onPause()
     }
 
     override fun onDestroyView() {
         handler.removeCallbacks(updateRunnable)
+        syncedLyrics?.stopAnimation()
         disposables.clear()
         headerCard = null
         stageCard = null
@@ -336,16 +331,18 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         val duration = mediaPlayerManager.playerDuration
         val position = mediaPlayerManager.playerPosition
 
-        // Keep the lyrics in sync with the playback position, shifted by the calibration offset
-        syncedLyrics?.update(lyricSearchPosition())
+        // The view animates the wipe between these 500 ms reports, so the real playback
+        // position (no calibration offset) and the playing state are all it needs.
+        syncedLyrics?.update(position.toLong().coerceAtLeast(0L), mediaPlayerManager.isPlaying)
+        renderHeader(position, duration)
 
-        // The calibration bar only makes sense when the lyrics carry a time axis
-        offsetBar?.visibility = if (syncedLyrics?.hasTimedLyrics == true && !showQueue) {
-            View.VISIBLE
-        } else {
-            View.GONE
+        // "Search lyrics again" in settings bumps a token instead of putting a button over
+        // the words. Every lyrics surface watches it on its normal refresh.
+        val token = Settings.lyricsReloadToken
+        if (token != lastReloadToken) {
+            lastReloadToken = token
+            loadLyrics(currentTrack, forceRefresh = true)
         }
-        updateOffsetLabel()
 
         if (!seekBarTracking) {
             seekBar?.max = if (duration > 0) duration else 1
@@ -383,23 +380,53 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     }
 
     private fun showTrack(track: Track?) {
+        showingNextHint = false
+        shownNextTrackId = null
         if (track == null) {
-            titleView?.text = getString(R.string.player_pane_idle)
-            artistView?.text = getString(R.string.player_pane_idle_hint)
             coverView?.setImageResource(R.drawable.unknown_album)
         } else {
-            titleView?.text = track.title.orEmpty()
-            val subtitle = listOfNotNull(track.artist, track.album)
-                .filter { it.isNotBlank() }
-                .joinToString(" · ")
-            artistView?.text = subtitle.ifBlank { getString(R.string.player_pane_idle_hint) }
             coverView?.let { target ->
                 imageLoaderProvider.executeOn { loader ->
                     if (isAdded) loader.loadImage(target, track, false, 0)
                 }
             }
         }
+        // A track change must start on the current song's name even if the player still
+        // reports the last position of the previous track for one frame.
+        renderHeader(0, mediaPlayerManager.playerDuration, true)
         loadLyrics(track)
+    }
+
+    /**
+     * The title area shows the current song, except for two short windows where it announces
+     * the next one: 10-20 s after the start and the last 15 s. Outside those windows the
+     * current song comes back. Both are pure presentation; playback is untouched.
+     */
+    private fun renderHeader(positionMs: Int, durationMs: Int, force: Boolean = false) {
+        val track = currentTrack
+        val hint = if (track != null && Settings.showNextTrackHint &&
+            NowPlayingHint.shouldShowNext(positionMs, durationMs)
+        ) {
+            runCatching { NowPlayingHint.nextTrack(mediaPlayerManager) }.getOrNull()
+        } else {
+            null
+        }
+        if (!force && hint?.id == shownNextTrackId && (hint != null) == showingNextHint) return
+        showingNextHint = hint != null
+        shownNextTrackId = hint?.id
+
+        val context = context ?: return
+        if (hint != null) {
+            titleView?.text = NowPlayingHint.title(context, hint)
+            artistView?.text = NowPlayingHint.subtitle(context, hint)
+        } else {
+            titleView?.text = track?.title?.takeIf { it.isNotBlank() }
+                ?: context.getString(R.string.player_pane_idle)
+            val detail = listOfNotNull(track?.artist, track?.album)
+                .filter { it.isNotBlank() }
+                .joinToString(" · ")
+            artistView?.text = detail.ifBlank { context.getString(R.string.player_pane_idle_hint) }
+        }
     }
 
     /** Loads lyrics from the server and, when needed, from the automatic online search. */
@@ -454,7 +481,10 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
                     if (result.labelRes != 0) getString(result.labelRes) else null
                 )
                 synced.setLyrics(result.text, result.lines)
-                synced.update(lyricSearchPosition())
+                synced.update(
+                    mediaPlayerManager.playerPosition.toLong().coerceAtLeast(0L),
+                    mediaPlayerManager.isPlaying
+                )
             }
         }
     }
@@ -609,37 +639,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         mediaPlayerManager.seekTo(target)
     }
 
-    // region lyric calibration
-
-    /**
-     * The position used to highlight the lyrics, shifted by the user calibration.
-     *
-     * A positive offset delays the lyrics (they appear later), a negative one shows them earlier.
-     * Many servers return timestamps that run ahead of or behind the audio, so the driver nudges
-     * the whole block until the words line up with what is heard.
-     */
-    private fun lyricSearchPosition(): Long {
-        return (mediaPlayerManager.playerPosition.toLong() - Settings.lyricsOffsetMs).coerceAtLeast(0L)
-    }
-
-    /** Changes the calibration by [deltaMs] and refreshes the lyrics and the label right away. */
-    private fun adjustLyricOffset(deltaMs: Int) {
-        Settings.lyricsOffsetMs = (Settings.lyricsOffsetMs + deltaMs).coerceIn(
-            -LYRIC_OFFSET_LIMIT_MS,
-            LYRIC_OFFSET_LIMIT_MS
-        )
-        updateOffsetLabel()
-        syncedLyrics?.update(lyricSearchPosition())
-    }
-
-    /** Shows the current calibration as a signed number of seconds on the bar. */
-    private fun updateOffsetLabel() {
-        val seconds = Settings.lyricsOffsetMs / 1000.0
-        offsetLabel?.text = getString(R.string.lyric_offset_label, String.format("%.1f", seconds))
-    }
-
-    // endregion
-
     // region sleep timer
 
     /** Tells the driver which duration is now running, or that it is off. */
@@ -697,12 +696,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         private const val STATUS_COLOR_ERROR = 0xFFFF534D.toInt()
         private const val ALPHA_ACTIVE = 1.0f
         private const val SEEK_STEP_MS = 15_000
-
-        /** One tap on the calibration bar shifts the lyrics by this many milliseconds. */
-        private const val LYRIC_OFFSET_STEP_MS = 500
-
-        /** The calibration cannot drift further than this from the real position. */
-        private const val LYRIC_OFFSET_LIMIT_MS = 20_000
         private const val REPEAT_OFF = 0
         private const val REPEAT_ALL = 1
         private const val REPEAT_ONE = 2

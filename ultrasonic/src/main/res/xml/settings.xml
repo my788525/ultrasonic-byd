@@ -503,6 +503,12 @@
             app:showSeekBarValue="true"/>
         <CheckBoxPreference
             a:defaultValue="true"
+            a:key="@string/setting_key.word_by_word_lyrics"
+            a:summary="@string/lyrics_word_by_word_summary"
+            a:title="@string/lyrics_word_by_word_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="true"
             a:key="@string/setting_key.auto_search_lyrics"
             a:summary="@string/lyrics_auto_search_summary"
             a:title="@string/lyrics_auto_search_title"
@@ -524,6 +530,23 @@
             a:key="@string/setting_key.prefetch_lyrics"
             a:summary="@string/lyrics_prefetch_summary"
             a:title="@string/lyrics_prefetch_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="false"
+            a:key="@string/setting_key.show_lyrics_source_badge"
+            a:summary="@string/lyrics_source_badge_summary"
+            a:title="@string/lyrics_source_badge_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="true"
+            a:key="@string/setting_key.show_next_track_hint"
+            a:summary="@string/lyrics_next_track_hint_summary"
+            a:title="@string/lyrics_next_track_hint_title"
+            app:iconSpaceReserved="false"/>
+        <Preference
+            a:key="@string/setting_key.lyrics_reload_now"
+            a:summary="@string/lyrics_reload_now_summary"
+            a:title="@string/lyrics_reload_now_title"
             app:iconSpaceReserved="false"/>
         <Preference
             a:key="@string/setting_key.lyrics_cache_clear"

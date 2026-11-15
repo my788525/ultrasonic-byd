@@ -185,6 +185,50 @@ object WordLyricsParser {
         return total
     }
 
+    /**
+     * Fractional character offset of the wipe at [positionMs].
+     *
+     * Unlike [sungLength], which jumps a whole word at a time, this interpolates *inside* the
+     * word being sung using its real start timestamp and the next real timestamp (the following
+     * word's start, or [lineEndMs] for the last word). The integer part is the number of fully
+     * sung characters; the fractional part is how far the character currently being sung has
+     * progressed. The lyrics view blends that character's colour, which removes the
+     * "one block at a time" stepping even when the player only reports its position twice a
+     * second.
+     *
+     * No duration is invented: when the next timestamp is missing or malformed the word is
+     * simply shown complete at its own start.
+     *
+     * @param lineEndMs start of the next lyric line, used only as the end of the last word.
+     */
+    fun sungFraction(
+        words: List<TimedWord>,
+        positionMs: Long,
+        lineEndMs: Long
+    ): Float {
+        if (words.isEmpty()) return 0f
+        val index = wordIndexAt(words, positionMs)
+        if (index < 0) return 0f
+
+        val word = words[index]
+        val before = sungLength(words, index - 1).toFloat()
+        val length = word.text.length
+        if (length == 0) return before
+
+        val start = word.startMs
+        val nextStart = words.getOrNull(index + 1)?.startMs ?: -1L
+        val end = when {
+            index < words.size - 1 && nextStart > start -> nextStart
+            lineEndMs > start -> lineEndMs
+            else -> -1L
+        }
+        if (end <= start) return before + length
+
+        val progress = ((positionMs - start).toDouble() / (end - start).toDouble())
+            .coerceIn(0.0, 1.0)
+        return before + (length * progress).toFloat()
+    }
+
     private fun tagTimeMs(match: MatchResult): Long {
         val groups = match.groupValues
         // The first alternative is <hh:mm:ss.xx>, the second <mm:ss.xx>.

@@ -97,13 +97,47 @@ object Settings {
     var floatingTextShadow by BooleanSetting(getKey(R.string.setting_key_floating_text_shadow), true)
 
     /**
-     * A global lyrics calibration in milliseconds, added to (or subtracted from) the song position
-     * before the highlighted line is chosen. Positive values delay the lyrics, negative ones show
-     * them earlier, so the words can be lined up with what is actually heard. Set from the +/- bar
-     * in the player panel.
+     * Word by word rendering. When on, lyrics with real word timestamps are painted as a
+     * continuous character wipe; when off, the active line is highlighted as a whole. Lyrics
+     * without word timings always fall back to the whole line.
+     *
+     * This used to be a clickable badge above the lyrics. It belongs in settings: a head unit
+     * should not have a small tap target next to the words the driver is reading.
      */
     @JvmStatic
-    var lyricsOffsetMs by IntSetting(getKey(R.string.setting_key_lyrics_offset), 0)
+    var wordByWordLyrics by BooleanSetting(
+        getKey(R.string.setting_key_word_by_word_lyrics), true
+    )
+
+    /**
+     * Whether the small source badge ("LRCLIB", "Navidrome", ...) is shown at all. Off by
+     * default: the badge used to double as a refresh button and got in the way of the lyrics.
+     * Refreshing is now an explicit action in settings.
+     */
+    @JvmStatic
+    var showLyricsSourceBadge by BooleanSetting(
+        getKey(R.string.setting_key_show_lyrics_source_badge), false
+    )
+
+    /**
+     * Bumped by the "Search lyrics again" action in settings. The player pane, the full screen
+     * player and the floating window compare this value on their normal refresh and re-run the
+     * online lookup with forceRefresh, so the old badge's tap-to-refresh behaviour is kept
+     * without putting a button on top of the lyrics.
+     */
+    @JvmStatic
+    var lyricsReloadToken by LongSetting(
+        getKey(R.string.setting_key_lyrics_reload_token), 0L
+    )
+
+    /**
+     * Show the "next track" announcement in the song title area from 10 s to 20 s and during
+     * the last 15 s of a song. Pure presentation; no playback state is changed.
+     */
+    @JvmStatic
+    var showNextTrackHint by BooleanSetting(
+        getKey(R.string.setting_key_show_next_track_hint), true
+    )
 
     /**
      * Lyrics font size in sp, shared by the right-hand player pane, the full-screen player and the

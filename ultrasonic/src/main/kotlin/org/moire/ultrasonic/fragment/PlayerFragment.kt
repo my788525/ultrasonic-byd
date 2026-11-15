@@ -116,6 +116,7 @@ import org.moire.ultrasonic.util.CancellationToken
 import org.moire.ultrasonic.util.CommunicationError
 import org.moire.ultrasonic.util.ConfirmationDialog
 import org.moire.ultrasonic.util.LyricsLoader
+import org.moire.ultrasonic.util.NowPlayingHint
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.Util
 import org.moire.ultrasonic.util.Util.toast
@@ -181,6 +182,16 @@ class PlayerFragment :
     private var lyricsTextView: TextView? = null
     private var lyricsTrackId: String? = null
     private var syncedLyrics: SyncedLyricsView? = null
+
+    /** Header state for the temporary "next track" announcement. */
+    private var showingNextHint = false
+    private var shownNextTrackId: String? = null
+    private var baseTitle: CharSequence? = null
+    private var baseArtist: CharSequence? = null
+    private var baseAlbum: CharSequence? = null
+
+    /** Watches the settings action that asks for a fresh online lookup. */
+    private var lastReloadToken = 0L
     private lateinit var emptyTextView: TextView
     private lateinit var emptyView: ConstraintLayout
     private lateinit var songTitleTextView: TextView
@@ -615,6 +626,7 @@ class PlayerFragment :
             updateModeTabs()
         }
 
+        lastReloadToken = Settings.lyricsReloadToken
         val handler = Handler(Looper.getMainLooper())
         val runnable = Runnable { handler.post { update(cancellationToken) } }
         executorService = Executors.newSingleThreadScheduledExecutor()
@@ -641,9 +653,11 @@ class PlayerFragment :
     override fun onPause() {
         super.onPause()
         executorService.shutdown()
+        syncedLyrics?.stopAnimation()
     }
 
     override fun onDestroyView() {
+        syncedLyrics?.stopAnimation()
         rxBusSubscription.dispose()
         ratingSubscription?.dispose()
         ratingSubscription = null
@@ -1043,8 +1057,8 @@ class PlayerFragment :
                     )
                     synced.setLyrics(result.text, result.lines)
                     synced.update(
-                        (mediaPlayerManager.playerPosition.toLong() - Settings.lyricsOffsetMs)
-                            .coerceAtLeast(0L)
+                        mediaPlayerManager.playerPosition.toLong().coerceAtLeast(0L),
+                        mediaPlayerManager.isPlaying
                     )
                 }
             }
@@ -1363,6 +1377,7 @@ class PlayerFragment :
         }
 
         updateSongRatingDisplay()
+        captureBaseHeader()
 
         updateMediaButtonActivationState()
     }
@@ -1396,8 +1411,56 @@ class PlayerFragment :
         val progress = mediaPlayerManager.bufferedPercentage
         updateBufferProgress(playbackState, progress)
 
-        // Follow the playback position in the lyrics page (apply manual offset calibration)
-        syncedLyrics?.update((millisPlayed.toLong() - Settings.lyricsOffsetMs).coerceAtLeast(0))
+        // The view interpolates the wipe between these 500 ms reports, so it only needs the
+        // real playback position and whether the song is actually playing.
+        syncedLyrics?.update(millisPlayed.toLong(), mediaPlayerManager.isPlaying)
+        renderHeaderHint(millisPlayed, duration)
+
+        // "Search lyrics again" in settings bumps a token instead of putting a button over
+        // the words. Every lyrics surface watches it on its normal refresh.
+        val token = Settings.lyricsReloadToken
+        if (token != lastReloadToken) {
+            lastReloadToken = token
+            if (playlistFlipper.displayedChild == LYRICS_PAGE) {
+                loadLyrics(currentSong, forceRefresh = true)
+            }
+        }
+    }
+
+    /** Remembers the current song's header so the next-track hint can restore it verbatim. */
+    private fun captureBaseHeader() {
+        baseTitle = songTitleTextView.text
+        baseArtist = artistTextView.text
+        baseAlbum = albumTextView.text
+        showingNextHint = false
+        shownNextTrackId = null
+    }
+
+    /**
+     * Temporarily announces the next track in the song title area: from 10 s to 20 s and
+     * during the last 15 s. Outside those windows the current song's own header comes back.
+     */
+    private fun renderHeaderHint(positionMs: Int, durationMs: Int) {
+        val hint = if (currentSong != null && Settings.showNextTrackHint &&
+            NowPlayingHint.shouldShowNext(positionMs, durationMs)
+        ) {
+            runCatching { NowPlayingHint.nextTrack(mediaPlayerManager) }.getOrNull()
+        } else {
+            null
+        }
+        if (hint?.id == shownNextTrackId && (hint != null) == showingNextHint) return
+        showingNextHint = hint != null
+        shownNextTrackId = hint?.id
+
+        if (hint != null) {
+            songTitleTextView.text = NowPlayingHint.title(requireContext(), hint)
+            artistTextView.text = NowPlayingHint.subtitle(requireContext(), hint)
+            albumTextView.text = null
+        } else {
+            songTitleTextView.text = baseTitle
+            artistTextView.text = baseArtist
+            albumTextView.text = baseAlbum
+        }
     }
 
     private fun updateTitle(playbackState: Int) {
