@@ -21,7 +21,12 @@ data class TimedLyric(
     val startMs: Long,
     val text: String,
     /** Word level timing when the source has it; empty for ordinary line synced lyrics. */
-    val words: List<TimedWord> = emptyList()
+    val words: List<TimedWord> = emptyList(),
+    /**
+     * Optional Chinese (or other language) translation shown under the original line.
+     * It is never part of [text], so the word level wipe still only covers the sung words.
+     */
+    val translation: String? = null
 )
 
 /**

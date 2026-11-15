@@ -101,6 +101,19 @@
             a:visibility="gone"
             tools:text="Buffering …"
             tools:visibility="visible" />
+
+        <!-- One tap gives the lyrics the whole screen, a second one restores the library on
+             the left. The button stays in the header so it is always reachable. -->
+        <ImageButton
+            a:id="@+id/pane_fullscreen"
+            a:layout_width="44dp"
+            a:layout_height="44dp"
+            a:layout_marginStart="4dp"
+            a:background="@drawable/car_control_bg"
+            a:contentDescription="@string/player_fullscreen_enter"
+            a:padding="9dp"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_fullscreen_enter" />
     </LinearLayout>
 
     <!-- The lyrics and the queue share the same stage. Only one of them is shown, so

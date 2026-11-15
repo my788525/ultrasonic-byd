@@ -488,9 +488,20 @@
             a:title="@string/settings_car_preload_title"
             app:iconSpaceReserved="false"/>
     </PreferenceCategory>
+    <!-- Every lyric parameter a driver can reasonably want to tune lives here. The three
+         groups separate how the words look, whether a translation is shown, and where the
+         words come from. Visual changes are picked up by the running player without a restart. -->
     <PreferenceCategory
-        a:title="@string/lyrics_category_title"
+        a:title="@string/lyrics_display_category_title"
         app:iconSpaceReserved="false">
+        <ListPreference
+            a:defaultValue="auto"
+            a:entries="@array/lyricsDisplayModeNames"
+            a:entryValues="@array/lyricsDisplayModeValues"
+            a:key="@string/setting_key.lyrics_display_mode"
+            a:summary="@string/lyrics_display_mode_summary"
+            a:title="@string/lyrics_display_mode_title"
+            app:iconSpaceReserved="false"/>
         <SeekBarPreference
             a:defaultValue="20"
             a:key="@string/setting_key.lyrics_font_size"
@@ -501,11 +512,130 @@
             app:min="12"
             app:seekBarIncrement="1"
             app:showSeekBarValue="true"/>
+        <ListPreference
+            a:defaultValue="start"
+            a:entries="@array/lyricsAlignmentNames"
+            a:entryValues="@array/lyricsAlignmentValues"
+            a:key="@string/setting_key.lyrics_alignment"
+            a:summary="@string/lyrics_alignment_summary"
+            a:title="@string/lyrics_alignment_title"
+            app:iconSpaceReserved="false"/>
+        <SeekBarPreference
+            a:defaultValue="12"
+            a:key="@string/setting_key.lyrics_line_spacing"
+            a:max="28"
+            a:summary="@string/lyrics_line_spacing_summary"
+            a:title="@string/lyrics_line_spacing_title"
+            app:iconSpaceReserved="false"
+            app:min="0"
+            app:seekBarIncrement="1"
+            app:showSeekBarValue="true"/>
+        <SeekBarPreference
+            a:defaultValue="38"
+            a:key="@string/setting_key.lyrics_current_line_anchor"
+            a:max="70"
+            a:summary="@string/lyrics_current_line_anchor_summary"
+            a:title="@string/lyrics_current_line_anchor_title"
+            app:iconSpaceReserved="false"
+            app:min="20"
+            app:seekBarIncrement="1"
+            app:showSeekBarValue="true"/>
+        <SeekBarPreference
+            a:defaultValue="42"
+            a:key="@string/setting_key.lyrics_inactive_alpha"
+            a:max="100"
+            a:summary="@string/lyrics_inactive_alpha_summary"
+            a:title="@string/lyrics_inactive_alpha_title"
+            app:iconSpaceReserved="false"
+            app:min="20"
+            app:seekBarIncrement="1"
+            app:showSeekBarValue="true"/>
+        <ListPreference
+            a:defaultValue="30"
+            a:entries="@array/lyricsWipeFpsNames"
+            a:entryValues="@array/lyricsWipeFpsValues"
+            a:key="@string/setting_key.lyrics_wipe_fps"
+            a:summary="@string/lyrics_wipe_fps_summary"
+            a:title="@string/lyrics_wipe_fps_title"
+            app:iconSpaceReserved="false"/>
+        <SeekBarPreference
+            a:defaultValue="130"
+            a:key="@string/setting_key.lyrics_fullscreen_font_scale"
+            a:max="180"
+            a:summary="@string/lyrics_fullscreen_font_scale_summary"
+            a:title="@string/lyrics_fullscreen_font_scale_title"
+            app:iconSpaceReserved="false"
+            app:min="100"
+            app:seekBarIncrement="5"
+            app:showSeekBarValue="true"/>
         <CheckBoxPreference
             a:defaultValue="true"
-            a:key="@string/setting_key.word_by_word_lyrics"
-            a:summary="@string/lyrics_word_by_word_summary"
-            a:title="@string/lyrics_word_by_word_title"
+            a:key="@string/setting_key.lyrics_auto_scroll"
+            a:summary="@string/lyrics_auto_scroll_summary"
+            a:title="@string/lyrics_auto_scroll_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="true"
+            a:key="@string/setting_key.lyrics_bold_current"
+            a:summary="@string/lyrics_bold_current_summary"
+            a:title="@string/lyrics_bold_current_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="true"
+            a:key="@string/setting_key.show_player_fullscreen_button"
+            a:summary="@string/player_fullscreen_button_summary"
+            a:title="@string/player_fullscreen_button_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="false"
+            a:key="@string/setting_key.show_lyrics_source_badge"
+            a:summary="@string/lyrics_source_badge_summary"
+            a:title="@string/lyrics_source_badge_title"
+            app:iconSpaceReserved="false"/>
+    </PreferenceCategory>
+    <PreferenceCategory
+        a:title="@string/lyrics_translation_category_title"
+        app:iconSpaceReserved="false">
+        <ListPreference
+            a:defaultValue="show"
+            a:entries="@array/lyricsTranslationModeNames"
+            a:entryValues="@array/lyricsTranslationModeValues"
+            a:key="@string/setting_key.lyrics_translation_mode"
+            a:summary="@string/lyrics_translation_mode_summary"
+            a:title="@string/lyrics_translation_mode_title"
+            app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="false"
+            a:key="@string/setting_key.online_lyrics_translation"
+            a:summary="@string/lyrics_online_translation_summary"
+            a:title="@string/lyrics_online_translation_title"
+            app:iconSpaceReserved="false"/>
+        <SeekBarPreference
+            a:defaultValue="80"
+            a:key="@string/setting_key.lyrics_translation_font_scale"
+            a:max="120"
+            a:summary="@string/lyrics_translation_font_scale_summary"
+            a:title="@string/lyrics_translation_font_scale_title"
+            app:iconSpaceReserved="false"
+            app:min="50"
+            app:seekBarIncrement="5"
+            app:showSeekBarValue="true"/>
+        <Preference
+            a:key="@string/setting_key.lyrics_translation_clear"
+            a:summary="@string/lyrics_translation_clear_summary"
+            a:title="@string/lyrics_translation_clear_title"
+            app:iconSpaceReserved="false"/>
+    </PreferenceCategory>
+    <PreferenceCategory
+        a:title="@string/lyrics_source_category_title"
+        app:iconSpaceReserved="false">
+        <ListPreference
+            a:defaultValue="online"
+            a:entries="@array/lyricsSourcePriorityNames"
+            a:entryValues="@array/lyricsSourcePriorityValues"
+            a:key="@string/setting_key.lyrics_source_priority"
+            a:summary="@string/lyrics_source_priority_summary"
+            a:title="@string/lyrics_source_priority_title"
             app:iconSpaceReserved="false"/>
         <CheckBoxPreference
             a:defaultValue="true"
@@ -530,12 +660,6 @@
             a:key="@string/setting_key.prefetch_lyrics"
             a:summary="@string/lyrics_prefetch_summary"
             a:title="@string/lyrics_prefetch_title"
-            app:iconSpaceReserved="false"/>
-        <CheckBoxPreference
-            a:defaultValue="false"
-            a:key="@string/setting_key.show_lyrics_source_badge"
-            a:summary="@string/lyrics_source_badge_summary"
-            a:title="@string/lyrics_source_badge_title"
             app:iconSpaceReserved="false"/>
         <CheckBoxPreference
             a:defaultValue="true"

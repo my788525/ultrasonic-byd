@@ -28,6 +28,7 @@ import android.os.Looper
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.util.TypedValue
 import android.view.ContextThemeWrapper
@@ -205,6 +206,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private var lastReloadToken = 0L
     private var lyricsTrackId: String? = null
     private var timedLyrics: List<TimedLyric> = emptyList()
+
+    /** Last applied lyric display settings, so the floating block rebuilds on a settings edit. */
+    private var lastLyricAppearance = 0
     private var lyricIndex = -1
 
     /** True while the playback waits for the network to come back. */
@@ -1783,6 +1787,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      * what the floating window is for. The minimal tier shows only the current and the next line.
      */
     private fun updateFloatingLyrics(positionMs: Long) {
+        syncLyricAppearance()
+
         // While the music waits for the network the lyrics would stand still anyway, so the
         // window shows the reason instead of a frozen line.
         if (waitingForNetwork) {
@@ -1843,6 +1849,24 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         )
     }
 
+    /**
+     * Applies the shared lyric font size and forces a rebuild when any display setting (most
+     * importantly the translation mode) changed while the window was already on screen.
+     */
+    private fun syncLyricAppearance() {
+        val signature = Settings.lyricsAppearanceSignature()
+        if (signature == lastLyricAppearance) return
+        lastLyricAppearance = signature
+        val sp = Settings.lyricsFontSizeSp.coerceIn(12, 30).toFloat()
+        lyricsView?.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+        lyricsMinView?.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp)
+        lyricIndex = -1
+    }
+
+    /**
+     * The compact window shows the same translations as the player. The translation is a
+     * smaller, dimmer line under its original, or replaces the original in "translation only".
+     */
     private fun buildLyricBlock(
         lines: List<TimedLyric>,
         highlightIndex: Int,
@@ -1850,9 +1874,13 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         dim: Int
     ): CharSequence {
         val builder = SpannableStringBuilder()
+        val mode = Settings.lyricsTranslationMode
+        val translationScale = Settings.lyricsTranslationFontScale / 100f
         lines.forEachIndexed { index, line ->
+            val translation = line.translation?.trim()?.takeIf { it.isNotBlank() }
+            val shown = if (mode == "only" && translation != null) translation else line.text
             val start = builder.length
-            builder.append(line.text)
+            builder.append(shown)
             val highlight = index == highlightIndex
             builder.setSpan(
                 ForegroundColorSpan(if (highlight) accent else dim),
@@ -1863,6 +1891,23 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             if (highlight) {
                 builder.setSpan(
                     StyleSpan(Typeface.BOLD), start, builder.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            if (mode == "show" && translation != null) {
+                builder.append('\n')
+                val subStart = builder.length
+                builder.append(translation)
+                builder.setSpan(
+                    ForegroundColorSpan(dim),
+                    subStart,
+                    builder.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                builder.setSpan(
+                    RelativeSizeSpan(translationScale),
+                    subStart,
+                    builder.length,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
                 )
             }
             if (index != lines.lastIndex) builder.append('\n')

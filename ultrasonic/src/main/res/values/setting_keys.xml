@@ -81,7 +81,21 @@
     <string name="setting_key.floating_idle_brightness" translatable="false">floatingIdleBrightness</string>
     <string name="setting_key.floating_text_color" translatable="false">floatingTextColor</string>
     <string name="setting_key.floating_text_shadow" translatable="false">floatingTextShadow</string>
-    <string name="setting_key.word_by_word_lyrics" translatable="false">wordByWordLyrics</string>
+    <string name="setting_key.lyrics_display_mode" translatable="false">lyricsDisplayMode</string>
+    <string name="setting_key.lyrics_alignment" translatable="false">lyricsAlignment</string>
+    <string name="setting_key.lyrics_line_spacing" translatable="false">lyricsLineSpacingDp</string>
+    <string name="setting_key.lyrics_current_line_anchor" translatable="false">lyricsCurrentLineAnchor</string>
+    <string name="setting_key.lyrics_inactive_alpha" translatable="false">lyricsInactiveAlpha</string>
+    <string name="setting_key.lyrics_auto_scroll" translatable="false">lyricsAutoScroll</string>
+    <string name="setting_key.lyrics_bold_current" translatable="false">lyricsBoldCurrent</string>
+    <string name="setting_key.lyrics_wipe_fps" translatable="false">lyricsWipeFps</string>
+    <string name="setting_key.lyrics_fullscreen_font_scale" translatable="false">lyricsFullscreenFontScale</string>
+    <string name="setting_key.show_player_fullscreen_button" translatable="false">showPlayerFullscreenButton</string>
+    <string name="setting_key.lyrics_translation_mode" translatable="false">lyricsTranslationMode</string>
+    <string name="setting_key.online_lyrics_translation" translatable="false">onlineLyricsTranslation</string>
+    <string name="setting_key.lyrics_translation_font_scale" translatable="false">lyricsTranslationFontScale</string>
+    <string name="setting_key.lyrics_translation_clear" translatable="false">lyricsTranslationClear</string>
+    <string name="setting_key.lyrics_source_priority" translatable="false">lyricsSourcePriority</string>
     <string name="setting_key.show_lyrics_source_badge" translatable="false">showLyricsSourceBadge</string>
     <string name="setting_key.lyrics_reload_token" translatable="false">lyricsReloadToken</string>
     <string name="setting_key.lyrics_reload_now" translatable="false">lyricsReloadNow</string>

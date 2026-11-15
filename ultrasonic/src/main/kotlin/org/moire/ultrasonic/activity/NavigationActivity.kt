@@ -107,6 +107,9 @@ class NavigationActivity : ScopeActivity() {
 
     private var nowPlayingView: FragmentContainerView? = null
     private var playerPane: FrameLayout? = null
+    private var navHostView: View? = null
+    private var toolbarView: View? = null
+    private var playerFullscreen = false
     private var nowPlayingHidden = false
     private var navigationView: NavigationView? = null
     private var drawerLayout: DrawerLayout? = null
@@ -134,6 +137,7 @@ class NavigationActivity : ScopeActivity() {
         /** Below this width two panes would squeeze the list too much. */
         private const val TWO_PANE_MIN_WIDTH_DP = 720
         private const val PLAYER_PANE_TAG = "twoPanePlayer"
+        private const val STATE_PLAYER_FULLSCREEN = "byd.playerFullscreen"
 
         /** How long a media key has to be held before it turns into a seek. */
         private const val LONG_PRESS_MS = 600L
@@ -179,15 +183,22 @@ class NavigationActivity : ScopeActivity() {
         CarTheme.applyWindow(this)
         lastNightMode = CarTheme.isNight(this)
 
+        playerFullscreen = savedInstanceState?.getBoolean(STATE_PLAYER_FULLSCREEN, false) ?: false
+
         nowPlayingView = findViewById(R.id.now_playing_fragment)
         playerPane = findViewById(R.id.player_pane)
+        navHostView = findViewById(R.id.nav_host_fragment)
         navigationView = findViewById(R.id.nav_view)
         drawerLayout = findViewById(R.id.drawer_layout)
 
         setupDrawerLayout(drawerLayout!!)
+        // Registered after the drawer callback, so while the player is fullscreen the back
+        // button returns to the two panes first instead of only closing a drawer.
+        onBackPressedDispatcher.addCallback(this, exitFullscreenOnBack)
         applyNavigationBarInset()
 
         val toolbar = findViewById<Toolbar>(R.id.toolbar)
+        toolbarView = toolbar
         setSupportActionBar(toolbar)
 
         host = supportFragmentManager
@@ -316,6 +327,10 @@ class NavigationActivity : ScopeActivity() {
 
         UiState.twoPane = enabled
         pane.visibility = if (enabled) View.VISIBLE else View.GONE
+        // A narrow or split screen cannot hold a fullscreen player pane. Leaving fullscreen
+        // here keeps the layout consistent when the head unit rotates or enters multi window.
+        if (!enabled) playerFullscreen = false
+        applyPlayerFullscreen(showToast = false)
 
         val fragmentManager = supportFragmentManager
         val existing = fragmentManager.findFragmentById(R.id.player_pane)
@@ -335,6 +350,43 @@ class NavigationActivity : ScopeActivity() {
         } else if (!nowPlayingHidden) {
             showNowPlaying()
         }
+    }
+
+    /**
+     * One-tap "cinema" mode for the lyrics: the right hand player pane takes the whole content
+     * area, the library on the left and the toolbar step aside, and the same button (or the
+     * back key) restores the two pane layout. The lyric font is enlarged by the pane itself,
+     * following its own setting.
+     */
+    fun togglePlayerFullscreen() {
+        if (!UiState.twoPane) return
+        playerFullscreen = !playerFullscreen
+        applyPlayerFullscreen(showToast = true)
+    }
+
+    fun isPlayerFullscreen(): Boolean = playerFullscreen
+
+    private fun applyPlayerFullscreen(showToast: Boolean) {
+        val full = playerFullscreen && UiState.twoPane
+        UiState.playerFullscreen = full
+        navHostView?.visibility = if (full) View.GONE else View.VISIBLE
+        toolbarView?.visibility = if (full) View.GONE else View.VISIBLE
+        exitFullscreenOnBack.isEnabled = full
+        // The pane also polls UiState, so a fragment transaction that is still pending cannot
+        // leave the button showing the wrong icon.
+        (supportFragmentManager.findFragmentByTag(PLAYER_PANE_TAG) as? PlayerPaneFragment)
+            ?.onFullscreenChanged(full)
+        if (showToast) {
+            Util.toast(
+                if (full) R.string.player_fullscreen_on else R.string.player_fullscreen_off,
+                context = this
+            )
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_PLAYER_FULLSCREEN, playerFullscreen)
     }
 
     /**
@@ -777,6 +829,14 @@ class NavigationActivity : ScopeActivity() {
 
     private fun setupActionBar(navController: NavController, appBarConfig: AppBarConfiguration) {
         setupActionBarWithNavController(navController, appBarConfig)
+    }
+
+    /** The hardware/back gesture leaves fullscreen lyrics before doing anything else. */
+    private val exitFullscreenOnBack = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            playerFullscreen = false
+            applyPlayerFullscreen(showToast = false)
+        }
     }
 
     private val closeNavigationDrawerOnBack = object : OnBackPressedCallback(true) {

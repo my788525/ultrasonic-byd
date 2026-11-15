@@ -192,6 +192,7 @@ class PlayerFragment :
 
     /** Watches the settings action that asks for a fresh online lookup. */
     private var lastReloadToken = 0L
+    private var lastAppearanceSignature = 0
     private lateinit var emptyTextView: TextView
     private lateinit var emptyView: ConstraintLayout
     private lateinit var songTitleTextView: TextView
@@ -258,7 +259,7 @@ class PlayerFragment :
                 view.findViewById(R.id.player_lyrics_source)
             ).apply {
                 setAccentColor(CarTheme.color(requireContext(), CarPalette.current().accent))
-                setFontSizeSp(Settings.lyricsFontSizeSp)
+                applySettings(Settings.lyricsFontSizeSp)
             }
         }
         emptyTextView = view.findViewById(R.id.empty_list_text)
@@ -614,9 +615,10 @@ class PlayerFragment :
     override fun onResume() {
         super.onResume()
         view?.let { applyPalette(it) }
-        // The lyrics font size is a global setting; re-apply it so a change made in the settings
-        // (while this fragment was in the background) is reflected without restarting playback.
-        syncedLyrics?.setFontSizeSp(Settings.lyricsFontSizeSp)
+        // Every lyric display parameter is re-applied on resume, so a change made in settings
+        // (while this fragment was in the background) is visible without restarting playback.
+        lastAppearanceSignature = Settings.lyricsAppearanceSignature()
+        syncedLyrics?.applySettings(Settings.lyricsFontSizeSp)
         if (mediaPlayerManager.currentMediaItem == null) {
             showPage(QUEUE_PAGE)
         } else {
@@ -1424,6 +1426,14 @@ class PlayerFragment :
             if (playlistFlipper.displayedChild == LYRICS_PAGE) {
                 loadLyrics(currentSong, forceRefresh = true)
             }
+        }
+
+        // Visual settings are applied in place; no new lookup is needed for a font, alignment
+        // or translation display change.
+        val appearance = Settings.lyricsAppearanceSignature()
+        if (appearance != lastAppearanceSignature) {
+            lastAppearanceSignature = appearance
+            syncedLyrics?.applySettings(Settings.lyricsFontSizeSp)
         }
     }
 

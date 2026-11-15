@@ -4,7 +4,6 @@
  *
  * Distributed under terms of the GNU GPLv3 license.
  */
-
 package org.moire.ultrasonic.ui
 
 import android.graphics.Color
@@ -17,6 +16,7 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
 import android.text.style.StyleSpan
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.widget.ScrollView
 import android.widget.TextView
@@ -26,26 +26,29 @@ import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.util.LyricsParser
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.TimedLyric
+import org.moire.ultrasonic.util.TimedWord
 import org.moire.ultrasonic.util.WordLyricsParser
 import timber.log.Timber
 
 /**
- * Shows lyrics that follow the song, one line at a time or word by word.
+ * Shows lyrics that follow the song, synced line by line or word by word, optionally with a
+ * translation line under each original.
  *
  * Word level lyrics are painted as a *continuous* wipe instead of lighting up one whole word at
  * a time: [WordLyricsParser.sungFraction] interpolates the playback position between two real
- * word timestamps and returns a fractional character position. The fully sung characters take
- * the accent colour, the character being sung right now takes a blended colour that moves from
- * dim to accent, and the rest stays dim. A ~30 fps self driven animation interpolates between
- * the (500 ms) position updates coming from the player, so the wipe advances smoothly even
- * though the rest of the UI only refreshes twice a second.
- *
- * Only three colour spans on the active line change per frame. The text is never re-set for a
+ * word timestamps and returns a fractional character position. A self driven animation (15, 30
+ * or 60 fps, chosen in settings) interpolates between the 500 ms position reports of the player.
+ * Only three colour spans on the active line change per frame; the text is never re-set for a
  * word change, so there is no measure/layout pass and the smooth scroll is not restarted.
  *
- * The same helper drives the lyrics page of the player and the right hand pane, so both look
- * identical. Word by word rendering can be turned off in settings; the view then highlights
- * whole lines, which is also the fallback for lyrics without word timings.
+ * Every visual parameter is read from [Settings]: display mode (auto / word / synced), font
+ * size, alignment, line spacing, the on-screen position of the active line, the brightness of
+ * the inactive lines, whether to auto scroll, whether to emphasise the active line, the frame
+ * rate and the translation mode / size. [applySettings] is called by the hosting fragments on
+ * their normal refresh, so a change in settings is visible as soon as the driver returns.
+ *
+ * A translation is a separate, smaller line under the original. It is never part of the sung
+ * text, so the karaoke wipe still covers exactly the words that are heard.
  */
 class SyncedLyricsView(
     private val scroll: View?,
@@ -54,8 +57,19 @@ class SyncedLyricsView(
     private val sourceBadge: TextView? = null
 ) {
 
+    /** One rendered lyric: the sung text, its word timeline and an optional translation. */
+    private data class DisplayLine(
+        val main: String,
+        val words: List<TimedWord>,
+        val sub: String?
+    )
+
+    /** Real time axis, used only to decide which line is active. */
     private var lines: List<TimedLyric> = emptyList()
+    private var display: List<DisplayLine> = emptyList()
     private var lineStarts: IntArray = IntArray(0)
+    private var subStarts: IntArray = IntArray(0)
+    private var subEnds: IntArray = IntArray(0)
 
     /**
      * The *displayed* spannable. TextView.setText(..., SPANNABLE) copies its argument, so this
@@ -68,6 +82,7 @@ class SyncedLyricsView(
     private var currentTrackId: String? = null
     private var lastPositionMs = 0L
     private var lastWipeFraction = INVALID_FRACTION
+    private var currentSourceLabel: CharSequence? = null
 
     /** The three spans that make up the wipe on the active line. Replaced in place each frame. */
     private val wipeSpans = ArrayList<ForegroundColorSpan>()
@@ -93,7 +108,7 @@ class SyncedLyricsView(
             // Only the wipe is interpolated. Switching lines on an extrapolated position
             // would let a delayed player report pull the highlight back one line.
             renderAt(anchorPositionMs + lead, allowLineChange = false)
-            if (animating) textView.postDelayed(this, FRAME_INTERVAL_MS)
+            if (animating) textView.postDelayed(this, frameIntervalMs())
         }
     }
 
@@ -102,7 +117,15 @@ class SyncedLyricsView(
 
     /** True when at least one line carries real word timings. */
     val hasWordTimedLyrics: Boolean
-        get() = lines.any { it.words.isNotEmpty() }
+        get() = display.any { it.words.isNotEmpty() }
+
+    /** Whether the karaoke wipe is enabled for the current settings and lyrics. */
+    private val wipeEnabled: Boolean
+        get() = when (Settings.lyricsDisplayMode) {
+            "synced" -> false
+            "word" -> true
+            else -> hasWordTimedLyrics
+        } && hasWordTimedLyrics
 
     fun setAccentColor(color: Int) {
         if (accentColor == color) return
@@ -118,7 +141,13 @@ class SyncedLyricsView(
 
     /** Shows where the lyrics came from. Hidden entirely unless the setting is enabled. */
     fun setSourceLabel(label: CharSequence?) {
+        currentSourceLabel = label
+        renderSourceBadge()
+    }
+
+    private fun renderSourceBadge() {
         val badge = sourceBadge ?: return
+        val label = currentSourceLabel
         if (!Settings.showLyricsSourceBadge || label.isNullOrBlank()) {
             badge.visibility = View.GONE
             return
@@ -133,7 +162,10 @@ class SyncedLyricsView(
     fun showPlaceholder(text: CharSequence) {
         stopAnimation()
         lines = emptyList()
+        display = emptyList()
         lineStarts = IntArray(0)
+        subStarts = IntArray(0)
+        subEnds = IntArray(0)
         cachedBuilder = null
         currentIndex = -1
         lastWipeFraction = INVALID_FRACTION
@@ -143,14 +175,32 @@ class SyncedLyricsView(
         scroll?.scrollTo(0, 0)
     }
 
-    /** Sets the lyrics font size in sp. Applied to both timed and plain lyrics. */
-    fun setFontSizeSp(sp: Int) {
-        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp.toFloat())
+    /**
+     * Applies every visual setting at once. [fontSp] is supplied by the caller because the
+     * right hand pane enlarges the lyrics while it is fullscreen.
+     *
+     * Rebuilding the display here (and not only on a new download) is what makes the
+     * "original + translation / translation only / original only" switch instant.
+     */
+    fun applySettings(fontSp: Int = Settings.lyricsFontSizeSp) {
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, fontSp.toFloat())
+        textView.gravity = when (Settings.lyricsAlignment) {
+            "center" -> Gravity.CENTER_HORIZONTAL
+            "end" -> Gravity.END
+            else -> Gravity.START
+        }
+        val spacingPx = Settings.lyricsLineSpacingDp *
+            textView.resources.displayMetrics.density
+        textView.setLineSpacing(spacingPx, 1f)
+        renderSourceBadge()
         if (lines.isNotEmpty()) {
-            // Changing the size changes the line wrap, so the highlight has to be laid out again.
-            redrawAll()
+            buildDisplay()
+            rebuildText()
         }
     }
+
+    /** Kept for callers that only want to set the size; delegates to [applySettings]. */
+    fun setFontSizeSp(sp: Int) = applySettings(sp)
 
     /** Replaces the shown lyrics. Timed lines are detected, everything else is shown verbatim. */
     fun setLyrics(raw: String?) {
@@ -173,7 +223,10 @@ class SyncedLyricsView(
 
         if (resolved.isEmpty()) {
             lines = emptyList()
+            display = emptyList()
             lineStarts = IntArray(0)
+            subStarts = IntArray(0)
+            subEnds = IntArray(0)
             cachedBuilder = null
             currentIndex = -1
             lastWipeFraction = INVALID_FRACTION
@@ -185,25 +238,57 @@ class SyncedLyricsView(
         }
 
         lines = resolved
-        val builder = SpannableStringBuilder()
-        lineStarts = IntArray(lines.size)
-        lines.forEachIndexed { index, line ->
-            lineStarts[index] = builder.length
-            builder.append(line.text)
-            builder.append('\n')
+        buildDisplay()
+        rebuildText()
+        Timber.d(
+            "Loaded %d timed lyric lines (%d word timed, %d translated)",
+            lines.size,
+            display.count { it.words.isNotEmpty() },
+            display.count { it.sub != null }
+        )
+    }
+
+    /** Turns the raw lines into what is actually put on screen, honouring the translation mode. */
+    private fun buildDisplay() {
+        val mode = Settings.lyricsTranslationMode
+        display = lines.map { line ->
+            val translation = line.translation?.trim()?.takeIf { it.isNotBlank() }
+            when {
+                mode == "only" && translation != null ->
+                    DisplayLine(translation, emptyList(), null)
+                mode == "show" && translation != null ->
+                    DisplayLine(line.text, line.words, translation)
+                else -> DisplayLine(line.text, line.words, null)
+            }
         }
-        cachedBuilder = builder
+    }
+
+    /** Builds the spannable from [display] and puts it on the TextView. */
+    private fun rebuildText() {
+        stopAnimation()
+        val builder = SpannableStringBuilder()
+        lineStarts = IntArray(display.size)
+        subStarts = IntArray(display.size) { -1 }
+        subEnds = IntArray(display.size)
+        display.forEachIndexed { index, line ->
+            lineStarts[index] = builder.length
+            builder.append(line.main)
+            builder.append('\n')
+            if (!line.sub.isNullOrBlank()) {
+                val subStart = builder.length
+                builder.append(line.sub)
+                subStarts[index] = subStart
+                subEnds[index] = builder.length
+                builder.append('\n')
+            }
+        }
         wipeSpans.clear()
         currentIndex = -1
         lastWipeFraction = INVALID_FRACTION
-
+        cachedBuilder = builder
         renderLines(-1)
         adoptDisplayedSpannable(builder)
-        Timber.d(
-            "Loaded %d timed lyric lines (%d with word timings)",
-            lines.size,
-            lines.count { it.words.isNotEmpty() }
-        )
+        renderAt(lastPositionMs)
     }
 
     /**
@@ -219,11 +304,7 @@ class SyncedLyricsView(
         }
         anchorPositionMs = positionMs
         anchorRealtimeMs = SystemClock.elapsedRealtime()
-        if (isPlaying && Settings.wordByWordLyrics && hasWordTimedLyrics) {
-            startAnimation()
-        } else {
-            stopAnimation()
-        }
+        if (isPlaying && wipeEnabled) restartAnimation() else stopAnimation()
         renderAt(positionMs)
     }
 
@@ -234,11 +315,19 @@ class SyncedLyricsView(
         textView.removeCallbacks(frameRunnable)
     }
 
-    private fun startAnimation() {
-        if (animating) return
-        animating = true
+    /**
+     * Re-anchors the frame loop on every player report. Besides preventing drift, this makes a
+     * frame rate change in settings take effect on the very next 500 ms tick.
+     */
+    private fun restartAnimation() {
         textView.removeCallbacks(frameRunnable)
-        textView.postDelayed(frameRunnable, FRAME_INTERVAL_MS)
+        animating = true
+        textView.postDelayed(frameRunnable, frameIntervalMs())
+    }
+
+    private fun frameIntervalMs(): Long {
+        val fps = Settings.lyricsWipeFps.toIntOrNull()?.coerceIn(10, 60) ?: 30
+        return (1_000L / fps).coerceIn(8L, 100L)
     }
 
     /** Called when the track changes, so the next position does not reuse the old highlight. */
@@ -248,7 +337,7 @@ class SyncedLyricsView(
         lastWipeFraction = INVALID_FRACTION
     }
 
-    /** Re-applies every span after a colour or font size change. */
+    /** Re-applies every span after a colour change. */
     private fun redrawAll() {
         if (cachedBuilder == null) return
         currentIndex = -1
@@ -268,9 +357,9 @@ class SyncedLyricsView(
             currentIndex = index
             lastWipeFraction = INVALID_FRACTION
             renderLines(index)
-            if (index in lines.indices) {
+            if (index in display.indices && Settings.lyricsBoldCurrent) {
                 val start = lineStarts[index]
-                val end = (start + lines[index].text.length).coerceAtMost(builder.length)
+                val end = (start + display[index].main.length).coerceAtMost(builder.length)
                 applyEmphasis(builder, start, end)
             }
             // A line change is the only moment the text is re-set; word changes never are.
@@ -278,11 +367,10 @@ class SyncedLyricsView(
             if (index >= 0) scrollWhenLayoutReady(index)
         }
 
-        val fraction = if (index in lines.indices &&
-            Settings.wordByWordLyrics &&
-            lines[index].words.isNotEmpty()
+        val fraction = if (index in display.indices && wipeEnabled &&
+            display[index].words.isNotEmpty()
         ) {
-            WordLyricsParser.sungFraction(lines[index].words, positionMs, lineEndMs(index))
+            WordLyricsParser.sungFraction(display[index].words, positionMs, lineEndMs(index))
         } else {
             WHOLE_LINE
         }
@@ -306,14 +394,14 @@ class SyncedLyricsView(
         val nextLine = lines.getOrNull(index + 1)?.startMs ?: -1L
         if (nextLine > line.startMs) return nextLine
         // Last line, or malformed timestamps: the last word is shown in full at its own start.
-        return line.words.lastOrNull()?.startMs ?: line.startMs
+        return display[index].words.lastOrNull()?.startMs ?: line.startMs
     }
 
     // -------------------------------------------------------------------------------------
     // Span painting
     // -------------------------------------------------------------------------------------
 
-    /** Colours of whole lines. Only runs when the active line changes. */
+    /** Colours of whole lines. Only runs when the active line changes or the text is rebuilt. */
     private fun renderLines(highlight: Int) {
         val builder = cachedBuilder ?: return
         // Only these three span types are ever attached, so a full sweep is both cheap and
@@ -327,22 +415,42 @@ class SyncedLyricsView(
         wipeSpans.clear()
 
         val base = baseRgb()
-        val inactive = withAlpha(base, INACTIVE_ALPHA)
+        val inactive = withAlpha(base, Settings.lyricsInactiveAlpha / 100f)
         val pending = withAlpha(base, PENDING_ALPHA)
         val sungLine = withAlpha(
             if (accentColor != 0) accentColor else base, SUNG_LINE_ALPHA
         )
+        val subInactive = withAlpha(base, (Settings.lyricsInactiveAlpha / 100f) * 0.85f)
+        val subActive = withAlpha(base, 0.92f)
+        val translationScale = Settings.lyricsTranslationFontScale / 100f
 
-        for (index in lines.indices) {
+        for (index in display.indices) {
             val start = lineStarts[index]
-            val end = (start + lines[index].text.length).coerceAtMost(builder.length)
-            if (end <= start) continue
-            when {
-                index < highlight -> applyColor(builder, sungLine, start, end)
-                index > highlight -> applyColor(builder, inactive, start, end)
-                highlight < 0 -> applyColor(builder, inactive, start, end)
-                // The active line starts dim; the wipe paints the sung part on top of it.
-                else -> applyColor(builder, pending, start, end)
+            val end = (start + display[index].main.length).coerceAtMost(builder.length)
+            if (end > start) {
+                when {
+                    index < highlight -> applyColor(builder, sungLine, start, end)
+                    index > highlight -> applyColor(builder, inactive, start, end)
+                    highlight < 0 -> applyColor(builder, inactive, start, end)
+                    // The active line starts dim; the wipe paints the sung part on top of it.
+                    else -> applyColor(builder, pending, start, end)
+                }
+            }
+            val subStart = subStarts[index]
+            val subEnd = subEnds[index]
+            if (subStart >= 0 && subEnd > subStart && subEnd <= builder.length) {
+                applyColor(
+                    builder,
+                    if (index == highlight) subActive else subInactive,
+                    subStart,
+                    subEnd
+                )
+                builder.setSpan(
+                    RelativeSizeSpan(translationScale),
+                    subStart,
+                    subEnd,
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
             }
         }
     }
@@ -359,10 +467,10 @@ class SyncedLyricsView(
         if (!force && abs(fraction - lastWipeFraction) < WIPE_EPSILON) return false
         lastWipeFraction = fraction
         clearWipeSpans(builder)
-        if (index !in lines.indices) return true
+        if (index !in display.indices) return true
 
         val start = lineStarts[index]
-        val end = (start + lines[index].text.length).coerceAtMost(builder.length)
+        val end = (start + display[index].main.length).coerceAtMost(builder.length)
         if (end <= start) return true
 
         val base = baseRgb()
@@ -396,12 +504,7 @@ class SyncedLyricsView(
         return true
     }
 
-    private fun applyColor(
-        builder: Spannable,
-        color: Int,
-        start: Int,
-        end: Int
-    ) {
+    private fun applyColor(builder: Spannable, color: Int, start: Int, end: Int) {
         if (end <= start) return
         builder.setSpan(
             ForegroundColorSpan(color), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -413,23 +516,14 @@ class SyncedLyricsView(
         wipeSpans.clear()
     }
 
-    private fun applyWipeColor(
-        builder: Spannable,
-        color: Int,
-        start: Int,
-        end: Int
-    ) {
+    private fun applyWipeColor(builder: Spannable, color: Int, start: Int, end: Int) {
         if (end <= start) return
         val span = ForegroundColorSpan(color)
         builder.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         wipeSpans.add(span)
     }
 
-    private fun applyEmphasis(
-        builder: Spannable,
-        start: Int,
-        end: Int
-    ) {
+    private fun applyEmphasis(builder: Spannable, start: Int, end: Int) {
         if (end <= start) return
         builder.setSpan(
             StyleSpan(Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -467,15 +561,9 @@ class SyncedLyricsView(
     // Scrolling (a rotation or a wrapped bilingual line must not shift the anchor)
     // -------------------------------------------------------------------------------------
 
-    /**
-     * Scrolls to the line once the text has been measured.
-     *
-     * A plain post() is not enough: it only puts the scroll at the end of the message queue,
-     * which can be before the measure and layout pass that builds the new layout. Without a
-     * layout the scroll silently does nothing, and because the line index is already updated
-     * the scroll is never retried.
-     */
+    /** Scrolls to the line once the text has been measured. */
     private fun scrollWhenLayoutReady(index: Int) {
+        if (!Settings.lyricsAutoScroll) return
         val attempt = object : Runnable {
             override fun run() {
                 val layout = textView.layout
@@ -495,24 +583,22 @@ class SyncedLyricsView(
         textView.postOnAnimation(attempt)
     }
 
-    /**
-     * Reserves enough room below the last line for it to still reach the highlight anchor.
-     * Without this the last lines of a song stay glued to the bottom of the pane.
-     *
-     * @return true when the padding changed and the layout needs another frame to settle.
-     */
+    /** Reserves enough room below the last line for it to still reach the highlight anchor. */
     private fun ensureTrailingSpace(): Boolean {
         val target = scroll ?: return false
         val viewport = target.height
         if (viewport <= 0) return false
         if (originalPaddingBottom < 0) originalPaddingBottom = textView.paddingBottom
-        val needed = (viewport * (1f - CURRENT_LINE_ANCHOR)).toInt()
+        val needed = (viewport * (1f - anchorFraction())).toInt()
         if (textView.paddingBottom >= needed) return false
         textView.setPadding(
             textView.paddingLeft, textView.paddingTop, textView.paddingRight, needed
         )
         return true
     }
+
+    private fun anchorFraction(): Float =
+        (Settings.lyricsCurrentLineAnchor / 100f).coerceIn(0.15f, 0.8f)
 
     private fun restorePaddingIfNeeded() {
         if (originalPaddingBottom >= 0 && textView.paddingBottom != originalPaddingBottom) {
@@ -535,7 +621,7 @@ class SyncedLyricsView(
         val textLine = layout.getLineForOffset(charOffset)
 
         val lineCenter = (layout.getLineTop(textLine) + layout.getLineBottom(textLine)) / 2
-        val anchor = (target.height * CURRENT_LINE_ANCHOR).toInt()
+        val anchor = (target.height * anchorFraction()).toInt()
         val offset = (contentOffsetY(target) + lineCenter - anchor).coerceAtLeast(0)
 
         when (target) {
@@ -564,16 +650,9 @@ class SyncedLyricsView(
     companion object {
         private const val HIGHLIGHT_SCALE = 1.15f
 
-        /** Where the current line sits inside the viewport: 0.5 = centre, 0.38 = slightly above. */
-        private const val CURRENT_LINE_ANCHOR = 0.38f
-
         /** Lines far from the current one recede; the sung line stays the brightest thing. */
-        private const val INACTIVE_ALPHA = 0.42f
         private const val PENDING_ALPHA = 0.75f
         private const val SUNG_LINE_ALPHA = 0.58f
-
-        /** ~30 fps is smooth enough for a wipe and much kinder to a head unit than every frame. */
-        private const val FRAME_INTERVAL_MS = 33L
 
         /** Never extrapolate further than one player update interval beyond the anchor. */
         private const val MAX_LEAD_MS = 600L

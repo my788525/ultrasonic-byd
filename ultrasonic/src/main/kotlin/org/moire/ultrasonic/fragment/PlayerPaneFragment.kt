@@ -33,6 +33,7 @@ import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.moire.ultrasonic.R
+import org.moire.ultrasonic.activity.NavigationActivity
 import org.moire.ultrasonic.adapters.QueueAdapter
 import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.service.MediaPlayerManager
@@ -47,6 +48,7 @@ import org.moire.ultrasonic.util.LyricsLoader
 import org.moire.ultrasonic.util.NowPlayingHint
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.SleepTimerManager
+import org.moire.ultrasonic.util.UiState
 import org.moire.ultrasonic.util.Util
 import org.moire.ultrasonic.util.toTrack
 import timber.log.Timber
@@ -89,6 +91,11 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var queueButton: ImageButton? = null
     private var queueAdapter: QueueAdapter? = null
     private var sleepButton: ImageButton? = null
+    private var fullscreenButton: ImageButton? = null
+
+    /** Last applied visual settings signature, so a change in settings is picked up at once. */
+    private var lastAppearanceSignature = 0
+    private var lastFullscreen = false
 
     /** The track whose lyrics are being shown, kept for the "search again" action in settings. */
     private var lyricsTrack: Track? = null
@@ -164,14 +171,25 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         queueView = view.findViewById(R.id.pane_queue)
         queueButton = view.findViewById(R.id.pane_queue_button)
         sleepButton = view.findViewById(R.id.pane_sleep)
+        fullscreenButton = view.findViewById(R.id.pane_fullscreen)
 
         lastReloadToken = Settings.lyricsReloadToken
 
         headerCard?.setOnClickListener {
+            // In cinema mode the library is hidden, so opening the full screen player there
+            // would appear to do nothing. The header acts as a second "leave fullscreen" target.
+            if (UiState.playerFullscreen) {
+                (activity as? NavigationActivity)?.togglePlayerFullscreen()
+                return@setOnClickListener
+            }
             runCatching {
                 Navigation.findNavController(requireActivity(), R.id.nav_host_fragment)
                     .navigate(R.id.playerFragment)
             }
+        }
+
+        fullscreenButton?.setOnClickListener {
+            (activity as? NavigationActivity)?.togglePlayerFullscreen()
         }
 
         decoratePane()
@@ -183,9 +201,12 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
                 view.findViewById(R.id.pane_lyrics_source)
             ).apply {
                 setAccentColor(CarTheme.color(requireContext(), CarPalette.current().accent))
-                setFontSizeSp(Settings.lyricsFontSizeSp)
+                applySettings(effectiveFontSp())
             }
         }
+        syncFullscreenButton()
+        lastAppearanceSignature = Settings.lyricsAppearanceSignature()
+        lastFullscreen = UiState.playerFullscreen
 
         playButton?.setOnClickListener { mediaPlayerManager.togglePlayPause() }
         previousButton?.setOnClickListener { onPreviousPressed() }
@@ -289,7 +310,48 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         handler.post(updateRunnable)
         sleepTimerManager.addListener(this)
         syncedLyrics?.setAccentColor(CarTheme.color(requireContext(), CarPalette.current().accent))
-        syncedLyrics?.setFontSizeSp(Settings.lyricsFontSizeSp)
+        applyLyricsAppearance()
+    }
+
+    /** Font size used on this pane; fullscreen mode enlarges it by its own setting. */
+    private fun effectiveFontSp(): Int {
+        val base = Settings.lyricsFontSizeSp.coerceIn(12, 36)
+        return if (UiState.playerFullscreen) {
+            (base * Settings.lyricsFullscreenFontScale / 100f).toInt().coerceIn(12, 48)
+        } else {
+            base
+        }
+    }
+
+    /** Re-applies all lyric settings, called on resume and whenever their signature changes. */
+    private fun applyLyricsAppearance() {
+        lastAppearanceSignature = Settings.lyricsAppearanceSignature()
+        lastFullscreen = UiState.playerFullscreen
+        syncedLyrics?.applySettings(effectiveFontSp())
+        syncFullscreenButton()
+    }
+
+    /** The button shows the action it will perform, not the state it is in. */
+    private fun syncFullscreenButton() {
+        val button = fullscreenButton ?: return
+        button.visibility = if (Settings.showPlayerFullscreenButton) View.VISIBLE else View.GONE
+        val full = UiState.playerFullscreen
+        button.setImageResource(
+            if (full) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen_enter
+        )
+        context?.let { ctx ->
+            button.contentDescription = ctx.getString(
+                if (full) R.string.player_fullscreen_exit else R.string.player_fullscreen_enter
+            )
+        }
+        applyToggleTint(button, full)
+    }
+
+    /** Called by [NavigationActivity] the moment the pane expands or collapses. */
+    fun onFullscreenChanged(fullscreen: Boolean) {
+        lastFullscreen = fullscreen
+        syncFullscreenButton()
+        syncedLyrics?.applySettings(effectiveFontSp())
     }
 
     override fun onPause() {
@@ -342,6 +404,16 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         if (token != lastReloadToken) {
             lastReloadToken = token
             loadLyrics(currentTrack, forceRefresh = true)
+        }
+
+        // A purely visual setting (mode, font, alignment, translation display, ...) must not
+        // cost a new download. The signature changes on every such edit and the view rebuilds
+        // its spannable in place. Fullscreen is polled too, in case a fragment transaction was
+        // still pending when the activity announced the change.
+        if (Settings.lyricsAppearanceSignature() != lastAppearanceSignature ||
+            UiState.playerFullscreen != lastFullscreen
+        ) {
+            applyLyricsAppearance()
         }
 
         if (!seekBarTracking) {

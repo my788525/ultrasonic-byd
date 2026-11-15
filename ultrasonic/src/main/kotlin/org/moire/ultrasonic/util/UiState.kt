@@ -18,4 +18,9 @@ object UiState {
     @JvmStatic
     @Volatile
     var twoPane: Boolean = false
+
+    /** True while the driver has expanded the right hand player pane over the whole screen. */
+    @JvmStatic
+    @Volatile
+    var playerFullscreen: Boolean = false
 }

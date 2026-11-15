@@ -366,4 +366,58 @@
         <item>@string/car_preload_one</item>
         <item>@string/car_preload_two</item>
     </string-array>
+
+    <!-- Lyrics settings: entry values are stable identifiers, never translated. -->
+    <string-array name="lyricsDisplayModeValues" translatable="false">
+        <item>auto</item>
+        <item>word</item>
+        <item>synced</item>
+    </string-array>
+    <string-array name="lyricsDisplayModeNames" translatable="false">
+        <item>@string/lyrics_display_mode_auto</item>
+        <item>@string/lyrics_display_mode_word</item>
+        <item>@string/lyrics_display_mode_synced</item>
+    </string-array>
+
+    <string-array name="lyricsAlignmentValues" translatable="false">
+        <item>start</item>
+        <item>center</item>
+        <item>end</item>
+    </string-array>
+    <string-array name="lyricsAlignmentNames" translatable="false">
+        <item>@string/lyrics_alignment_start</item>
+        <item>@string/lyrics_alignment_center</item>
+        <item>@string/lyrics_alignment_end</item>
+    </string-array>
+
+    <string-array name="lyricsWipeFpsValues" translatable="false">
+        <item>15</item>
+        <item>30</item>
+        <item>60</item>
+    </string-array>
+    <string-array name="lyricsWipeFpsNames" translatable="false">
+        <item>@string/lyrics_wipe_fps_15</item>
+        <item>@string/lyrics_wipe_fps_30</item>
+        <item>@string/lyrics_wipe_fps_60</item>
+    </string-array>
+
+    <string-array name="lyricsTranslationModeValues" translatable="false">
+        <item>off</item>
+        <item>show</item>
+        <item>only</item>
+    </string-array>
+    <string-array name="lyricsTranslationModeNames" translatable="false">
+        <item>@string/lyrics_translation_mode_off</item>
+        <item>@string/lyrics_translation_mode_show</item>
+        <item>@string/lyrics_translation_mode_only</item>
+    </string-array>
+
+    <string-array name="lyricsSourcePriorityValues" translatable="false">
+        <item>online</item>
+        <item>server</item>
+    </string-array>
+    <string-array name="lyricsSourcePriorityNames" translatable="false">
+        <item>@string/lyrics_source_priority_online</item>
+        <item>@string/lyrics_source_priority_server</item>
+    </string-array>
 </resources>

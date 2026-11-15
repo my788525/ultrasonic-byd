@@ -97,17 +97,132 @@ object Settings {
     var floatingTextShadow by BooleanSetting(getKey(R.string.setting_key_floating_text_shadow), true)
 
     /**
-     * Word by word rendering. When on, lyrics with real word timestamps are painted as a
-     * continuous character wipe; when off, the active line is highlighted as a whole. Lyrics
-     * without word timings always fall back to the whole line.
+     * How lyrics follow the song: `auto` uses a continuous word wipe whenever the source has
+     * real word timings, `word` forces that mode, `synced` always highlights whole lines.
      *
-     * This used to be a clickable badge above the lyrics. It belongs in settings: a head unit
-     * should not have a small tap target next to the words the driver is reading.
+     * This used to be a Boolean and, before that, a clickable badge over the words. Every
+     * display choice now belongs in settings: a head unit should not have small tap targets
+     * next to the words the driver is reading.
      */
     @JvmStatic
-    var wordByWordLyrics by BooleanSetting(
-        getKey(R.string.setting_key_word_by_word_lyrics), true
+    var lyricsDisplayMode by StringSetting(
+        getKey(R.string.setting_key_lyrics_display_mode), "auto"
     )
+
+    /** Whether the loader should prefer a copy with real word timings. */
+    val wantWordTimings: Boolean
+        get() = lyricsDisplayMode != "synced" && preferWordLyrics
+
+    /** Text alignment of every lyric line: start, center or end. */
+    @JvmStatic
+    var lyricsAlignment by StringSetting(
+        getKey(R.string.setting_key_lyrics_alignment), "start"
+    )
+
+    /** Extra space between two lyric lines, in dp. */
+    @JvmStatic
+    var lyricsLineSpacingDp by IntSetting(
+        getKey(R.string.setting_key_lyrics_line_spacing), 12
+    )
+
+    /** Where the active line sits in the viewport, in percent of its height. */
+    @JvmStatic
+    var lyricsCurrentLineAnchor by IntSetting(
+        getKey(R.string.setting_key_lyrics_current_line_anchor), 38
+    )
+
+    /** Brightness of the lines that are not being sung, in percent. */
+    @JvmStatic
+    var lyricsInactiveAlpha by IntSetting(
+        getKey(R.string.setting_key_lyrics_inactive_alpha), 42
+    )
+
+    /** Smooth scroll to the active line. Off keeps the text where the driver put it. */
+    @JvmStatic
+    var lyricsAutoScroll by BooleanSetting(
+        getKey(R.string.setting_key_lyrics_auto_scroll), true
+    )
+
+    /** Bold and slightly larger active line. */
+    @JvmStatic
+    var lyricsBoldCurrent by BooleanSetting(
+        getKey(R.string.setting_key_lyrics_bold_current), true
+    )
+
+    /** Frames per second of the continuous word wipe: "15", "30" or "60". */
+    @JvmStatic
+    var lyricsWipeFps by StringSetting(
+        getKey(R.string.setting_key_lyrics_wipe_fps), "30"
+    )
+
+    /** Font size multiplier (percent) while the player pane is fullscreen. */
+    @JvmStatic
+    var lyricsFullscreenFontScale by IntSetting(
+        getKey(R.string.setting_key_lyrics_fullscreen_font_scale), 130
+    )
+
+    /** Show the one-tap fullscreen button in the right hand player pane. */
+    @JvmStatic
+    var showPlayerFullscreenButton by BooleanSetting(
+        getKey(R.string.setting_key_show_player_fullscreen_button), true
+    )
+
+    /**
+     * Translation display: `off` (original only), `show` (original plus translation when one
+     * is available) or `only` (translation instead of the original). A line without a
+     * translation always falls back to its original text.
+     */
+    @JvmStatic
+    var lyricsTranslationMode by StringSetting(
+        getKey(R.string.setting_key_lyrics_translation_mode), "show"
+    )
+
+    /**
+     * Look up a Chinese translation online when the lyrics themselves carry none. Off by
+     * default: it is an extra network request and the lookup is a third party service.
+     */
+    @JvmStatic
+    var onlineLyricsTranslation by BooleanSetting(
+        getKey(R.string.setting_key_online_lyrics_translation), false
+    )
+
+    /** Size of the translation line relative to the original, in percent. */
+    @JvmStatic
+    var lyricsTranslationFontScale by IntSetting(
+        getKey(R.string.setting_key_lyrics_translation_font_scale), 80
+    )
+
+    /**
+     * Which source wins: `online` (LRCLIB first, Navidrome as fallback - the default) or
+     * `server` (Navidrome first, LRCLIB only when the server has nothing).
+     */
+    @JvmStatic
+    var lyricsSourcePriority by StringSetting(
+        getKey(R.string.setting_key_lyrics_source_priority), "online"
+    )
+
+    /**
+     * A single value that changes whenever any purely visual lyric setting changes. The three
+     * lyric surfaces poll it on their normal refresh, so a change made in settings takes effect
+     * as soon as the driver comes back - no restart and no re-download of the lyrics.
+     */
+    @JvmStatic
+    fun lyricsAppearanceSignature(): Int = listOf(
+        lyricsDisplayMode,
+        lyricsFontSizeSp.toString(),
+        lyricsAlignment,
+        lyricsLineSpacingDp.toString(),
+        lyricsCurrentLineAnchor.toString(),
+        lyricsInactiveAlpha.toString(),
+        lyricsAutoScroll.toString(),
+        lyricsBoldCurrent.toString(),
+        lyricsWipeFps.toString(),
+        lyricsFullscreenFontScale.toString(),
+        showLyricsSourceBadge.toString(),
+        lyricsTranslationMode,
+        lyricsTranslationFontScale.toString(),
+        showPlayerFullscreenButton.toString()
+    ).joinToString("|").hashCode()
 
     /**
      * Whether the small source badge ("LRCLIB", "Navidrome", ...) is shown at all. Off by

@@ -170,6 +170,23 @@ class SettingsFragment :
             }
             true
         }
+
+        // Translations have their own on-device cache. Clearing it does not touch the lyrics.
+        findPreference<Preference>(getString(R.string.setting_key_lyrics_translation_clear))
+            ?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+            lifecycleScope.launch {
+                val removed = withContext(Dispatchers.IO) {
+                    org.moire.ultrasonic.util.LyricsTranslation.clearCache(appContext)
+                }
+                if (!isAdded) return@launch
+                android.widget.Toast.makeText(
+                    appContext,
+                    getString(R.string.lyrics_translation_cleared, removed),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            true
+        }
     }
 
     /**
@@ -559,6 +576,15 @@ class SettingsFragment :
             getString(R.string.setting_key_lyrics_font_size),
             getString(R.string.setting_key_floating_lyric_lines) -> {
                 applyFloatingAppearance()
+            }
+            getString(R.string.setting_key_online_lyrics_translation),
+            getString(R.string.setting_key_lyrics_source_priority) -> {
+                // These two change which data the loader combines, not just how it is drawn.
+                // Drop the in-memory results and let the three lyric surfaces rebuild them on
+                // their next refresh. The bumped token is the same signal the "search again"
+                // action uses, so a translation lookup happens right away.
+                org.moire.ultrasonic.util.LyricsLoader.invalidateAll()
+                Settings.lyricsReloadToken = Settings.lyricsReloadToken + 1L
             }
             getString(R.string.setting_key_floating_detail_seconds),
             getString(R.string.setting_key_floating_pass_through) -> {

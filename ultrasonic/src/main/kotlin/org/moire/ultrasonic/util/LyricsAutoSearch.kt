@@ -371,7 +371,13 @@ object LyricsAutoSearch {
         val record = JSONObject(json)
         if (record.optBoolean("instrumental", false)) null
         else {
-            val wordLines = WordLyricsParser.parseLyricsFile(record.optString("lyricsfile"))
+            // A driver who picked "synced lyrics" gets the line timed LRC, not the word timed
+            // Lyricsfile. Auto and word mode use the richer timeline when the record has one.
+            val wordLines = if (Settings.lyricsDisplayMode != "synced") {
+                WordLyricsParser.parseLyricsFile(record.optString("lyricsfile"))
+            } else {
+                emptyList()
+            }
             val synced = record.optString("syncedLyrics")
             val plain = record.optString("plainLyrics")
             val lines = when {
