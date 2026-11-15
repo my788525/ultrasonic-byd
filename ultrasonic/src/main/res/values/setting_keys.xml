@@ -110,14 +110,6 @@
     <string name="setting_key.floating_lyric_lines" translatable="false">floatingLyricLines</string>
     <string name="setting_key.floating_detail_seconds" translatable="false">floatingDetailSeconds</string>
     <string name="setting_key.floating_pass_through" translatable="false">floatingPassThrough</string>
-    <string name="setting_key.floating_reverse_safety" translatable="false">floatingReverseSafety</string>
-    <string name="setting_key.floating_camera_signal_status" translatable="false">floatingCameraSignalStatus</string>
-    <string name="setting_key.floating_camera_adb_grant" translatable="false">floatingCameraAdbGrant</string>
-    <string name="setting_key.floating_camera_detection_service" translatable="false">floatingCameraDetectionService</string>
-    <string name="setting_key.floating_camera_fallback" translatable="false">floatingCameraFallback</string>
-    <string name="setting_key.floating_camera_temp_hide" translatable="false">floatingCameraTempHide</string>
-    <string name="setting_key.floating_camera_audio_focus" translatable="false">floatingCameraAudioFocus</string>
-    <string name="setting_key.floating_manual_toggle" translatable="false">floatingManualToggle</string>
     <string name="setting_key.home_playlist_count" translatable="false">homePlaylistCount</string>
     <string name="setting_key.home_playlists_pinned" translatable="false">homePinnedPlaylists</string>
     <string name="setting_key.update_check_now" translatable="false">update.check_now</string>
@@ -125,4 +117,9 @@
     <string name="setting_key.update_mirror_url" translatable="false">update.mirror_url</string>
     <string name="setting_key.update_skip_version" translatable="false">update.skip_version</string>
     <string name="setting_key.player_fullscreen" translatable="false">ui.player_fullscreen</string>
+    <!-- Cold-start layout + fullscreen backdrop tuning -->
+    <string name="setting_key.fullscreen_on_start" translatable="false">ui.fullscreen_on_start</string>
+    <string name="setting_key.backdrop_dim" translatable="false">ui.backdrop_dim</string>
+    <string name="setting_key.backdrop_tint" translatable="false">ui.backdrop_tint</string>
+    <string name="setting_key.backdrop_blur" translatable="false">ui.backdrop_blur</string>
 </resources>

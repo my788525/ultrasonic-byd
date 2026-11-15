@@ -595,7 +595,7 @@
     <string name="floating_permission_needed">Please allow "display over other apps" for Nav音乐, then choose the floating window again.</string>
 
     <string name="settings.resume_on_start_title">Resume the last queue on start</string>
-    <string name="settings.resume_on_start_summary">When the app is opened, the queue of the last session is restored and playback continues from the last position.</string>
+    <string name="settings.resume_on_start_summary">When the app is opened, the queue of the last session is restored and playback continues from the last position. This is the only switch that controls auto-resume; fullscreen no longer forces it.</string>
 
     <!-- Car UI: color schemes -->
     <string name="settings_palette_title">Color scheme</string>
@@ -668,8 +668,6 @@
     <string name="floating_detail_seconds_summary">How long the cover, title and artist stay visible after a switch before the window collapses to the lyrics alone. 0 keeps them on.</string>
     <string name="floating_pass_through_title">Pass-through mode</string>
     <string name="floating_pass_through_summary">When the floating window is locked, taps pass through to the app below (such as the navigation map), so the screen underneath stays usable while the lyrics keep showing. Unlock the window or turn this off to make it touchable again.</string>
-    <string name="floating_reverse_safety_title">Hide and pause in 360 / reverse</string>
-    <string name="floating_reverse_safety_summary">While the 360 camera or reverse gear is active the window is hidden and the music paused; both come back when the camera is off. BYD blocks ordinary apps from reading the car state directly, so on head units whose ADB is locked this automatic detection cannot work - use the reliable manual hide below instead.</string>
     <string name="lyrics_font_size_title">Lyrics font size</string>
     <string name="lyrics_font_size_summary">Applies to the lyrics in the player panel, the full screen and the floating window</string>
     <string name="floating_opacity_title">Background opacity</string>
@@ -751,48 +749,11 @@
     <string name="home_playlist_pin_reset">Automatic</string>
     <string name="home_playlist_pin_empty">No playlists loaded yet. Open the home screen once first.</string>
     <string name="home_playlist_pin_saved">Home playlists updated</string>
-    <string name="camera_watch_service_label">NavMusic camera view detection</string>
-    <string name="camera_watch_service_description">Watches only which app window is on top, so NavMusic can hide its floating player and pause music while the car shows the 360 / reversing camera picture. It does not read your screen content and does not perform any action.</string>
-    <string name="floating_camera_detection_service_title">Enable camera detection service</string>
-    <string name="floating_camera_detection_service_on">Enabled. The floating window will hide while the car camera view is on top.</string>
-    <string name="floating_camera_detection_service_off">NOT enabled. BYD DiLink has no accessibility settings screen and newer firmware has disabled ADB, so on a locked head unit this route is permanently unavailable. The zero-permission fallback below still runs, and the manual hide always works.</string>
-    <string name="floating_camera_signal_status_title">Camera detection status</string>
-    <string name="floating_camera_signal_status_summary">Last signal: %1$s. Current: %2$s. %3$s</string>
-    <string name="floating_camera_signal_sources">Sources: ADB usage grant %1$s, accessibility %2$s, BYD car API (signature-only) %3$s, audio focus %4$s, manual hide %5$s; last foreground %6$s; last audio focus event %7$s.</string>
-    <string name="floating_camera_source_on">on</string>
-    <string name="floating_camera_source_off">off</string>
-    <string name="floating_camera_signal_active">camera view detected, window hidden</string>
-    <string name="floating_camera_signal_idle">normal, window visible</string>
     <string name="floating_temp_hide_action">Hide 30 s</string>
-    <string name="floating_camera_fallback_title">Zero-permission fallback</string>
-    <string name="floating_camera_fallback_summary">Fallback scan %1$s. Last observation: %2$s. Window dump %3$s.</string>
-    <string name="floating_camera_temp_hide_title">Hide floating window for 30 seconds</string>
-    <string name="floating_camera_temp_hide_summary">Manual fallback when the car allows no detection service: hides the window for 30 seconds, then restores it. The ongoing notification has the same action.</string>
-    <string name="floating_camera_adb_grant_title">One-time ADB grant (only if ADB is available)</string>
-    <string name="floating_camera_adb_grant_summary">BYD firmware from 2606 onward has disabled ADB and it cannot be re-enabled. If your car cannot open ADB, this route is unavailable and automatic camera detection cannot work - use the manual hide instead. Tap to see the command for cars that still allow ADB.</string>
-    <string name="floating_camera_adb_grant_dialog_title">One-time ADB command</string>
-    <string name="floating_camera_adb_grant_dialog">BYD DiLink hides both the usage-access and the accessibility settings screens, so the switch cannot be turned on from the car UI. On cars that still allow wireless ADB, run this ONCE from a phone or PC:
-
-adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow
-
-It needs no root and no signature, survives reboots, and takes effect immediately. NavMusic then watches com.byd.avc (the camera app) resume and hides the floating window for exactly as long as the picture is up.
-
-IMPORTANT: BYD firmware from 2606 onward has disabled ADB and it cannot be re-enabled. If your car cannot open ADB, this command will fail; that is a platform restriction, not an app problem. In that case use the manual hide (the button in the floating window, the edge bubble, or the notification action) - it needs no permission at all.
-
-Optional, only if your car DOES have an accessibility screen:
-adb shell settings put secure enabled_accessibility_services org.moire.ultrasonic/.util.CameraWatchAccessibilityService
-adb shell settings put secure accessibility_enabled 1</string>
-    <string name="floating_camera_adb_grant_copy">Copy command</string>
-    <string name="floating_camera_adb_grant_copied">ADB command copied to clipboard</string>
-    <string name="floating_camera_adb_command">adb shell appops set org.moire.ultrasonic GET_USAGE_STATS allow</string>
     <string name="floating_manual_hide_action">Hide window</string>
     <string name="floating_manual_show_action">Show window</string>
     <string name="floating_collapse_content_description">Hide floating window</string>
     <string name="floating_restore_bubble_description">Show floating window again</string>
-    <string name="floating_camera_audio_focus_title">Audio focus as camera hint</string>
-    <string name="floating_camera_audio_focus_summary">Off by default. When the car takes audio focus briefly, hide the window and pause music. Navigation voice prompts take the same focus, so this can hide the window at every turn instruction - only enable it if your car takes focus exclusively for the camera view.</string>
-    <string name="floating_manual_toggle_title">Show / hide floating window</string>
-    <string name="floating_manual_toggle_summary">Reliable one-tap hide that needs no permission. Also available as a small button inside the floating window, as an edge dot after hiding, and in the ongoing notification. Music pauses with the window and resumes when it comes back.</string>
     <string name="car_fallback_playing_cached">Poor network: switched to cached track</string>
     <string name="car_fallback_shuffle_cached">Poor network: shuffling downloaded music</string>
     <string name="player_view_cover">Cover</string>
@@ -815,4 +776,14 @@ adb shell settings put secure accessibility_enabled 1</string>
     <string name="quick_queue_title">Play queue</string>
     <string name="quick_queue_empty">The play queue is empty</string>
     <string name="quick_queue_current">Now playing  %1$s</string>
+    <!-- byd.50: fullscreen backdrop tuning and explicit cold-start switches -->
+    <string name="backdrop_category_title">Fullscreen backdrop</string>
+    <string name="backdrop_dim_title">Backdrop brightness</string>
+    <string name="backdrop_dim_summary">Higher values darken the cover with a thicker mask so lyrics stay readable; lower values keep the artwork bright.</string>
+    <string name="backdrop_tint_title">Theme colour strength</string>
+    <string name="backdrop_tint_summary">How strongly the mask takes on the selected theme colour. 0 keeps a neutral dark mask.</string>
+    <string name="backdrop_blur_title">Software blur</string>
+    <string name="backdrop_blur_summary">Lightweight downscale blur for the cover, no extra library and no GPU requirement. Set to 0 to turn it off.</string>
+    <string name="settings_fullscreen_on_start_title">Restore fullscreen on start</string>
+    <string name="settings_fullscreen_on_start_summary">Reopen in fullscreen if the player was fullscreen when the app closed. Turn off to always start in the two-pane layout.</string>
 </resources>

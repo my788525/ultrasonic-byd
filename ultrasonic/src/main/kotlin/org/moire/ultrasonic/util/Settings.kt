@@ -221,7 +221,10 @@ object Settings {
         showLyricsSourceBadge.toString(),
         lyricsTranslationMode,
         lyricsTranslationFontScale.toString(),
-        showPlayerFullscreenButton.toString()
+        showPlayerFullscreenButton.toString(),
+        backdropDim.toString(),
+        backdropTint.toString(),
+        backdropBlur.toString()
     ).joinToString("|").hashCode()
 
     /**
@@ -338,26 +341,6 @@ object Settings {
      */
     @JvmStatic
     var floatingPassThrough by BooleanSetting(getKey(R.string.setting_key_floating_pass_through), false)
-
-    /**
-     * Hides the floating window and pauses the music while the 360 camera or the reverse gear is
-     * active, and brings both back when they are off again.
-     *
-     * This is a driving-safety feature: while the driver watches the surround view or the rear,
-     * a window over the screen and a song playing are both distractions. It is on by default.
-     */
-    @JvmStatic
-    var floatingReverseSafety by BooleanSetting(getKey(R.string.setting_key_floating_reverse_safety), true)
-
-    /**
-     * Treat a transient audio-focus loss as a camera-view signal. Off by default: navigation
-     * prompts take the same focus, and hiding the window at every turn instruction is worse
-     * than showing it during a camera view.
-     */
-    @JvmStatic
-    var floatingCameraAudioFocus by BooleanSetting(
-        getKey(R.string.setting_key_floating_camera_audio_focus), false
-    )
 
     /** How many of the most-played playlists show on the home screen; -1 means every playlist. */
     @JvmStatic
@@ -521,6 +504,26 @@ object Settings {
     @JvmStatic
     var playerFullscreen
         by BooleanSetting(getKey(R.string.setting_key_player_fullscreen), false)
+
+    /** Cold-start switch: whether the persisted fullscreen state is restored at all. */
+    @JvmStatic
+    var fullscreenOnStart
+        by BooleanSetting(getKey(R.string.setting_key_fullscreen_on_start), true)
+
+    /**
+     * Fullscreen cover backdrop, all 0..100 so they can be driven by SeekBarPreference.
+     *  - dim: how heavy the theme-tinted mask is (higher = darker, lyrics easier to read);
+     *  - tint: how far the mask is pulled towards the active theme accent (0 = neutral);
+     *  - blur: software blur strength, 0 disables the transformation entirely.
+     */
+    @JvmStatic
+    var backdropDim by IntSetting(getKey(R.string.setting_key_backdrop_dim), 50)
+
+    @JvmStatic
+    var backdropTint by IntSetting(getKey(R.string.setting_key_backdrop_tint), 35)
+
+    @JvmStatic
+    var backdropBlur by IntSetting(getKey(R.string.setting_key_backdrop_blur), 35)
 
     /**
      * Maps the DPAD up/down keys of a car steering wheel to previous/next track.

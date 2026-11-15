@@ -1,7 +1,5 @@
 package org.moire.ultrasonic.fragment
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.DialogInterface
 import android.content.Context
 import android.content.Intent
@@ -45,10 +43,6 @@ import org.moire.ultrasonic.util.ConfirmationDialog
 import org.moire.ultrasonic.util.Constants
 import org.moire.ultrasonic.util.ErrorDialog
 import org.moire.ultrasonic.util.FileUtil.ultrasonicDirectory
-import org.moire.ultrasonic.util.CameraSignalBus
-import org.moire.ultrasonic.util.CameraWatchAccessibilityService
-import org.moire.ultrasonic.util.ForegroundPackageMonitor
-import org.moire.ultrasonic.util.ZeroPermissionCameraDetector
 import org.moire.ultrasonic.util.HomePrefs
 import org.moire.ultrasonic.util.InfoDialog
 import org.moire.ultrasonic.util.SelectCacheActivityContract
@@ -116,7 +110,6 @@ class SettingsFragment :
         setupUpdatePreferences()
         setupHomePlaylistPreferences()
         setupLyricsPreferences()
-        setupFloatingPreferences()
     }
 
     /** Online lyrics settings: show how many songs are saved and let the driver clear them. */
@@ -229,120 +222,6 @@ class SettingsFragment :
             }
             .setNegativeButton(android.R.string.cancel, null)
             .show()
-    }
-
-    /**
-     * Read-only diagnostic: which zero-permission signal last hid the window. On a
-     * real head unit this says whether the camera was seen at all, without adb.
-     */
-    private fun setupFloatingPreferences() {
-        findPreference<Preference>(
-            getString(R.string.setting_key_floating_camera_adb_grant)
-        )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-            val command = getString(R.string.floating_camera_adb_command)
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.floating_camera_adb_grant_dialog_title)
-                .setMessage(getString(R.string.floating_camera_adb_grant_dialog))
-                .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton(R.string.floating_camera_adb_grant_copy) { _, _ ->
-                    val clipboard = requireContext()
-                        .getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                    clipboard?.setPrimaryClip(
-                        ClipData.newPlainText("NavMusic ADB command", command)
-                    )
-                    android.widget.Toast.makeText(
-                        requireContext(),
-                        R.string.floating_camera_adb_grant_copied,
-                        android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
-                .show()
-            true
-        }
-        findPreference<Preference>(
-            getString(R.string.setting_key_floating_camera_detection_service)
-        )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-            try {
-                startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            } catch (all: Exception) {
-                Timber.w(all, "Accessibility settings not available on this head unit")
-            }
-            true
-        }
-        findPreference<Preference>(
-            getString(R.string.setting_key_floating_camera_temp_hide)
-        )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-            FloatingPlayerService.hideTemporarily(requireContext())
-            true
-        }
-        findPreference<Preference>(
-            getString(R.string.setting_key_floating_manual_toggle)
-        )?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-            FloatingPlayerService.setManuallyHidden(
-                requireContext(), !FloatingPlayerService.isManuallyHidden()
-            )
-            updateCameraSignalSummary()
-            true
-        }
-        updateCameraSignalSummary()
-    }
-
-    private fun updateCameraSignalSummary() {
-        val context = context ?: return
-        val enabled = CameraWatchAccessibilityService.isEnabled(context)
-        val usage = ForegroundPackageMonitor.hasUsageAccess(context)
-        CameraSignalBus.accessibilityEnabled = enabled
-        CameraSignalBus.usageAccessGranted = usage
-
-        findPreference<Preference>(
-            getString(R.string.setting_key_floating_camera_detection_service)
-        )?.summary = getString(
-            if (enabled) {
-                R.string.floating_camera_detection_service_on
-            } else {
-                R.string.floating_camera_detection_service_off
-            }
-        )
-
-        val row = findPreference<Preference>(
-            getString(R.string.setting_key_floating_camera_signal_status)
-        ) ?: return
-        val state = if (CameraSignalBus.isActive()) {
-            getString(R.string.floating_camera_signal_active)
-        } else {
-            getString(R.string.floating_camera_signal_idle)
-        }
-        val on = getString(R.string.floating_camera_source_on)
-        val off = getString(R.string.floating_camera_source_off)
-        val sources = getString(
-            R.string.floating_camera_signal_sources,
-            if (usage) on else off,
-            if (enabled) on else off,
-            if (CameraSignalBus.bydApiAvailable) on else off,
-            if (Settings.floatingCameraAudioFocus) on else off,
-            if (FloatingPlayerService.isManuallyHidden()) on else off,
-            CameraSignalBus.lastForegroundPackage ?: "-",
-            CameraSignalBus.audioFocusLastEvent
-        )
-        row.summary = getString(
-            R.string.floating_camera_signal_status_summary,
-            CameraSignalBus.lastReason,
-            state,
-            sources
-        )
-
-        findPreference<Preference>(
-            getString(R.string.setting_key_floating_camera_fallback)
-        )?.summary = getString(
-            R.string.floating_camera_fallback_summary,
-            if (ZeroPermissionCameraDetector.running) on else off,
-            ZeroPermissionCameraDetector.lastObservation,
-            when (ZeroPermissionCameraDetector.dumpsysAvailable) {
-                true -> on
-                false -> off
-                else -> "-"
-            }
-        )
     }
 
     /**
@@ -519,8 +398,6 @@ class SettingsFragment :
     override fun onResume() {
         super.onResume()
         preferences.registerOnSharedPreferenceChangeListener(this)
-        // Refresh the camera-detection diagnostic after returning from another screen.
-        updateCameraSignalSummary()
     }
 
     override fun onPause() {

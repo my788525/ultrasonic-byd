@@ -111,8 +111,6 @@ class NavigationActivity : ScopeActivity() {
     private var toolbarView: View? = null
     private var playerFullscreen = false
 
-    /** True when a cold start restored fullscreen from the persisted setting. */
-    private var coldStartFullscreenRestored = false
     private var nowPlayingHidden = false
     private var navigationView: NavigationView? = null
     private var drawerLayout: DrawerLayout? = null
@@ -186,11 +184,11 @@ class NavigationActivity : ScopeActivity() {
         CarTheme.applyWindow(this)
         lastNightMode = CarTheme.isNight(this)
 
-        // A cold start has no saved instance state. Fall back to the persisted choice so the
-        // head unit comes back in the same layout the driver left it in.
+        // A cold start has no saved instance state. Fall back to the persisted choice, but
+        // only while the "restore fullscreen on start" switch is on. Playback itself is
+        // governed solely by "resume on start"; fullscreen no longer forces an auto-resume.
         playerFullscreen = savedInstanceState?.getBoolean(STATE_PLAYER_FULLSCREEN, false)
-            ?: Settings.playerFullscreen
-        coldStartFullscreenRestored = savedInstanceState == null && playerFullscreen
+            ?: (Settings.fullscreenOnStart && Settings.playerFullscreen)
 
         nowPlayingView = findViewById(R.id.now_playing_fragment)
         playerPane = findViewById(R.id.player_pane)
@@ -711,10 +709,9 @@ class NavigationActivity : ScopeActivity() {
 
         setMenuForServerCapabilities()
 
-        // Lifecycle support's constructor registers some event receivers so it should be created early
-        // Restoring the fullscreen lyrics implies the driver wants the music back as well,
-        // even when the general "resume on start" switch has been turned off.
-        lifecycleSupport.onCreate(Settings.resumeOnStart || coldStartFullscreenRestored)
+        // Lifecycle support's constructor registers some event receivers so it should be created early.
+        // The single "resume on start" switch decides this; fullscreen is a layout choice only.
+        lifecycleSupport.onCreate(Settings.resumeOnStart)
 
         // The floating window is hidden while the app is in the foreground, regardless of which
         // fragment is showing. It re-appears over the navigation map only when the app goes

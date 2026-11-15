@@ -10,6 +10,7 @@ import androidx.core.content.ContextCompat
 import com.squareup.picasso.LruCache
 import com.squareup.picasso.Picasso
 import com.squareup.picasso.RequestCreator
+import com.squareup.picasso.Transformation
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -67,6 +68,7 @@ class ImageLoader(
             .addPlaceholder(request)
             .addError(request)
             .stableKey(request.cacheKey)
+            .applyTransformation(request)
             .into(request.imageView)
     }
 
@@ -75,7 +77,14 @@ class ImageLoader(
             .addPlaceholder(request)
             .addError(request)
             .stableKey(request.cacheKey)
+            .applyTransformation(request)
             .get()
+    }
+
+    /** Optional blur for the fullscreen backdrop; ordinary covers keep the untransformed path. */
+    private fun RequestCreator.applyTransformation(request: ImageRequest.CoverArt): RequestCreator {
+        val transformation = request.transformation
+        return if (transformation != null) transform(transformation) else this
     }
 
     private fun loadAvatar(request: ImageRequest.Avatar) {
@@ -131,7 +140,8 @@ class ImageLoader(
         entry: MusicDirectory.Child?,
         large: Boolean,
         size: Int,
-        defaultResourceId: Int = R.drawable.unknown_album
+        defaultResourceId: Int = R.drawable.unknown_album,
+        transformation: Transformation? = null
     ) = launch {
         val id = entry?.coverArt
         val key: String?
@@ -140,7 +150,7 @@ class ImageLoader(
             key = FileUtil.getAlbumArtKey(entry, large)
         }
 
-        loadImage(view, id, key, large, size, defaultResourceId)
+        loadImage(view, id, key, large, size, defaultResourceId, transformation)
     }
 
     /**
@@ -154,7 +164,8 @@ class ImageLoader(
         key: String?,
         large: Boolean,
         size: Int,
-        defaultResourceId: Int = R.drawable.unknown_album
+        defaultResourceId: Int = R.drawable.unknown_album,
+        transformation: Transformation? = null
     ) {
         // Decoding a 600 px cover for a 96 dp row wastes memory and bandwidth on a slow head
         // unit, so the view measures the request when the caller did not ask for a size.
@@ -164,7 +175,8 @@ class ImageLoader(
             val request = ImageRequest.CoverArt(
                 id, key, view, requestedSize,
                 placeHolderDrawableRes = defaultResourceId,
-                errorDrawableRes = defaultResourceId
+                errorDrawableRes = defaultResourceId,
+                transformation = transformation
             )
             load(request)
         } else if (view is ImageView) {
@@ -303,6 +315,7 @@ sealed class ImageRequest(
         val size: Int,
         placeHolderDrawableRes: Int? = null,
         errorDrawableRes: Int? = null,
+        val transformation: Transformation? = null,
     ) : ImageRequest(
         placeHolderDrawableRes,
         errorDrawableRes,

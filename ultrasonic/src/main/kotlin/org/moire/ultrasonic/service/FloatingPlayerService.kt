@@ -66,7 +66,6 @@ import org.moire.ultrasonic.util.CarTransport
 import org.moire.ultrasonic.util.FloatingAppearance
 import org.moire.ultrasonic.util.LyricsLoader
 import org.moire.ultrasonic.util.LyricsParser
-import org.moire.ultrasonic.util.ReverseSafetyManager
 import org.moire.ultrasonic.activity.NavigationActivity
 import org.moire.ultrasonic.util.NowPlayingHint
 import org.moire.ultrasonic.util.Settings
@@ -129,13 +128,6 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private var navMode = false
     private var locked = false
     private var passThrough = false
-
-    /**
-     * The reverse-camera / 360 safety gate. It watches the car and, when the gearbox is in R or
-     * the panorama view is up, hides this window and pauses the music. It is wired here so it runs
-     * exactly while the floating window exists, and never on a device without the car service.
-     */
-    private val reverseSafetyManager = ReverseSafetyManager()
 
     /** True while the detail block (cover, title, artist) is shown and waiting to collapse. */
     private var detailVisible = false
@@ -238,13 +230,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         }
     }
 
-    /**
-     * A 1x1 transparent window that only watches the drawing surface. When the head unit
-     * brings up the 360 / reversing camera it reclaims the app's surface - the very same
-     * zero-permission signal the fntv BYD fork uses to stop playback. It stays attached
-     * for the whole life of this service, independently of the player window, so hiding
-     * and rebuilding the player cannot destroy the sensor. No usage access is required.
-     */
+    /** Dims the window after a few seconds without a touch, so it stops drawing the eye. */
     private val idleFadeRunnable = Runnable { fadeToIdle() }
 
     /**
@@ -255,9 +241,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
     /**
      * Manual hide. This is the one path that needs no permission at all and therefore always
-     * works, even on head units whose ADB was disabled by the manufacturer. It is deliberately
-     * independent of the automatic camera gate: turning the automatic gate off must never take
-     * away the driver's reliable hide button.
+     * works, even on a locked-down head unit. The button in the window, the edge bubble and the
+     * notification action all drive this flag.
      */
     @Volatile private var manualHidden = false
     private var pausedByManualHide = false
@@ -452,7 +437,6 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
     override fun onDestroy() {
         sleepTimerManager.removeListener(this)
-        reverseSafetyManager.stop()
         disposables.clear()
         lyricsScope.cancel()
         handler.removeCallbacks(updateRunnable)
@@ -471,9 +455,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     // region window
 
     private fun showOverlay() {
-        // Any of the gates can veto the window: the app's own screens and the reverse/360
-        // safety gate (which now also carries the zero-permission camera signals). Skip
-        // creation entirely; applyOverlayVisibility removes it again when a gate asks.
+        // The app's own screens or a manual hide can veto the window. Skip creation entirely;
+        // applyOverlayVisibility removes it again when a gate asks.
         if (shouldHideOverlay()) return
         if (rootView == null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
@@ -530,9 +513,6 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         handler.removeCallbacks(updateRunnable)
         handler.post(updateRunnable)
         scheduleIdleFade()
-        // The window is up: start (or keep) the reverse/360 safety gate so the camera view
-        // hides it and pauses the music. start() is idempotent, so re-shows are harmless.
-        reverseSafetyManager.start()
     }
 
     /**
@@ -1266,7 +1246,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
     /**
      * Hides or restores the window on the driver's request. Music follows the window, so a
-     * manual hide also gives the driver the quiet he would get from the automatic camera gate.
+     * manual hide also pauses playback and restores it when the window comes back.
      */
     private fun setManualHidden(hide: Boolean) {
         if (manualHidden == hide) return
@@ -1301,12 +1281,11 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     /**
      * The gates that can veto the window, combined with a logical OR:
      *  - the host app is on one of its own screens;
-     *  - the reverse / 360 safety gate is engaged, either by the BYD car API or by a
-     *    zero-permission camera signal (surface reclaim, window hidden, camera process).
+     *  - the driver hid the window by hand (button, bubble or notification).
+     * The reverse / 360 camera gate is gone: the car picture no longer hides the window.
      */
     private fun shouldHideOverlay(): Boolean =
         FloatingPlayerService.hostWantsHide ||
-            FloatingPlayerService._reverseSafetyActive ||
             tempHideActive ||
             manualHidden
 
@@ -1314,8 +1293,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private fun applyOverlayVisibility() {
         if (shouldHideOverlay()) {
             if (rootView != null) removeOverlay()
-            // The bubble is only for a *manual* hide. An automatic camera hide must leave the
-            // screen completely clear, and the app's own screens must not grow a dot either.
+            // The bubble is only for a manual hide; the app's own screens must not grow a dot.
             if (manualHidden && !FloatingPlayerService.hostWantsHide) {
                 showRestoreBubble()
             } else {
@@ -1325,11 +1303,6 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             removeRestoreBubble()
             if (rootView == null) showOverlay()
         }
-    }
-
-    /** Called by the static reverse-safety accessors; the gates are evaluated together. */
-    fun applyReverseSafetyVisibility() {
-        applyOverlayVisibility()
     }
 
 
@@ -1923,9 +1896,8 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             notificationManager = androidx.core.app.NotificationManagerCompat.from(this)
         )
 
-        // The first action is a real toggle: hide now, show again when the camera view is gone.
-        // Together with the edge bubble and the button inside the window this is the reliable
-        // path on head units where ADB, accessibility and usage access are all unavailable.
+        // The first action is a real toggle: hide now, show again with one tap. Together with
+        // the edge bubble and the button inside the window this path needs no permission at all.
         val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
             (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PendingIntent.FLAG_IMMUTABLE
@@ -2095,18 +2067,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         @JvmStatic
         private var instance: FloatingPlayerService? = null
 
-        /** The backing field of the reverse-safety gate; the public accessors live on the setter. */
-        @JvmStatic
-        @Volatile
-        private var _reverseSafetyActive = false
-
-        /**
-         * The MediaController of the running service, or null when no service instance is up.
-         *
-         * The reverse-safety gate reaches the player through this static seam so it does not
-         * have to hold a service reference. The read is null-safe: a missing controller simply
-         * makes the gate skip the audio half, and the window half still works.
-         */
+        /** The MediaController of the running service, or null when no service instance is up. */
         @JvmStatic
         fun controller(): MediaController? = instance?.controller
 
@@ -2121,21 +2082,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             instance?.applyPassThrough()
         }
 
-        /**
-         * Flips the reverse-safety gate on or off for the overlay.
-         *
-         * Called by the [ReverseSafetyManager] on the main thread: when the gate engages the
-         * overlay marks itself hidden-for-reverse, and when it releases the overlay clears the
-         * mark and re-shows. The static flag survives a service recreate, so a brief service
-         * restart during the reverse view keeps the window off.
-         */
-        @JvmStatic
-        fun setReverseSafetyActive(active: Boolean) {
-            _reverseSafetyActive = active
-            instance?.applyReverseSafetyVisibility()
-        }
-
-        /** Driver-facing toggle used by Settings; it needs no permission of any kind. */
+        /** Driver-facing toggle that needs no permission of any kind. */
         @JvmStatic
         fun setManuallyHidden(context: Context, hidden: Boolean) {
             val intent = Intent(context, FloatingPlayerService::class.java).apply {
@@ -2150,30 +2097,6 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
         @JvmStatic
         fun isManuallyHidden(): Boolean = instance?.manualHidden == true
-
-        /**
-         * Hides the overlay for the duration of the reverse view.
-         *
-         * The overlay reads the static flag and its own state; the call only forces an
-         * immediate visibility update. When the safety gate is off the overlay keeps showing.
-         */
-        @JvmStatic
-        fun hideForReverse() {
-            _reverseSafetyActive = true
-            instance?.applyReverseSafetyVisibility()
-        }
-
-        /**
-         * Brings the overlay back after the reverse view is gone.
-         *
-         * Only when the safety gate is still on, so a driver who switched the gate off while
-         * reversing keeps the overlay hidden until they reopen it on purpose.
-         */
-        @JvmStatic
-        fun showForReverse() {
-            _reverseSafetyActive = false
-            instance?.applyReverseSafetyVisibility()
-        }
 
         /** Tier order, from the smallest footprint to the largest. */
         const val TIER_TITLE = 0
@@ -2324,7 +2247,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             )
         }
 
-        /** Manual fallback used by the settings screen and the notification action. */
+        /** Hides the window for 30 seconds; also available as a notification action. */
         @JvmStatic
         fun hideTemporarily(context: Context) {
             val intent = Intent(context, FloatingPlayerService::class.java).apply {
@@ -2345,8 +2268,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         @JvmStatic
         fun setHostHidden(context: Context, hidden: Boolean) {
             hostWantsHide = hidden
-            // The camera gate is event driven now, so a host state change only has to
-            // re-evaluate the combined visibility of the remaining gates.
+            // Re-evaluate the combined visibility of the remaining gates.
             instance?.applyOverlayVisibility()
         }
 

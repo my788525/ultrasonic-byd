@@ -46,6 +46,7 @@ import org.moire.ultrasonic.service.MusicServiceFactory
 import org.moire.ultrasonic.service.RxBus
 import org.moire.ultrasonic.service.plusAssign
 import org.moire.ultrasonic.subsonic.ImageLoaderProvider
+import org.moire.ultrasonic.ui.BackdropBlurTransformation
 import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.ui.SyncedLyricsView
@@ -116,7 +117,8 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var lastUpNextKey: String? = null
     private var backdropView: ImageView? = null
     private var backdropScrim: View? = null
-    private var lastBackdropTrackId: String? = null
+    /** Track id + blur strength: changing the slider must reload the transformed bitmap. */
+    private var lastBackdropKey: String? = null
 
     /** Last applied visual settings signature, so a change in settings is picked up at once. */
     private var lastAppearanceSignature = 0
@@ -408,19 +410,32 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         }
     }
 
-    /** Theme-tinted mask over the cover: dark at the header and controls, lighter in the middle. */
+    /**
+     * Theme-tinted mask over the cover: dark at the header and controls, lighter in the middle.
+     * Both how dark it is and how strongly it takes the palette colour are settings now, so the
+     * driver can balance artwork against lyric readability for his own screen and theme.
+     */
     private fun applyBackdropScrim(ctx: Context, palette: CarPalette) {
         val top = CarTheme.tone(ctx, ContextCompat.getColor(ctx, palette.bgTop))
         val bottom = CarTheme.tone(ctx, ContextCompat.getColor(ctx, palette.bgBottom))
         val surface = CarTheme.surfaceColor(ctx, palette)
         val accent = CarTheme.accent(ctx, palette)
-        val tintedMiddle = CarTheme.mix(surface, accent, SCRIM_ACCENT_RATIO)
+        val tint = Settings.backdropTint.coerceIn(0, 100) / 100f
+        val tintedTop = CarTheme.mix(top, accent, tint * 0.35f)
+        val tintedBottom = CarTheme.mix(bottom, accent, tint * 0.35f)
+        val tintedMiddle = CarTheme.mix(surface, accent, tint * 0.65f)
+
+        // 50 is the byd.49 look: scale 1.0. 0 keeps the cover bright, 100 is nearly black.
+        val scale = 0.45f + Settings.backdropDim.coerceIn(0, 100) / 100f * 1.1f
+        fun masked(color: Int, baseAlpha: Int): Int =
+            CarTheme.withAlpha(color, (baseAlpha * scale).toInt().coerceIn(0, 255))
+
         backdropScrim?.background = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(
-                CarTheme.withAlpha(top, 0xD8),
-                CarTheme.withAlpha(tintedMiddle, 0x8C),
-                CarTheme.withAlpha(bottom, 0xE8)
+                masked(tintedTop, 0xD8),
+                masked(tintedMiddle, 0x8C),
+                masked(tintedBottom, 0xE8)
             )
         )
     }
@@ -428,19 +443,21 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     /** Loads the current cover at a size that still looks clean when cropped to the full pane. */
     private fun loadBackdrop(track: Track?, force: Boolean = false) {
         if (!UiState.playerFullscreen) return
-        val id = track?.id
-        if (!force && id == lastBackdropTrackId) return
-        lastBackdropTrackId = id
+        val blur = Settings.backdropBlur.coerceIn(0, 100)
+        val key = "${track?.id}|$blur"
+        if (!force && key == lastBackdropKey) return
+        lastBackdropKey = key
         val target = backdropView ?: return
         if (track == null) {
             target.setImageResource(R.drawable.car_backdrop_placeholder)
             return
         }
+        val transformation = if (blur > 0) BackdropBlurTransformation(blur) else null
         imageLoaderProvider.executeOn { loader ->
             if (isAdded) {
                 loader.loadImage(
                     target, track, false, BACKDROP_SIZE_PX,
-                    R.drawable.car_backdrop_placeholder
+                    R.drawable.car_backdrop_placeholder, transformation
                 )
             }
         }
@@ -530,7 +547,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         quickFontPlus = null
         backdropView = null
         backdropScrim = null
-        lastBackdropTrackId = null
+        lastBackdropKey = null
         lastPlayingState = null
         lastQueueIndex = -2
         super.onDestroyView()
@@ -1153,7 +1170,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         private const val PLAYLIST_FETCH_TTL_MS = 10 * 60 * 1000L
         private const val UP_NEXT_COUNT = 2
         private const val BACKDROP_SIZE_PX = 800
-        private const val SCRIM_ACCENT_RATIO = 0.22f
         private const val LYRICS_SHADOW_RADIUS = 9f
         private const val LYRICS_SHADOW_DY = 2f
         private const val LYRICS_SHADOW_COLOR = 0xCC000000.toInt()
