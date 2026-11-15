@@ -430,6 +430,18 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
                 }.getOrNull()
             }
 
+            // Warm the next song in play order while this one is on screen. The playlist has
+            // to be read on the main thread; LyricsLoader deduplicates this against the same
+            // prefetch made by the floating window.
+            if (isAdded && Settings.prefetchLyrics) {
+                val next = runCatching {
+                    val items = mediaPlayerManager.playlistInPlayOrder
+                    val current = mediaPlayerManager.getCurrentShuffleIndex()
+                    items.getOrNull(current + 1)?.toTrack()
+                }.getOrNull()
+                LyricsLoader.prefetch(context, next, (next?.duration ?: 0) * 1_000L)
+            }
+
             if (!isAdded || currentLyricsTrackId != track.id) return@launch
 
             if (result == null || result.isEmpty) {

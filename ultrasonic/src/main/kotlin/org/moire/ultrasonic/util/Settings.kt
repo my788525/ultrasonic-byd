@@ -137,6 +137,17 @@ object Settings {
         getKey(R.string.setting_key_prefer_saved_lyrics), true
     )
 
+    /**
+     * Look up the lyrics of the next song in the queue while the current one is playing, so
+     * switching tracks shows the words without a network round trip. Disable on a metered or
+     * very slow connection: a prefetch uses the same normal lookup and respects LRCLIB's
+     * rate limits.
+     */
+    @JvmStatic
+    var prefetchLyrics by BooleanSetting(
+        getKey(R.string.setting_key_prefetch_lyrics), true
+    )
+
     /** Side of the song/controls panel inside a banner floating window ("left" or "right"). */
     @JvmStatic
     var floatingBannerPanelSide by StringSetting(

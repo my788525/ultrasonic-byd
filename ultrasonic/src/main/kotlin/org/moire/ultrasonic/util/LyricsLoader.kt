@@ -8,7 +8,12 @@
 package org.moire.ultrasonic.util
 
 import android.content.Context
+import android.util.LruCache
+import java.util.Collections
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.moire.ultrasonic.R
@@ -44,16 +49,23 @@ data class LyricsLoadResult(
  * A lyrics record that was downloaded once is saved on the device and takes priority over
  * everything else: it is read from disk with no server call and no network, so the car keeps
  * showing the same word by word lyrics even fully offline. Only songs without a saved copy go
- * through the Subsonic / Navidrome server, and only when that has no usable time axis does
- * [LyricsAutoSearch] look the track up on LRCLIB. Any successful download is saved immediately.
+ * through the Subsonic / Navidrome server (with `enhanced=true` word timings when available),
+ * and only when that has no usable time axis does [LyricsAutoSearch] look the track up on
+ * LRCLIB. Any successful download is saved immediately.
  *
- * Both the full screen player and the permanent car panel use this loader, so they always show
- * exactly the same lyrics and the same source label.
+ * The full screen player, the permanent car panel and the floating window all use this loader,
+ * so they always show exactly the same lyrics and the same source label. A small LRU keeps the
+ * last results in memory, and [prefetch] warms it for the next song in the queue.
  */
 object LyricsLoader {
 
     private const val SERVER_TIMEOUT_MS = 8_000L
     private const val ONLINE_TIMEOUT_MS = 14_000L
+    private const val MEMORY_CACHE_SIZE = 24
+
+    private val memoryCache = LruCache<String, LyricsLoadResult>(MEMORY_CACHE_SIZE)
+    private val prefetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val inFlight: MutableSet<String> = Collections.synchronizedSet(HashSet())
 
     suspend fun load(
         context: Context,
@@ -61,6 +73,41 @@ object LyricsLoader {
         durationMs: Long,
         forceRefresh: Boolean = false
     ): LyricsLoadResult = withContext(Dispatchers.IO) {
+        loadInternal(context.applicationContext, track, durationMs, forceRefresh)
+    }
+
+    /**
+     * Warms the next song's lyrics while the current one is playing. The lookup is deduplicated
+     * against the memory cache and against lookups already running, so the player pane and the
+     * full screen player cannot trigger two network searches for the same track.
+     */
+    fun prefetch(context: Context, track: Track?, durationMs: Long) {
+        if (track == null || !Settings.prefetchLyrics) return
+        val key = track.id
+        if (key.isBlank() || memoryCache.get(key) != null) return
+        synchronized(inFlight) {
+            if (!inFlight.add(key)) return
+        }
+        prefetchScope.launch {
+            try {
+                val result = runCatching {
+                    loadInternal(context.applicationContext, track, durationMs, false)
+                }.getOrNull()
+                if (result != null) putCached(key, result)
+            } catch (all: Exception) {
+                Timber.w(all, "Could not prefetch lyrics for the next song")
+            } finally {
+                synchronized(inFlight) { inFlight.remove(key) }
+            }
+        }
+    }
+
+    private suspend fun loadInternal(
+        context: Context,
+        track: Track,
+        durationMs: Long,
+        forceRefresh: Boolean
+    ): LyricsLoadResult {
         val title = track.title.orEmpty().trim()
         val artist = track.artist.orEmpty().trim()
         val album = track.album.orEmpty().trim()
@@ -68,6 +115,12 @@ object LyricsLoader {
             durationMs
         } else {
             (track.duration ?: 0) * 1_000L
+        }
+
+        if (forceRefresh) {
+            memoryCache.remove(track.id)
+        } else {
+            memoryCache.get(track.id)?.let { return it }
         }
 
         // A saved copy wins before the server is even asked. forceRefresh (pull to refresh or a
@@ -78,7 +131,7 @@ object LyricsLoader {
         ) {
             val saved = runCatching {
                 LyricsAutoSearch.readSaved(
-                    context.applicationContext,
+                    context,
                     title,
                     artist,
                     album,
@@ -86,10 +139,13 @@ object LyricsLoader {
                 )
             }.getOrNull()
             if (saved != null) {
-                return@withContext toResult(fromOnline(saved, effectiveDuration))
+                return putCached(track.id, toResult(fromOnline(saved, effectiveDuration)))
             }
         }
 
+        // The REST client has its own socket timeouts; this deadline only stops the caller from
+        // waiting on a stalled server. A server lookup is read only and writes no cache, so an
+        // abandoned one cannot race with the next lookup.
         val server = withTimeoutOrNull(SERVER_TIMEOUT_MS) {
             runCatching {
                 val service = MusicServiceFactory.getMusicService()
@@ -109,21 +165,23 @@ object LyricsLoader {
                 serverCandidate.rank == 0 ||
                 (Settings.preferWordLyrics && !serverCandidate.wordSynced))
 
+        // The online lookup owns its own hard deadline now. Every request is bounded by the
+        // remaining budget, so no socket stays open and no cache entry is written after the
+        // caller has stopped waiting (which used to happen with withTimeoutOrNull + blocking IO).
         val online = if (wantsOnline) {
-            withTimeoutOrNull(ONLINE_TIMEOUT_MS) {
-                runCatching {
-                    LyricsAutoSearch.search(
-                        context.applicationContext,
-                        title,
-                        artist,
-                        album,
-                        effectiveDuration,
-                        forceRefresh,
-                        Settings.preferSavedLyrics
-                    )
-                }.onFailure { Timber.w(it, "Online lyrics search failed for %s", title) }
-                    .getOrNull()
-            }
+            runCatching {
+                LyricsAutoSearch.search(
+                    context,
+                    title,
+                    artist,
+                    album,
+                    effectiveDuration,
+                    forceRefresh,
+                    Settings.preferSavedLyrics,
+                    ONLINE_TIMEOUT_MS
+                )
+            }.onFailure { Timber.w(it, "Online lyrics search failed for %s", title) }
+                .getOrNull()
         } else {
             null
         }
@@ -139,7 +197,14 @@ object LyricsLoader {
             else -> serverCandidate
         }
 
-        toResult(chosen)
+        return putCached(track.id, toResult(chosen))
+    }
+
+    private fun putCached(key: String, result: LyricsLoadResult): LyricsLoadResult {
+        // A synthetic time axis depends on the duration reported when the song started, which
+        // may differ the next time it plays. Real timed lines are safe to reuse.
+        if (!result.isEmpty && !result.synthetic) memoryCache.put(key, result)
+        return result
     }
 
     private fun toResult(candidate: Candidate): LyricsLoadResult {
@@ -185,7 +250,13 @@ object LyricsLoader {
         val raw = lyrics?.text
         val timed = lyrics?.timedLines
         val lines = when {
-            !timed.isNullOrEmpty() -> timed.map { TimedLyric(it.startMs, it.text) }
+            !timed.isNullOrEmpty() -> timed.map { line ->
+                TimedLyric(
+                    line.startMs,
+                    line.text,
+                    line.words.map { TimedWord(it.startMs, it.text) }
+                )
+            }
             !raw.isNullOrBlank() -> LyricsParser.parse(raw)
             else -> emptyList()
         }
@@ -193,7 +264,7 @@ object LyricsLoader {
         val effective = if (synthetic) LyricsParser.spreadPlainLyrics(raw, durationMs) else lines
         val wordSynced = effective.any { it.words.isNotEmpty() }
         val rank = when {
-            effective.isEmpty() -> 0
+            effective.isEmpty() && raw.isNullOrBlank() -> 0
             synthetic -> 1
             wordSynced -> 3
             else -> 2
@@ -204,7 +275,7 @@ object LyricsLoader {
             source = if (effective.isEmpty() && raw.isNullOrBlank()) LyricsSource.NONE else LyricsSource.SERVER,
             rank = rank,
             wordSynced = wordSynced,
-            synthetic = synthetic && effective.isNotEmpty()
+            synthetic = synthetic
         )
     }
 
@@ -220,7 +291,7 @@ object LyricsLoader {
         }
         val rank = when {
             synthetic -> 1
-            effective.isEmpty() -> 0
+            effective.isEmpty() && record.rawText.isNullOrBlank() -> 0
             record.wordSynced -> 3
             else -> 2
         }

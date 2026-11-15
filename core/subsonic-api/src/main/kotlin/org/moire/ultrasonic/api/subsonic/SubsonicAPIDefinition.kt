@@ -187,10 +187,15 @@ interface SubsonicAPIDefinition {
      * timestamp, so the app cannot scroll along with the song when it only asks for that one.
      * Servers that do not know this endpoint answer with an error, and the app then falls
      * back to the plain one.
+     *
+     * `enhanced=true` (songLyrics extension v2) additionally asks for `cueLine` word level
+     * timings. It is optional: older servers ignore the parameter, and servers that reject it
+     * are retried without it by the REST music service.
      */
     @GET("getLyricsBySongId")
     fun getLyricsBySongId(
-        @Query("id") id: String
+        @Query("id") id: String,
+        @Query("enhanced") enhanced: Boolean? = null
     ): Call<GetLyricsBySongIdResponse>
 
     @GET("scrobble.view")

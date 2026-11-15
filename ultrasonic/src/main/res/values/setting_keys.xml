@@ -86,6 +86,7 @@
     <string name="setting_key.auto_search_lyrics" translatable="false">autoSearchLyrics</string>
     <string name="setting_key.prefer_word_lyrics" translatable="false">preferWordLyrics</string>
     <string name="setting_key.prefer_saved_lyrics" translatable="false">preferSavedLyrics</string>
+    <string name="setting_key.prefetch_lyrics" translatable="false">prefetchLyrics</string>
     <string name="setting_key.lyrics_cache_clear" translatable="false">lyricsCacheClear</string>
     <string name="setting_key.floating_banner_panel_side" translatable="false">floatingBannerPanelSide</string>
     <string name="setting_key.floating_lyric_lines" translatable="false">floatingLyricLines</string>

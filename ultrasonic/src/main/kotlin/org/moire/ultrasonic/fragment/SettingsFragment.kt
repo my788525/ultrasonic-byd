@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.provider.SearchRecentSuggestions
 import android.view.View
 import androidx.annotation.StringRes
+import androidx.lifecycle.lifecycleScope
 import androidx.preference.CheckBoxPreference
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -21,6 +22,9 @@ import androidx.preference.PreferenceFragmentCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 import kotlin.math.ceil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.moire.ultrasonic.R
@@ -118,22 +122,36 @@ class SettingsFragment :
     /** Online lyrics settings: show how many songs are saved and let the driver clear them. */
     private fun setupLyricsPreferences() {
         val clear = findPreference<Preference>(getString(R.string.setting_key_lyrics_cache_clear))
+        // Counting the saved records reads and parses one JSON file per song. Doing that on the
+        // main thread makes the settings screen stutter (and trips StrictMode in debug builds),
+        // so both the count and the clear run on Dispatchers.IO.
+        val appContext = requireContext().applicationContext
 
         fun refreshCount() {
-            val count = org.moire.ultrasonic.util.LyricsAutoSearch.savedCount(requireContext())
-            clear?.summary = getString(R.string.lyrics_cache_clear_summary) + " " +
-                getString(R.string.lyrics_saved_count, count)
+            lifecycleScope.launch {
+                val count = withContext(Dispatchers.IO) {
+                    org.moire.ultrasonic.util.LyricsAutoSearch.savedCount(appContext)
+                }
+                if (!isAdded) return@launch
+                clear?.summary = getString(R.string.lyrics_cache_clear_summary) + " " +
+                    getString(R.string.lyrics_saved_count, count)
+            }
         }
 
         refreshCount()
         clear?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-            val removed = org.moire.ultrasonic.util.LyricsAutoSearch.clearCache(requireContext())
-            android.widget.Toast.makeText(
-                requireContext(),
-                getString(R.string.lyrics_cache_cleared, removed),
-                android.widget.Toast.LENGTH_SHORT
-            ).show()
-            refreshCount()
+            lifecycleScope.launch {
+                val removed = withContext(Dispatchers.IO) {
+                    org.moire.ultrasonic.util.LyricsAutoSearch.clearCache(appContext)
+                }
+                if (!isAdded) return@launch
+                android.widget.Toast.makeText(
+                    appContext,
+                    getString(R.string.lyrics_cache_cleared, removed),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                refreshCount()
+            }
             true
         }
     }

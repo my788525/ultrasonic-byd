@@ -225,9 +225,7 @@ class UpdateManager(private val context: Context) {
                 }
                 when (outcome) {
                     DownloadOutcome.SUCCESS ->
-                        if (info.sha256.isEmpty() ||
-                            sha256Of(target).equals(info.sha256, ignoreCase = true)
-                        ) {
+                        if (verifyDownload(target, info)) {
                             downloaded = target
                         } else {
                             sawChecksumFailure = true
@@ -389,12 +387,41 @@ class UpdateManager(private val context: Context) {
         } catch (exception: UnknownHostException) {
             DownloadOutcome.NETWORK
         } catch (exception: IOException) {
-            DownloadOutcome.STORAGE
+            // A socket reset, a broken proxy or a TLS error is an IOException too. Only a
+            // genuine out-of-space condition is a storage failure; blaming the user's storage
+            // for a network error sent people to clear space for nothing.
+            val message = exception.message.orEmpty()
+            val outOfSpace = message.contains("ENOSPC", ignoreCase = true) ||
+                message.contains("No space left", ignoreCase = true) ||
+                message.contains("disk full", ignoreCase = true) ||
+                message.contains("not enough space", ignoreCase = true) ||
+                runCatching { target.usableSpace < 1024L * 1024L }.getOrDefault(false)
+            if (outOfSpace) DownloadOutcome.STORAGE else DownloadOutcome.NETWORK
         } catch (exception: Exception) {
             DownloadOutcome.NETWORK
         } finally {
             connection?.disconnect()
         }
+    }
+
+    /**
+     * A missing checksum in the manifest must not turn integrity checking off completely.
+     * Without one we still require the declared size and a real ZIP header, so an error page
+     * or a truncated response can never be handed to the package installer.
+     */
+    private fun verifyDownload(file: File, info: UpdateInfo): Boolean {
+        if (info.sha256.isNotBlank()) {
+            return sha256Of(file).equals(info.sha256, ignoreCase = true)
+        }
+        if (info.size <= 0L || file.length() != info.size) return false
+        return runCatching {
+            file.inputStream().use { input ->
+                val header = ByteArray(4)
+                input.read(header) == 4 &&
+                    header[0] == 0x50.toByte() && header[1] == 0x4B.toByte() &&
+                    header[2] == 0x03.toByte() && header[3] == 0x04.toByte()
+            }
+        }.getOrDefault(false)
     }
 
     private fun sha256Of(file: File): String {

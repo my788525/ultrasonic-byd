@@ -519,6 +519,12 @@
             a:summary="@string/lyrics_prefer_word_summary"
             a:title="@string/lyrics_prefer_word_title"
             app:iconSpaceReserved="false"/>
+        <CheckBoxPreference
+            a:defaultValue="true"
+            a:key="@string/setting_key.prefetch_lyrics"
+            a:summary="@string/lyrics_prefetch_summary"
+            a:title="@string/lyrics_prefetch_title"
+            app:iconSpaceReserved="false"/>
         <Preference
             a:key="@string/setting_key.lyrics_cache_clear"
             a:summary="@string/lyrics_cache_clear_summary"

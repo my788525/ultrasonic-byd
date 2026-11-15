@@ -482,6 +482,8 @@
     <string name="lyrics_prefer_saved_summary">已保存的歌词直接从本机读取，无需联网、秒开，并且优先于服务器歌词。关闭后仍会下载保存，但每次先问服务器。</string>
     <string name="lyrics_prefer_word_title">优先使用逐字歌词</string>
     <string name="lyrics_prefer_word_summary">在线结果带有真实逐字时间戳时，即使服务器已有逐行歌词也优先使用在线版本。</string>
+    <string name="lyrics_prefetch_title">预取下一首歌词</string>
+    <string name="lyrics_prefetch_summary">当前歌曲播放时提前查询队列里的下一首，切歌即刻显示歌词。流量受限或网络较慢时可关闭。</string>
     <string name="lyrics_cache_clear_title">清空已保存的在线歌词</string>
     <string name="lyrics_cache_clear_summary">删除本机所有已保存歌词；下次播放时重新联网搜索。</string>
     <string name="lyrics_cache_cleared">已清空 %1$d 首歌的歌词</string>

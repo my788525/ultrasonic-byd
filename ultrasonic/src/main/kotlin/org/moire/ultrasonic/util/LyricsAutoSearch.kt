@@ -8,12 +8,14 @@
 package org.moire.ultrasonic.util
 
 import android.content.Context
+import android.os.SystemClock
 import java.io.File
 import java.net.URLEncoder
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,17 +32,25 @@ import timber.log.Timber
  *    `hasWordSync: true` carry real per word timings in `lines[].words[].start_ms`, which is
  *    what drives the word by word highlight.
  *
- * No API key is needed, but the service requires an identifying User-Agent and asks clients to
- * send requests sequentially and to honour `Retry-After` on HTTP 429. Both are implemented here.
+ * The official docs require an identifying User-Agent, a 200-500 ms pause between requests,
+ * and honouring `Retry-After` after HTTP 429 ("Ignoring this may result in a temporary ban").
+ * All three are implemented: requests are serialized with a 250 ms gap, a 429 starts a global
+ * cooldown read from the header, and during the cooldown no request is sent at all. A rate
+ * limit never writes a negative cache entry, so the song is looked up again as soon as the
+ * cooldown ends.
  *
  * A successfully downloaded record is saved permanently under [Context.getFilesDir], not in the
  * reclaimable cache: the next time the song plays it is read straight from disk, without any
  * server or network call. Only "not found" results expire, so a title added to LRCLIB later can
  * still be picked up. A second, normalised key is written alongside the exact one so small
- * metadata edits (album spelling, corrected duration) do not lose a saved copy.
+ * metadata edits (album spelling, corrected duration) do not lose a saved copy. Alias hits are
+ * verified against the saved track name, artist and duration before being used, so a live or
+ * remix version of a song cannot silently borrow another version's lyrics.
  *
- * This is a regular blocking client: callers must invoke it from Dispatchers.IO or a worker
- * thread.
+ * This is a regular blocking client with its own hard deadline: callers must invoke it from
+ * Dispatchers.IO or a worker thread. Every request is bounded by the time left of [search]'s
+ * `timeoutMs`, so a cancelled lookup cannot keep a socket open or write a cache entry after the
+ * caller has given up.
  */
 object LyricsAutoSearch {
 
@@ -57,6 +67,12 @@ object LyricsAutoSearch {
         val saved: Boolean = false
     )
 
+    private data class HttpResult(
+        val code: Int,
+        val body: String?,
+        val retryAfterSec: Long?
+    )
+
     private const val BASE_URL = "https://lrclib.net"
     private const val USER_AGENT =
         "NavMusic/4.8.0 (https://github.com/my788525/ultrasonic-byd)"
@@ -64,6 +80,11 @@ object LyricsAutoSearch {
     private const val LEGACY_DIR = "lyrics_auto"
     private const val ALIAS_SUFFIX = ".alias.json"
     private const val NEGATIVE_TTL_MS = 6 * 60 * 60 * 1000L
+    /** LRCLIB asks for 200-500 ms between requests. */
+    private const val MIN_REQUEST_GAP_MS = 250L
+    private const val DEFAULT_RETRY_AFTER_SEC = 60L
+    /** Roughly 1500 songs (each song keeps an exact file and a normalised alias). */
+    private const val MAX_CACHE_FILES = 3000
 
     private val PAREN_NOISE = Regex(
         """(?i)\s*\([^)]*(?:remaster|live|version|edit|mix|feat|ft\.?|official|audio|video)[^)]*\)"""
@@ -77,6 +98,9 @@ object LyricsAutoSearch {
     private val PUNCTUATION = Regex("""[^\p{L}\p{N}]+""")
 
     private val migrated = AtomicBoolean(false)
+    private val rateLimitedUntil = AtomicLong(0L)
+    private val requestLock = Any()
+    private var lastRequestAt = 0L
 
     private val client: OkHttpClient by lazy {
         OkHttpClient.Builder()
@@ -105,15 +129,25 @@ object LyricsAutoSearch {
         val durationSec = if (durationMs > 0) durationMs / 1000.0 else 0.0
         val (exact, alias) = cacheFiles(context, cleanTitle, artist, album, durationSec)
         val exactBody = readPositive(exact)
-        val body = exactBody ?: readPositive(alias)
+        val aliasBody = if (exactBody == null) readPositive(alias) else null
+        val body = exactBody ?: aliasBody
 
         // A record saved before the normalised key existed gets one on its first read.
         if (exactBody != null && !alias.exists()) writePositive(alias, exactBody)
 
         val record = body?.let { parseRecord(it, fromCache = true, saved = true) }
-        if (body != null && record == null) {
+        if (body == null) return null
+        if (record == null) {
             exact.delete()
             alias.delete()
+            return null
+        }
+        if (aliasBody != null && !aliasMatches(record, cleanTitle, artist, durationSec)) {
+            // The alias belongs to a different recording (live, remix, a different album cut).
+            // Dropping it lets the real lookup run instead of showing the wrong words.
+            alias.delete()
+            Timber.i("Rejected a saved lyrics alias for %s", cleanTitle)
+            return null
         }
         return record
     }
@@ -125,6 +159,9 @@ object LyricsAutoSearch {
      * metadata. A saved copy (when [useSaved] is on) answers before any request; a valid result
      * is written to disk immediately. `forceRefresh` re-queries the service and overwrites the
      * saved copy, but a failed refresh keeps the existing copy instead of throwing it away.
+     *
+     * [timeoutMs] is a hard deadline for the whole lookup, not just one request. When it runs
+     * out no further request is made and no cache entry is written by an abandoned call.
      */
     fun search(
         context: Context,
@@ -133,7 +170,8 @@ object LyricsAutoSearch {
         album: String,
         durationMs: Long,
         forceRefresh: Boolean = false,
-        useSaved: Boolean = true
+        useSaved: Boolean = true,
+        timeoutMs: Long = 14_000L
     ): LyricsRecord? {
         val cleanTitle = title.trim()
         if (cleanTitle.isEmpty()) return null
@@ -141,75 +179,85 @@ object LyricsAutoSearch {
 
         val durationSec = if (durationMs > 0) durationMs / 1000.0 else 0.0
         val (exact, alias) = cacheFiles(context, cleanTitle, artist, album, durationSec)
+        val savedCopy = { readSaved(context, cleanTitle, artist, album, durationMs) }
 
         if (!forceRefresh) {
             if (useSaved) {
-                val body = readPositive(exact) ?: readPositive(alias)
-                if (body != null) return parseRecord(body, fromCache = true, saved = true)
+                val saved = savedCopy()
+                if (saved != null) return saved
             }
             if (hasFreshNegative(exact)) return null
         }
 
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs.coerceAtLeast(1_000L)
         var body: String? = null
+        var rateLimited = false
 
-        val exactResponse = get(buildGetUrl(cleanTitle, artist, album, durationSec))
-        val exactBody = exactResponse?.second
-        if (exactResponse != null && exactResponse.first == 200 && !exactBody.isNullOrBlank()) {
-            body = exactBody
-        } else if (exactResponse?.first == 429) {
-            // The docs require honouring Retry-After. Rate limiting must never erase a copy
-            // that was already saved for this song.
-            Timber.i("LRCLIB rate limited, skipping this lyrics lookup")
-            if (useSaved) {
-                val existing = readPositive(exact) ?: readPositive(alias)
-                if (existing != null) {
-                    return parseRecord(existing, fromCache = true, saved = true)
+        val exactResponse = get(buildGetUrl(cleanTitle, artist, album, durationSec), deadline)
+        if (exactResponse != null && exactResponse.code == 200 && !exactResponse.body.isNullOrBlank()) {
+            body = exactResponse.body
+        } else if (exactResponse?.code == 429) {
+            rateLimited = true
+            startCooldown(exactResponse.retryAfterSec)
+        }
+
+        if (body == null && !rateLimited && timeLeft(deadline)) {
+            val structured = get(buildSearchUrl(cleanTitle, artist), deadline)
+            if (structured?.code == 429) {
+                rateLimited = true
+                startCooldown(structured.retryAfterSec)
+            } else if (structured != null && structured.code == 200 && !structured.body.isNullOrBlank()) {
+                body = pickBest(structured.body, cleanTitle, artist, durationSec)
+            }
+        }
+
+        if (body == null && !rateLimited && timeLeft(deadline)) {
+            val keyword = cleanedQuery(cleanTitle, artist)
+            if (keyword.isNotBlank()) {
+                val fallback = get("$BASE_URL/api/search?q=${enc(keyword)}", deadline)
+                if (fallback?.code == 429) {
+                    rateLimited = true
+                    startCooldown(fallback.retryAfterSec)
+                } else if (fallback != null && fallback.code == 200 && !fallback.body.isNullOrBlank()) {
+                    body = pickBest(fallback.body, cleanTitle, artist, durationSec)
                 }
+            }
+        }
+
+        if (rateLimited) {
+            Timber.i("LRCLIB rate limited; retrying after the server cooldown")
+            // Never write a negative result here: the 6 h negative TTL would hide a title that
+            // is available as soon as the cooldown is over. Also keep any already saved copy.
+            return if (useSaved) savedCopy() else null
+        }
+
+        // Only a record that really carries lyrics becomes permanent. An instrumental or an
+        // empty response is a short lived negative result instead.
+        if (body == null) {
+            val existing = if (useSaved) savedCopy() else null
+            if (existing != null) {
+                Timber.i("Online lyrics refresh failed, keeping the saved copy")
+                return existing
             }
             writeNegative(exact)
             return null
         }
 
-        if (body == null) {
-            val structured = get(buildSearchUrl(cleanTitle, artist))
-            val structuredBody = structured?.second
-            if (structured != null && structured.first == 200 && !structuredBody.isNullOrBlank()) {
-                body = pickBest(structuredBody, cleanTitle, artist, durationSec)
-            }
-        }
-
-        if (body == null) {
-            val keyword = cleanedQuery(cleanTitle, artist)
-            if (keyword.isNotBlank()) {
-                val fallback = get("$BASE_URL/api/search?q=${enc(keyword)}")
-                val fallbackBody = fallback?.second
-                if (fallback != null && fallback.first == 200 && !fallbackBody.isNullOrBlank()) {
-                    body = pickBest(fallbackBody, cleanTitle, artist, durationSec)
-                }
-            }
-        }
-
-        // Only a record that really carries lyrics becomes permanent. An instrumental or an
-        // empty response is a short lived negative result instead.
-        val record = body?.let { parseRecord(it, fromCache = false) }
-        if (record != null && body != null) {
+        val record = parseRecord(body, fromCache = false)
+        return if (record != null) {
             writePositive(exact, body)
             writePositive(alias, body)
-            return record
+            record
+        } else {
+            // An instrumental or a broken payload must not erase a copy that was already good.
+            val existing = if (useSaved) savedCopy() else null
+            if (existing != null) return existing
+            writeNegative(exact)
+            null
         }
-
-        if (useSaved) {
-            val existing = readPositive(exact) ?: readPositive(alias)
-            if (existing != null) {
-                Timber.i("Online lyrics refresh failed, keeping the saved copy")
-                return parseRecord(existing, fromCache = true, saved = true)
-            }
-        }
-        writeNegative(exact)
-        return null
     }
 
-    /** Number of songs with a permanently saved lyrics record. */
+    /** Number of songs with a permanently saved lyrics record. May do disk IO: call off main. */
     fun savedCount(context: Context): Int {
         migrateLegacy(context)
         val files = savedDir(context).listFiles()
@@ -229,6 +277,7 @@ object LyricsAutoSearch {
                 if (file.delete() && counted) removed++
             }
         }
+        rateLimitedUntil.set(0L)
         return removed
     }
 
@@ -353,18 +402,63 @@ object LyricsAutoSearch {
         null
     }
 
-    private fun get(url: String): Pair<Int, String?>? = try {
-        val request = Request.Builder()
-            .url(url)
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .build()
-        client.newCall(request).execute().use { response ->
-            response.code to response.body?.string()
+    /**
+     * One request. Honours the global 429 cooldown and the inter-request gap, and bounds the
+     * call by whatever time is left of the whole lookup.
+     */
+    private fun get(url: String, deadline: Long): HttpResult? {
+        val remaining = deadline - SystemClock.elapsedRealtime()
+        if (remaining <= 0L) return null
+        if (SystemClock.elapsedRealtime() < rateLimitedUntil.get()) {
+            Timber.i("Skipping LRCLIB request during the Retry-After cooldown")
+            return null
         }
-    } catch (all: Exception) {
-        Timber.w(all, "LRCLIB request failed: %s", url.take(120))
-        null
+
+        synchronized(requestLock) {
+            val wait = MIN_REQUEST_GAP_MS -
+                (SystemClock.elapsedRealtime() - lastRequestAt)
+            if (wait in 1L..MIN_REQUEST_GAP_MS) Thread.sleep(wait)
+            lastRequestAt = SystemClock.elapsedRealtime()
+        }
+
+        return try {
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", USER_AGENT)
+                .header("Accept", "application/json")
+                .build()
+            // newBuilder() shares the connection pool and dispatcher, but lets us cap this one
+            // call at the remaining budget so an abandoned lookup cannot keep a socket open.
+            val timedClient = client.newBuilder()
+                .callTimeout(remaining.coerceAtMost(20_000L), TimeUnit.MILLISECONDS)
+                .build()
+            timedClient.newCall(request).execute().use { response ->
+                HttpResult(
+                    code = response.code,
+                    body = response.body?.string(),
+                    retryAfterSec = response.header("Retry-After")?.trim()?.toLongOrNull()
+                )
+            }
+        } catch (all: Exception) {
+            Timber.w(all, "LRCLIB request failed: %s", url.take(120))
+            null
+        }
+    }
+
+    private fun timeLeft(deadline: Long): Boolean =
+        SystemClock.elapsedRealtime() < deadline &&
+            SystemClock.elapsedRealtime() >= rateLimitedUntil.get()
+
+    private fun startCooldown(retryAfterSec: Long?) {
+        val seconds = (retryAfterSec ?: DEFAULT_RETRY_AFTER_SEC)
+            .coerceIn(1L, 3_600L)
+        val until = SystemClock.elapsedRealtime() + seconds * 1_000L
+        var changed: Boolean
+        do {
+            val previous = rateLimitedUntil.get()
+            changed = rateLimitedUntil.compareAndSet(previous, maxOf(previous, until))
+        } while (!changed)
+        Timber.i("LRCLIB asked to retry after %d s", seconds)
     }
 
     private fun enc(value: String): String = URLEncoder.encode(value, Charsets.UTF_8.name())
@@ -402,13 +496,51 @@ object LyricsAutoSearch {
         ARTIST_SPLIT.split(value.lowercase(Locale.ROOT)).firstOrNull().orEmpty(), " "
     ).trim()
 
+    /**
+     * Guards the album/duration-free alias key against a different recording of the same song.
+     * A live or remix cut usually has a very different length, and the name check catches the
+     * cases where the tagger kept the version in the title.
+     */
+    private fun aliasMatches(
+        record: LyricsRecord,
+        title: String,
+        artist: String,
+        durationSec: Double
+    ): Boolean {
+        val wantedTitle = normalizeTitle(title)
+        val foundTitle = normalizeTitle(record.trackName)
+        val titleOk = wantedTitle.isBlank() || foundTitle.isBlank() ||
+            wantedTitle == foundTitle ||
+            wantedTitle.contains(foundTitle) || foundTitle.contains(wantedTitle)
+        if (!titleOk) return false
+
+        val wantedArtist = normalizeArtist(artist)
+        val foundArtist = normalizeArtist(record.artistName)
+        val artistOk = wantedArtist.isBlank() || foundArtist.isBlank() ||
+            wantedArtist == foundArtist ||
+            (wantedArtist.length >= 4 && foundArtist.contains(wantedArtist.take(5), ignoreCase = true)) ||
+            (foundArtist.length >= 4 && wantedArtist.contains(foundArtist.take(5), ignoreCase = true))
+        if (!artistOk) return false
+
+        val savedDuration = record.durationSec
+        if (durationSec > 1.0 && savedDuration > 1.0 &&
+            abs(durationSec - savedDuration) > 15.0
+        ) {
+            return false
+        }
+        return true
+    }
+
     /** Positive records never expire; that is the point of keeping a local library of lyrics. */
     private fun readPositive(file: File): String? {
         if (!file.exists()) return null
         return try {
             val entry = JSONObject(file.readText())
             if (entry.optBoolean("negative", false)) null
-            else entry.optString("body", "").ifBlank { null }
+            else entry.optString("body", "").ifBlank { null }?.also {
+                // Touch the file so the LRU trim keeps the songs played most recently.
+                file.setLastModified(System.currentTimeMillis())
+            }
         } catch (all: Exception) {
             null
         }
@@ -434,9 +566,22 @@ object LyricsAutoSearch {
             entry.put("negative", false)
             entry.put("body", body)
             file.writeText(entry.toString())
+            enforceFileLimit(file.parentFile)
         } catch (all: Exception) {
             Timber.w(all, "Could not save online lyrics")
         }
+    }
+
+    /** Least-recently-used cap: a car used for years must not grow an unbounded lyrics folder. */
+    private fun enforceFileLimit(dir: File?) {
+        val files = dir?.listFiles()
+            ?.filter { it.name.endsWith(".json") }
+            ?.sortedBy { it.lastModified() }
+            ?: return
+        val excess = files.size - MAX_CACHE_FILES
+        if (excess <= 0) return
+        files.take(excess).forEach { it.delete() }
+        Timber.i("Trimmed %d old lyrics records to keep the cache under %d files", excess, MAX_CACHE_FILES)
     }
 
     private fun writeNegative(file: File) {
@@ -446,6 +591,7 @@ object LyricsAutoSearch {
             entry.put("negative", true)
             entry.put("body", "")
             file.writeText(entry.toString())
+            enforceFileLimit(file.parentFile)
         } catch (all: Exception) {
             Timber.w(all, "Could not cache a missing lyrics result")
         }

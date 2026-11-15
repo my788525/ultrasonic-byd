@@ -49,6 +49,11 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
 import io.reactivex.rxjava3.disposables.CompositeDisposable
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import org.moire.ultrasonic.R
@@ -58,6 +63,7 @@ import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.util.CarTransport
 import org.moire.ultrasonic.util.FloatingAppearance
+import org.moire.ultrasonic.util.LyricsLoader
 import org.moire.ultrasonic.util.LyricsParser
 import org.moire.ultrasonic.util.ReverseSafetyManager
 import org.moire.ultrasonic.activity.NavigationActivity
@@ -210,6 +216,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private var showingNetworkMessage = false
 
     private val handler = Handler(Looper.getMainLooper())
+
+    /** One cancellable scope for every lyrics lookup, instead of a raw Thread per song. */
+    private val lyricsScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** The subscriptions of the service, released when it goes away. */
     private val disposables = CompositeDisposable()
@@ -436,6 +445,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         sleepTimerManager.removeListener(this)
         reverseSafetyManager.stop()
         disposables.clear()
+        lyricsScope.cancel()
         handler.removeCallbacks(updateRunnable)
         handler.removeCallbacks(idleFadeRunnable)
         handler.removeCallbacks(tempHideRunnable)
@@ -1681,68 +1691,46 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
         lyricsView?.setText(R.string.player_pane_lyrics_loading)
 
-        val artist = track.artist.orEmpty().trim()
-        val title = track.title.orEmpty().trim()
-        val album = track.album.orEmpty().trim()
         val targetId = track.id
         val durationMs = (controller?.duration ?: 0L).coerceAtLeast(0L)
+        val appContext = applicationContext
 
-        Thread {
-            val found: Pair<String?, List<TimedLyric>> = try {
-                // A lyrics copy downloaded earlier wins over anything the server has. It lives
-                // on the device, so the floating window keeps its word timings while offline.
-                val saved = if (Settings.preferSavedLyrics) {
-                    org.moire.ultrasonic.util.LyricsAutoSearch.readSaved(
-                        applicationContext, title, artist, album, durationMs
-                    )
-                } else {
-                    null
-                }
-                if (saved != null) {
-                    saved.rawText to saved.lines
-                } else {
-                    // The endpoint with the time axis is asked first, because the plain one
-                    // drops every timestamp and the lyrics would not move along with the song.
-                    val service = MusicServiceFactory.getMusicService()
-                    val lyrics = runCatching { service.getSyncedLyrics(targetId) }.getOrNull()
-                        ?.takeIf { it.timedLines.isNotEmpty() }
-                        ?: service.getLyrics(artist, title)
-                    val text = lyrics?.text
-                    val timed = lyrics?.timedLines?.map { TimedLyric(it.startMs, it.text) }
-                        ?: emptyList()
-                    text to timed
-                }
-            } catch (all: Exception) {
-                Timber.w(all, "Could not load lyrics for the floating window")
-                null to emptyList()
-            }
-
-            val text = found.first
-            val timed = if (found.second.isNotEmpty()) {
-                found.second
-            } else {
-                // Without a time axis the lines are spread over the length of the song, so the
-                // lyrics still move along with the music instead of freezing on the first lines.
-                LyricsParser.spreadPlainLyrics(text, durationMs)
-            }
+        // The floating window uses the very same loader as the player pane and the full screen
+        // player: permanently saved copies first, then the server (including enhanced word
+        // timings), then LRCLIB with its deadline and rate limit handling. Duplicating that
+        // chain here used to mean a raw Thread on every song change, no online fallback and no
+        // timeout at all.
+        lyricsScope.launch {
+            val result = runCatching {
+                LyricsLoader.load(appContext, track, durationMs)
+            }.onFailure { Timber.w(it, "Could not load lyrics for the floating window") }
+                .getOrNull()
 
             handler.post {
                 if (lyricsTrackId != targetId) return@post
+                val timed = result?.lines.orEmpty()
                 if (timed.isNotEmpty()) {
                     timedLyrics = timed
                     lyricIndex = -1
                     updateFloatingLyrics(controller?.currentPosition ?: 0L)
                 } else {
-                    val fallback = if (text.isNullOrBlank()) {
-                        getString(R.string.player_pane_lyrics_empty)
-                    } else {
-                        text
-                    }
+                    val fallback = result?.text?.takeIf { it.isNotBlank() }
+                        ?: getString(R.string.player_pane_lyrics_empty)
                     lyricsView?.text = fallback
                     lyricsMinView?.text = fallback
                 }
             }
-        }.start()
+        }
+
+        // Warm the next song even when the app is not on screen (the window sits on the map).
+        if (Settings.prefetchLyrics) {
+            val next = runCatching {
+                val player = controller
+                val index = player?.nextMediaItemIndex ?: -1
+                if (player != null && index >= 0) player.getMediaItemAt(index).toTrack() else null
+            }.getOrNull()
+            LyricsLoader.prefetch(appContext, next, (next?.duration ?: 0) * 1_000L)
+        }
     }
 
     /**

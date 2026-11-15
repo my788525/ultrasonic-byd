@@ -1,11 +1,24 @@
 package org.moire.ultrasonic.domain
 
 /**
+ * One sung segment of a lyric line, with the moment it starts.
+ *
+ * Concatenating the words of a line must reproduce [TimedLyricLine.text] exactly, including
+ * spaces, because the karaoke wipe is drawn over that string.
+ */
+data class TimedLyricWord(
+    val startMs: Long,
+    val text: String
+)
+
+/**
  * One line of lyrics together with the moment it has to be shown.
  */
 data class TimedLyricLine(
     val startMs: Long,
-    val text: String
+    val text: String,
+    /** Word level timing from the OpenSubsonic enhanced response, empty for line synced songs. */
+    val words: List<TimedLyricWord> = emptyList()
 )
 
 /**

@@ -351,7 +351,14 @@ open class RESTMusicService(
 
     @Throws(Exception::class)
     override fun getSyncedLyrics(id: String): Lyrics? {
-        val response = API.getLyricsBySongId(id).execute().throwOnFailure()
+        // OpenSubsonic songLyrics v2 adds cueLine word level timings behind enhanced=true.
+        // Older servers either ignore the parameter (same response shape) or reject it; in the
+        // latter case a plain request is made, so no version probing is needed and every server
+        // keeps working. Jackson ignores unknown fields, so a v1 response parses unchanged.
+        val enhanced = runCatching {
+            API.getLyricsBySongId(id, true).execute().throwOnFailure()
+        }.getOrNull()
+        val response = enhanced ?: API.getLyricsBySongId(id).execute().throwOnFailure()
 
         return response.body()?.lyricsList?.toDomainEntity()
     }

@@ -72,17 +72,18 @@ object LyricsParser {
             if (tags.isEmpty()) return@forEach
 
             val text = line.substring(tags.last().range.last + 1).trim()
-            // Word timings are absolute inside the file, so the same global offset applies.
+            // Word timings are absolute inside the file and belong to the first timestamp of
+            // the line. When the same line is repeated with more timestamps (a chorus, for
+            // example) the whole word timeline has to move with the line it belongs to.
             val enhanced = WordLyricsParser.parseEnhanced(text)
+            val baseStartMs = tagStartMs(tags.first())
             tags.forEach { match ->
-                val hours = match.groupValues[1].toLongOrNull() ?: 0L
-                val minutes = match.groupValues[2].toLongOrNull() ?: 0L
-                val seconds = match.groupValues[3].toLongOrNull() ?: 0L
-                val startMs = hours * MS_PER_HOUR + minutes * MS_PER_MINUTE +
-                    seconds * MS_PER_SECOND + fractionMs(match.groupValues[4]) + globalOffsetMs
+                val rawStartMs = tagStartMs(match)
+                val startMs = rawStartMs + globalOffsetMs
                 if (enhanced != null) {
+                    val shift = rawStartMs - baseStartMs
                     val words = enhanced.second.map { word ->
-                        TimedWord(word.startMs + globalOffsetMs, word.text)
+                        TimedWord(word.startMs + shift + globalOffsetMs, word.text)
                     }
                     timed.add(TimedLyric(startMs, enhanced.first, words))
                 } else {
@@ -92,6 +93,14 @@ object LyricsParser {
         }
 
         return timed.sortedBy { it.startMs }
+    }
+
+    private fun tagStartMs(match: MatchResult): Long {
+        val hours = match.groupValues[1].toLongOrNull() ?: 0L
+        val minutes = match.groupValues[2].toLongOrNull() ?: 0L
+        val seconds = match.groupValues[3].toLongOrNull() ?: 0L
+        return hours * MS_PER_HOUR + minutes * MS_PER_MINUTE +
+            seconds * MS_PER_SECOND + fractionMs(match.groupValues[4])
     }
 
     /** Parses an LRC offset value: decimals are seconds, integers are milliseconds. */
@@ -130,9 +139,13 @@ object LyricsParser {
      * the real timing of the words, but the lyrics move along with the song and every line
      * becomes visible, which is much better than a frozen block of text.
      *
+     * When the length is unknown there is no honest time axis to invent. Putting the lines at
+     * 0, 1, 2 ms would make the whole song flash by in the first frames, so the caller gets an
+     * empty list and shows the untouched plain text instead.
+     *
      * @param text the plain lyrics.
      * @param durationMs the length of the song, in milliseconds.
-     * @return the lines with an evenly spread time axis.
+     * @return the lines with an evenly spread time axis, or an empty list without a duration.
      */
     fun spreadPlainLyrics(text: String?, durationMs: Long): List<TimedLyric> {
         if (text.isNullOrBlank()) return emptyList()
@@ -141,15 +154,7 @@ object LyricsParser {
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .toList()
-        if (lines.isEmpty()) return emptyList()
-
-        // A song of unknown length would put every line at the very beginning, so the
-        // lines would all appear at once. In that case there is no time axis to make.
-        if (durationMs <= 0) {
-            return lines.mapIndexed { index, line ->
-                TimedLyric(index.toLong(), line)
-            }
-        }
+        if (lines.isEmpty() || durationMs <= 0) return emptyList()
 
         val step = durationMs / lines.size
         return lines.mapIndexed { index, line ->
