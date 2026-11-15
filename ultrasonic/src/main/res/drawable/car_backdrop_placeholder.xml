@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Neutral stand-in while the cover is downloading, or when the track has no cover art.
+     A flat dark surface keeps the tinted scrim readable instead of blowing a tiny placeholder
+     icon up to the size of the head unit display. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#0A0D12" />
+</shape>

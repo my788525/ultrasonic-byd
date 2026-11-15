@@ -774,4 +774,21 @@ adb shell settings put secure accessibility_enabled 1</string>
     <string name="player_view_cover">封面</string>
     <string name="player_view_lyrics">歌词</string>
     <string name="player_view_queue">队列</string>
+    <!-- byd.49：全屏专属布局与快捷工具 -->
+    <string name="pane_up_next_first">下一首  %1$s</string>
+    <string name="pane_up_next_second">随后  %1$s</string>
+    <string name="pane_up_next_empty">队列已到末尾</string>
+    <string name="quick_tools_theme">主题</string>
+    <string name="quick_tools_playlist">歌单</string>
+    <string name="quick_tools_queue">播放列表</string>
+    <string name="quick_tools_font_minus">字号-</string>
+    <string name="quick_tools_font_plus">字号+</string>
+    <string name="quick_theme_changed">配色主题：%1$s</string>
+    <string name="quick_font_changed">歌词字号：%1$d sp</string>
+    <string name="quick_font_limit">歌词字号已达上限 %1$d sp</string>
+    <string name="quick_playlist_title">快速选择歌单</string>
+    <string name="quick_playlist_empty">暂无可用歌单</string>
+    <string name="quick_queue_title">播放列表</string>
+    <string name="quick_queue_empty">播放列表为空</string>
+    <string name="quick_queue_current">正在播放  %1$s</string>
 </resources>

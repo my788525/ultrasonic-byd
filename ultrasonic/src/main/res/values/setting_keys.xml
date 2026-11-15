@@ -124,4 +124,5 @@
     <string name="setting_key.update_check_on_start" translatable="false">update.check_on_start</string>
     <string name="setting_key.update_mirror_url" translatable="false">update.mirror_url</string>
     <string name="setting_key.update_skip_version" translatable="false">update.skip_version</string>
+    <string name="setting_key.player_fullscreen" translatable="false">ui.player_fullscreen</string>
 </resources>

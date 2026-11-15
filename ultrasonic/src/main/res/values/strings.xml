@@ -798,4 +798,21 @@ adb shell settings put secure accessibility_enabled 1</string>
     <string name="player_view_cover">Cover</string>
     <string name="player_view_lyrics">Lyrics</string>
     <string name="player_view_queue">Queue</string>
+    <!-- byd.49: fullscreen chrome and quick tools -->
+    <string name="pane_up_next_first">Next  %1$s</string>
+    <string name="pane_up_next_second">Then  %1$s</string>
+    <string name="pane_up_next_empty">End of queue</string>
+    <string name="quick_tools_theme">Theme</string>
+    <string name="quick_tools_playlist">Playlists</string>
+    <string name="quick_tools_queue">Queue</string>
+    <string name="quick_tools_font_minus">Font -</string>
+    <string name="quick_tools_font_plus">Font +</string>
+    <string name="quick_theme_changed">Color scheme: %1$s</string>
+    <string name="quick_font_changed">Lyrics font: %1$d sp</string>
+    <string name="quick_font_limit">Lyrics font is already at the %1$d sp limit</string>
+    <string name="quick_playlist_title">Pick a playlist</string>
+    <string name="quick_playlist_empty">No playlists available</string>
+    <string name="quick_queue_title">Play queue</string>
+    <string name="quick_queue_empty">The play queue is empty</string>
+    <string name="quick_queue_current">Now playing  %1$s</string>
 </resources>

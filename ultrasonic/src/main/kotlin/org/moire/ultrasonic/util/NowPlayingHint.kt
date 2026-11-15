@@ -66,6 +66,40 @@ object NowPlayingHint {
         return runCatching { p.getMediaItemAt(index).toTrack() }.getOrNull()
     }
 
+    /**
+     * The next [count] distinct tracks in play order, shuffle and repeat aware.
+     *
+     * Used by the fullscreen header, where both upcoming songs stay on screen all the time
+     * instead of replacing the current title for a few seconds. A hard step budget guarantees
+     * termination even for a single-song queue with repeat-all turned on.
+     */
+    fun upNextTracks(manager: MediaPlayerManager, count: Int): List<Track> {
+        if (count <= 0 || manager.repeatMode == Player.REPEAT_MODE_ONE) return emptyList()
+        val items = runCatching { manager.playlistInPlayOrder }.getOrNull().orEmpty()
+        if (items.isEmpty()) return emptyList()
+        val current = runCatching { manager.getCurrentShuffleIndex() }.getOrDefault(-1)
+        if (current < 0) return emptyList()
+        val repeatAll = manager.repeatMode == Player.REPEAT_MODE_ALL
+        val currentId = runCatching { items.getOrNull(current)?.toTrack()?.id }.getOrNull()
+        val result = ArrayList<Track>(count)
+        var index = current + 1
+        var steps = 0
+        val budget = items.size * 2 + count
+        while (result.size < count && steps < budget) {
+            steps++
+            if (index >= items.size) {
+                if (!repeatAll) break
+                index = 0
+            }
+            val track = runCatching { items.getOrNull(index)?.toTrack() }.getOrNull()
+            if (track != null && track.id != currentId && result.none { it.id == track.id }) {
+                result.add(track)
+            }
+            index++
+        }
+        return result
+    }
+
     /** Title line: an explicit "next" prefix followed by the track name. */
     fun title(context: Context, track: Track): String =
         context.getString(R.string.next_track_title, track.title.orEmpty())

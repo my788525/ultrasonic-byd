@@ -6,17 +6,42 @@
   a central stage for synced lyrics or the playback queue, and a high-contrast car control
   dock at the bottom.
 -->
-<LinearLayout xmlns:a="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:a="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    a:id="@+id/player_pane_root"
+    a:id="@+id/player_pane_backdrop_root"
     a:layout_width="match_parent"
-    a:layout_height="match_parent"
-    a:orientation="vertical"
-    a:paddingStart="16dp"
-    a:paddingTop="8dp"
-    a:paddingEnd="16dp"
-    a:paddingBottom="10dp">
+    a:layout_height="match_parent">
+
+    <!-- Fullscreen only. The current album art fills the whole pane; the scrim View on top
+         is rebuilt from the active CarPalette so the tint follows the chosen theme. Both
+         stay GONE in the two pane layout, where the window gradient is the background. -->
+    <ImageView
+        a:id="@+id/pane_backdrop"
+        a:layout_width="match_parent"
+        a:layout_height="match_parent"
+        a:contentDescription="@null"
+        a:scaleType="centerCrop"
+        a:src="@drawable/car_backdrop_placeholder"
+        a:visibility="gone"
+        tools:visibility="visible" />
+
+    <View
+        a:id="@+id/pane_backdrop_scrim"
+        a:layout_width="match_parent"
+        a:layout_height="match_parent"
+        a:visibility="gone"
+        tools:visibility="visible" />
+
+    <LinearLayout
+        a:id="@+id/player_pane_root"
+        a:layout_width="match_parent"
+        a:layout_height="match_parent"
+        a:orientation="vertical"
+        a:paddingStart="16dp"
+        a:paddingTop="8dp"
+        a:paddingEnd="16dp"
+        a:paddingBottom="10dp">
 
     <!-- Compact Now Playing header so the driver always sees what is playing even when
          browsing folders, albums, artists, or settings on the left pane. -->
@@ -33,6 +58,21 @@
         a:paddingTop="8dp"
         a:paddingEnd="12dp"
         a:paddingBottom="8dp">
+
+        <!-- In fullscreen the exit button sits on the LEFT of the song title, leaving the
+             right hand side free for the two upcoming tracks. -->
+        <ImageButton
+            a:id="@+id/pane_fullscreen_exit"
+            a:layout_width="44dp"
+            a:layout_height="44dp"
+            a:layout_marginEnd="10dp"
+            a:background="@drawable/car_control_bg"
+            a:contentDescription="@string/player_fullscreen_exit"
+            a:padding="9dp"
+            a:scaleType="fitCenter"
+            a:src="@drawable/ic_fullscreen_exit"
+            a:visibility="gone"
+            tools:visibility="visible" />
 
         <com.google.android.material.card.MaterialCardView
             a:id="@+id/pane_cover_card"
@@ -102,8 +142,48 @@
             tools:text="Buffering …"
             tools:visibility="visible" />
 
+        <!-- Fullscreen only: the next two tracks stay visible to the RIGHT of the title.
+             The clickable container keeps taps here from falling through to the header, which
+             would otherwise leave fullscreen mode. -->
+        <LinearLayout
+            a:id="@+id/pane_up_next"
+            a:layout_width="230dp"
+            a:layout_height="wrap_content"
+            a:layout_marginStart="12dp"
+            a:layout_marginEnd="6dp"
+            a:clickable="true"
+            a:gravity="end"
+            a:orientation="vertical"
+            a:visibility="gone"
+            tools:visibility="visible">
+
+            <TextView
+                a:id="@+id/pane_up_next_first"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:ellipsize="end"
+                a:gravity="end"
+                a:maxLines="1"
+                a:textColor="@color/pal_text_primary"
+                a:textSize="13sp"
+                a:textStyle="bold"
+                tools:text="Next  Bad Habits - Ed Sheeran" />
+
+            <TextView
+                a:id="@+id/pane_up_next_second"
+                a:layout_width="match_parent"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="3dp"
+                a:ellipsize="end"
+                a:gravity="end"
+                a:maxLines="1"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="12sp"
+                tools:text="Then  Shape of You - Ed Sheeran" />
+        </LinearLayout>
+
         <!-- One tap gives the lyrics the whole screen, a second one restores the library on
-             the left. The button stays in the header so it is always reachable. -->
+             the left. In fullscreen this button is hidden and the LEFT exit button takes over. -->
         <ImageButton
             a:id="@+id/pane_fullscreen"
             a:layout_width="44dp"
@@ -332,4 +412,169 @@
 
     </LinearLayout>
 
+    <!-- Fullscreen-only quick tools. A separate row keeps the seven transport buttons large
+         instead of squeezing twelve targets into a single strip on a narrow head unit. -->
+    <LinearLayout
+        a:id="@+id/pane_quick_tools"
+        a:layout_width="match_parent"
+        a:layout_height="wrap_content"
+        a:layout_marginTop="8dp"
+        a:gravity="center"
+        a:orientation="horizontal"
+        a:visibility="gone"
+        tools:visibility="visible">
+
+        <LinearLayout
+            a:id="@+id/quick_theme"
+            a:layout_width="0dp"
+            a:layout_height="54dp"
+            a:layout_weight="1"
+            a:layout_marginStart="3dp"
+            a:layout_marginEnd="3dp"
+            a:background="@drawable/car_quick_tool_bg"
+            a:clickable="true"
+            a:focusable="true"
+            a:gravity="center"
+            a:orientation="vertical">
+
+            <ImageView
+                a:layout_width="22dp"
+                a:layout_height="22dp"
+                a:contentDescription="@null"
+                a:scaleType="fitCenter"
+                a:src="@drawable/ic_quick_theme" />
+
+            <TextView
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:maxLines="1"
+                a:text="@string/quick_tools_theme"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            a:id="@+id/quick_playlist"
+            a:layout_width="0dp"
+            a:layout_height="54dp"
+            a:layout_weight="1"
+            a:layout_marginStart="3dp"
+            a:layout_marginEnd="3dp"
+            a:background="@drawable/car_quick_tool_bg"
+            a:clickable="true"
+            a:focusable="true"
+            a:gravity="center"
+            a:orientation="vertical">
+
+            <ImageView
+                a:layout_width="22dp"
+                a:layout_height="22dp"
+                a:contentDescription="@null"
+                a:scaleType="fitCenter"
+                a:src="@drawable/ic_quick_playlist" />
+
+            <TextView
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:maxLines="1"
+                a:text="@string/quick_tools_playlist"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            a:id="@+id/quick_queue"
+            a:layout_width="0dp"
+            a:layout_height="54dp"
+            a:layout_weight="1"
+            a:layout_marginStart="3dp"
+            a:layout_marginEnd="3dp"
+            a:background="@drawable/car_quick_tool_bg"
+            a:clickable="true"
+            a:focusable="true"
+            a:gravity="center"
+            a:orientation="vertical">
+
+            <ImageView
+                a:layout_width="22dp"
+                a:layout_height="22dp"
+                a:contentDescription="@null"
+                a:scaleType="fitCenter"
+                a:src="@drawable/ic_quick_queue" />
+
+            <TextView
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:maxLines="1"
+                a:text="@string/quick_tools_queue"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            a:id="@+id/quick_font_minus"
+            a:layout_width="0dp"
+            a:layout_height="54dp"
+            a:layout_weight="1"
+            a:layout_marginStart="3dp"
+            a:layout_marginEnd="3dp"
+            a:background="@drawable/car_quick_tool_bg"
+            a:clickable="true"
+            a:focusable="true"
+            a:gravity="center"
+            a:orientation="vertical">
+
+            <ImageView
+                a:layout_width="22dp"
+                a:layout_height="22dp"
+                a:contentDescription="@null"
+                a:scaleType="fitCenter"
+                a:src="@drawable/ic_quick_font_minus" />
+
+            <TextView
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:maxLines="1"
+                a:text="@string/quick_tools_font_minus"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="10sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            a:id="@+id/quick_font_plus"
+            a:layout_width="0dp"
+            a:layout_height="54dp"
+            a:layout_weight="1"
+            a:layout_marginStart="3dp"
+            a:layout_marginEnd="3dp"
+            a:background="@drawable/car_quick_tool_bg"
+            a:clickable="true"
+            a:focusable="true"
+            a:gravity="center"
+            a:orientation="vertical">
+
+            <ImageView
+                a:layout_width="22dp"
+                a:layout_height="22dp"
+                a:contentDescription="@null"
+                a:scaleType="fitCenter"
+                a:src="@drawable/ic_quick_font_plus" />
+
+            <TextView
+                a:layout_width="wrap_content"
+                a:layout_height="wrap_content"
+                a:layout_marginTop="2dp"
+                a:maxLines="1"
+                a:text="@string/quick_tools_font_plus"
+                a:textColor="@color/pal_text_secondary"
+                a:textSize="10sp" />
+        </LinearLayout>
+
+    </LinearLayout>
+
 </LinearLayout>
+</FrameLayout>

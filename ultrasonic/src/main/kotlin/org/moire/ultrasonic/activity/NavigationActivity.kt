@@ -110,6 +110,9 @@ class NavigationActivity : ScopeActivity() {
     private var navHostView: View? = null
     private var toolbarView: View? = null
     private var playerFullscreen = false
+
+    /** True when a cold start restored fullscreen from the persisted setting. */
+    private var coldStartFullscreenRestored = false
     private var nowPlayingHidden = false
     private var navigationView: NavigationView? = null
     private var drawerLayout: DrawerLayout? = null
@@ -183,7 +186,11 @@ class NavigationActivity : ScopeActivity() {
         CarTheme.applyWindow(this)
         lastNightMode = CarTheme.isNight(this)
 
-        playerFullscreen = savedInstanceState?.getBoolean(STATE_PLAYER_FULLSCREEN, false) ?: false
+        // A cold start has no saved instance state. Fall back to the persisted choice so the
+        // head unit comes back in the same layout the driver left it in.
+        playerFullscreen = savedInstanceState?.getBoolean(STATE_PLAYER_FULLSCREEN, false)
+            ?: Settings.playerFullscreen
+        coldStartFullscreenRestored = savedInstanceState == null && playerFullscreen
 
         nowPlayingView = findViewById(R.id.now_playing_fragment)
         playerPane = findViewById(R.id.player_pane)
@@ -361,6 +368,7 @@ class NavigationActivity : ScopeActivity() {
     fun togglePlayerFullscreen() {
         if (!UiState.twoPane) return
         playerFullscreen = !playerFullscreen
+        Settings.playerFullscreen = playerFullscreen
         applyPlayerFullscreen(showToast = true)
     }
 
@@ -704,7 +712,9 @@ class NavigationActivity : ScopeActivity() {
         setMenuForServerCapabilities()
 
         // Lifecycle support's constructor registers some event receivers so it should be created early
-        lifecycleSupport.onCreate(Settings.resumeOnStart)
+        // Restoring the fullscreen lyrics implies the driver wants the music back as well,
+        // even when the general "resume on start" switch has been turned off.
+        lifecycleSupport.onCreate(Settings.resumeOnStart || coldStartFullscreenRestored)
 
         // The floating window is hidden while the app is in the foreground, regardless of which
         // fragment is showing. It re-appears over the navigation map only when the app goes
@@ -835,6 +845,7 @@ class NavigationActivity : ScopeActivity() {
     private val exitFullscreenOnBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
             playerFullscreen = false
+            Settings.playerFullscreen = false
             applyPlayerFullscreen(showToast = false)
         }
     }

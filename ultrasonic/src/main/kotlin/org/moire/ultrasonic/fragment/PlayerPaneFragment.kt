@@ -7,8 +7,10 @@
 
 package org.moire.ultrasonic.fragment
 
+import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.os.Bundle
 import android.os.Handler
@@ -16,6 +18,7 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.SeekBar
@@ -26,10 +29,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.android.ext.android.inject
 import org.koin.androidx.scope.ScopeFragment
 import org.moire.ultrasonic.R
@@ -37,6 +42,7 @@ import org.moire.ultrasonic.activity.NavigationActivity
 import org.moire.ultrasonic.adapters.QueueAdapter
 import org.moire.ultrasonic.domain.Track
 import org.moire.ultrasonic.service.MediaPlayerManager
+import org.moire.ultrasonic.service.MusicServiceFactory
 import org.moire.ultrasonic.service.RxBus
 import org.moire.ultrasonic.service.plusAssign
 import org.moire.ultrasonic.subsonic.ImageLoaderProvider
@@ -44,8 +50,13 @@ import org.moire.ultrasonic.ui.CarPalette
 import org.moire.ultrasonic.ui.CarTheme
 import org.moire.ultrasonic.ui.SyncedLyricsView
 import org.moire.ultrasonic.util.CarTransport
+import org.moire.ultrasonic.util.DownloadUtil
+import org.moire.ultrasonic.util.DownloadedTracks
+import org.moire.ultrasonic.util.HomePrefs
 import org.moire.ultrasonic.util.LyricsLoader
 import org.moire.ultrasonic.util.NowPlayingHint
+import org.moire.ultrasonic.util.PinnedPlaylist
+import org.moire.ultrasonic.util.PlaylistResumeStore
 import org.moire.ultrasonic.util.Settings
 import org.moire.ultrasonic.util.SleepTimerManager
 import org.moire.ultrasonic.util.UiState
@@ -92,6 +103,20 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var queueAdapter: QueueAdapter? = null
     private var sleepButton: ImageButton? = null
     private var fullscreenButton: ImageButton? = null
+    private var exitFullscreenButton: ImageButton? = null
+    private var upNextContainer: View? = null
+    private var upNextFirst: TextView? = null
+    private var upNextSecond: TextView? = null
+    private var quickTools: View? = null
+    private var quickTheme: View? = null
+    private var quickPlaylist: View? = null
+    private var quickQueue: View? = null
+    private var quickFontMinus: View? = null
+    private var quickFontPlus: View? = null
+    private var lastUpNextKey: String? = null
+    private var backdropView: ImageView? = null
+    private var backdropScrim: View? = null
+    private var lastBackdropTrackId: String? = null
 
     /** Last applied visual settings signature, so a change in settings is picked up at once. */
     private var lastAppearanceSignature = 0
@@ -172,6 +197,18 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         queueButton = view.findViewById(R.id.pane_queue_button)
         sleepButton = view.findViewById(R.id.pane_sleep)
         fullscreenButton = view.findViewById(R.id.pane_fullscreen)
+        exitFullscreenButton = view.findViewById(R.id.pane_fullscreen_exit)
+        upNextContainer = view.findViewById(R.id.pane_up_next)
+        upNextFirst = view.findViewById(R.id.pane_up_next_first)
+        upNextSecond = view.findViewById(R.id.pane_up_next_second)
+        quickTools = view.findViewById(R.id.pane_quick_tools)
+        quickTheme = view.findViewById(R.id.quick_theme)
+        quickPlaylist = view.findViewById(R.id.quick_playlist)
+        quickQueue = view.findViewById(R.id.quick_queue)
+        quickFontMinus = view.findViewById(R.id.quick_font_minus)
+        quickFontPlus = view.findViewById(R.id.quick_font_plus)
+        backdropView = view.findViewById(R.id.pane_backdrop)
+        backdropScrim = view.findViewById(R.id.pane_backdrop_scrim)
 
         lastReloadToken = Settings.lyricsReloadToken
 
@@ -191,6 +228,14 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         fullscreenButton?.setOnClickListener {
             (activity as? NavigationActivity)?.togglePlayerFullscreen()
         }
+        exitFullscreenButton?.setOnClickListener {
+            (activity as? NavigationActivity)?.togglePlayerFullscreen()
+        }
+        quickTheme?.setOnClickListener { cycleTheme() }
+        quickPlaylist?.setOnClickListener { showPlaylistQuickPick() }
+        quickQueue?.setOnClickListener { showQueueQuickPick() }
+        quickFontMinus?.setOnClickListener { adjustFontSize(-FONT_STEP_SP) }
+        quickFontPlus?.setOnClickListener { adjustFontSize(FONT_STEP_SP) }
 
         decoratePane()
 
@@ -302,6 +347,103 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
         seekBar?.progressTintList = ColorStateList.valueOf(accent)
         seekBar?.thumbTintList = ColorStateList.valueOf(accent)
+        applyFullscreenSurfaces(ctx)
+    }
+
+    /**
+     * Fullscreen makes the current cover the background of the whole pane.
+     *
+     * The scrim is rebuilt from the active palette instead of being a fixed black overlay:
+     * its top and bottom use the theme background colours, the middle is the theme surface
+     * pulled towards the theme accent. Ocean, Aurora, Violet, Bordeaux and Amber therefore
+     * each cast their own colour over the art, so the photo and the controls read as one UI.
+     * The cards in the middle go translucent and the lyrics get a dark shadow, which keeps
+     * white text readable without hiding the artwork.
+     */
+    private fun applyFullscreenSurfaces(ctx: Context) {
+        val palette = CarPalette.current()
+        val accent = CarTheme.accent(ctx, palette)
+        val surface = CarTheme.surfaceColor(ctx, palette)
+        val full = UiState.playerFullscreen
+
+        headerCard?.background = if (full) {
+            CarTheme.roundedFill(
+                ctx,
+                CarTheme.withAlpha(surface, 0x9E),
+                CarTheme.withAlpha(accent, 0x3D),
+                16f
+            )
+        } else {
+            CarTheme.cardBackground(ctx, palette, cornerDp = 16f)
+        }
+
+        stageCard?.background = if (full) {
+            CarTheme.roundedFill(
+                ctx,
+                CarTheme.withAlpha(surface, 0x44),
+                CarTheme.withAlpha(accent, 0x33),
+                16f
+            )
+        } else {
+            CarTheme.roundedFill(
+                ctx,
+                CarTheme.withAlpha(surface, 0xB8),
+                CarTheme.withAlpha(accent, 0x26),
+                16f
+            )
+        }
+
+        lyricsView?.setShadowLayer(
+            if (full) LYRICS_SHADOW_RADIUS else 0f,
+            0f,
+            if (full) LYRICS_SHADOW_DY else 0f,
+            if (full) LYRICS_SHADOW_COLOR else Color.TRANSPARENT
+        )
+
+        backdropView?.visibility = if (full) View.VISIBLE else View.GONE
+        backdropScrim?.visibility = if (full) View.VISIBLE else View.GONE
+        if (full) {
+            applyBackdropScrim(ctx, palette)
+            loadBackdrop(currentTrack)
+        }
+    }
+
+    /** Theme-tinted mask over the cover: dark at the header and controls, lighter in the middle. */
+    private fun applyBackdropScrim(ctx: Context, palette: CarPalette) {
+        val top = CarTheme.tone(ctx, ContextCompat.getColor(ctx, palette.bgTop))
+        val bottom = CarTheme.tone(ctx, ContextCompat.getColor(ctx, palette.bgBottom))
+        val surface = CarTheme.surfaceColor(ctx, palette)
+        val accent = CarTheme.accent(ctx, palette)
+        val tintedMiddle = CarTheme.mix(surface, accent, SCRIM_ACCENT_RATIO)
+        backdropScrim?.background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(
+                CarTheme.withAlpha(top, 0xD8),
+                CarTheme.withAlpha(tintedMiddle, 0x8C),
+                CarTheme.withAlpha(bottom, 0xE8)
+            )
+        )
+    }
+
+    /** Loads the current cover at a size that still looks clean when cropped to the full pane. */
+    private fun loadBackdrop(track: Track?, force: Boolean = false) {
+        if (!UiState.playerFullscreen) return
+        val id = track?.id
+        if (!force && id == lastBackdropTrackId) return
+        lastBackdropTrackId = id
+        val target = backdropView ?: return
+        if (track == null) {
+            target.setImageResource(R.drawable.car_backdrop_placeholder)
+            return
+        }
+        imageLoaderProvider.executeOn { loader ->
+            if (isAdded) {
+                loader.loadImage(
+                    target, track, false, BACKDROP_SIZE_PX,
+                    R.drawable.car_backdrop_placeholder
+                )
+            }
+        }
     }
 
     override fun onResume() {
@@ -331,20 +473,26 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         syncFullscreenButton()
     }
 
-    /** The button shows the action it will perform, not the state it is in. */
+    /**
+     * Fullscreen chrome: enter on the right, exit on the left, the two upcoming tracks on the
+     * right of the title and the quick tools row. Exactly one of the two buttons is visible.
+     */
     private fun syncFullscreenButton() {
-        val button = fullscreenButton ?: return
-        button.visibility = if (Settings.showPlayerFullscreenButton) View.VISIBLE else View.GONE
         val full = UiState.playerFullscreen
-        button.setImageResource(
-            if (full) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen_enter
-        )
-        context?.let { ctx ->
-            button.contentDescription = ctx.getString(
-                if (full) R.string.player_fullscreen_exit else R.string.player_fullscreen_enter
-            )
+        fullscreenButton?.let { button ->
+            button.visibility =
+                if (!full && Settings.showPlayerFullscreenButton) View.VISIBLE else View.GONE
+            button.setImageResource(R.drawable.ic_fullscreen_enter)
+            context?.let { ctx ->
+                button.contentDescription = ctx.getString(R.string.player_fullscreen_enter)
+            }
+            applyToggleTint(button, false)
         }
-        applyToggleTint(button, full)
+        exitFullscreenButton?.visibility = if (full) View.VISIBLE else View.GONE
+        upNextContainer?.visibility = if (full) View.VISIBLE else View.GONE
+        quickTools?.visibility = if (full) View.VISIBLE else View.GONE
+        if (full) renderUpNext(force = true) else lastUpNextKey = null
+        context?.let { applyFullscreenSurfaces(it) }
     }
 
     /** Called by [NavigationActivity] the moment the pane expands or collapses. */
@@ -370,6 +518,19 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         coverView = null
         titleView = null
         artistView = null
+        exitFullscreenButton = null
+        upNextContainer = null
+        upNextFirst = null
+        upNextSecond = null
+        quickTools = null
+        quickTheme = null
+        quickPlaylist = null
+        quickQueue = null
+        quickFontMinus = null
+        quickFontPlus = null
+        backdropView = null
+        backdropScrim = null
+        lastBackdropTrackId = null
         lastPlayingState = null
         lastQueueIndex = -2
         super.onDestroyView()
@@ -397,6 +558,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         // position (no calibration offset) and the playing state are all it needs.
         syncedLyrics?.update(position.toLong().coerceAtLeast(0L), mediaPlayerManager.isPlaying)
         renderHeader(position, duration)
+        renderUpNext()
 
         // "Search lyrics again" in settings bumps a token instead of putting a button over
         // the words. Every lyrics surface watches it on its normal refresh.
@@ -467,6 +629,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         // reports the last position of the previous track for one frame.
         renderHeader(0, mediaPlayerManager.playerDuration, true)
         loadLyrics(track)
+        loadBackdrop(track, force = true)
     }
 
     /**
@@ -476,7 +639,9 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
      */
     private fun renderHeader(positionMs: Int, durationMs: Int, force: Boolean = false) {
         val track = currentTrack
-        val hint = if (track != null && Settings.showNextTrackHint &&
+        // In fullscreen the two upcoming tracks are always visible on the right, so the title
+        // itself stays on the current song instead of being replaced for a few seconds.
+        val hint = if (!UiState.playerFullscreen && track != null && Settings.showNextTrackHint &&
             NowPlayingHint.shouldShowNext(positionMs, durationMs)
         ) {
             runCatching { NowPlayingHint.nextTrack(mediaPlayerManager) }.getOrNull()
@@ -758,6 +923,216 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         mediaPlayerManager.pause()
     }
 
+    // region fullscreen quick tools
+
+    /**
+     * Fullscreen only: keeps the next two tracks in play order visible at the right of the
+     * title. The identity key avoids resetting the TextViews twice a second.
+     */
+    private fun renderUpNext(force: Boolean = false) {
+        if (!UiState.playerFullscreen) return
+        val tracks = runCatching {
+            NowPlayingHint.upNextTracks(mediaPlayerManager, UP_NEXT_COUNT)
+        }.getOrNull().orEmpty()
+        val key = tracks.joinToString("|") { it.id } + "#" + mediaPlayerManager.repeatMode
+        if (!force && key == lastUpNextKey) return
+        lastUpNextKey = key
+        val ctx = context ?: return
+        val first = tracks.getOrNull(0)
+        val second = tracks.getOrNull(1)
+        upNextFirst?.text = if (first != null) {
+            ctx.getString(R.string.pane_up_next_first, upNextLabel(first))
+        } else {
+            ctx.getString(R.string.pane_up_next_empty)
+        }
+        upNextSecond?.text = if (second != null) {
+            ctx.getString(R.string.pane_up_next_second, upNextLabel(second))
+        } else {
+            ""
+        }
+        upNextSecond?.visibility = if (second != null) View.VISIBLE else View.GONE
+    }
+
+    private fun upNextLabel(track: Track): String =
+        listOfNotNull(track.title, track.artist)
+            .filter { it.isNotBlank() }
+            .joinToString(" · ")
+            .ifBlank { track.title.orEmpty() }
+
+    /** One tap walks through the six car color schemes; the activity rebuilds its window. */
+    private fun cycleTheme() {
+        val all = CarPalette.values()
+        val next = all[(all.indexOf(CarPalette.current()) + 1) % all.size]
+        Settings.palette = next.key
+        // Repaint the scrim before the activity recreates, so the tint change is visible at once.
+        context?.let { decoratePane() }
+        Util.toast(
+            getString(R.string.quick_theme_changed, getString(next.labelRes)),
+            context = requireContext()
+        )
+        RxBus.themeChangedEventPublisher.onNext(Unit)
+    }
+
+    /** Steps the base lyrics font size; the appearance signature redraws without a download. */
+    private fun adjustFontSize(delta: Int) {
+        val current = Settings.lyricsFontSizeSp
+        val next = (current + delta).coerceIn(FONT_MIN_SP, FONT_MAX_SP)
+        if (next == current) {
+            Util.toast(
+                getString(R.string.quick_font_limit, effectiveFontSp()),
+                context = requireContext()
+            )
+            return
+        }
+        Settings.lyricsFontSizeSp = next
+        applyLyricsAppearance()
+        Util.toast(
+            getString(R.string.quick_font_changed, effectiveFontSp()),
+            context = requireContext()
+        )
+    }
+
+    /**
+     * Server playlists as a single-tap dialog. A warm cache opens immediately; a background
+     * refresh keeps the next opening current without making the driver wait for the network.
+     */
+    private fun showPlaylistQuickPick() {
+        val cached = HomePrefs.getCachedPlaylists()
+        if (cached.isNotEmpty()) {
+            showPlaylistDialog(cached)
+            refreshPlaylistCache()
+            return
+        }
+        viewLifecycleOwner.lifecycleScope.launch {
+            val loaded = fetchPlaylists()
+            if (!isAdded) return@launch
+            if (loaded.isEmpty()) {
+                Util.toast(getString(R.string.quick_playlist_empty), context = requireContext())
+            } else {
+                showPlaylistDialog(loaded)
+            }
+        }
+    }
+
+    /** Reads the playlists on IO with a hard deadline and caches a non-empty answer. */
+    private suspend fun fetchPlaylists(): List<PinnedPlaylist> = withContext(Dispatchers.IO) {
+        val loaded = withTimeoutOrNull(PLAYLIST_FETCH_TIMEOUT_MS) {
+            runCatching {
+                MusicServiceFactory.getMusicService().getPlaylists(false)
+                    .map { PinnedPlaylist(it.id, it.name, it.coverArt) }
+            }.getOrNull().orEmpty()
+        }.orEmpty()
+        if (loaded.isNotEmpty()) {
+            HomePrefs.setCachedPlaylists(loaded)
+            HomePrefs.setPlaylistFetchTime(System.currentTimeMillis())
+        }
+        loaded
+    }
+
+    private fun refreshPlaylistCache() {
+        val age = System.currentTimeMillis() - HomePrefs.getPlaylistFetchTime()
+        if (age < PLAYLIST_FETCH_TTL_MS) return
+        viewLifecycleOwner.lifecycleScope.launch { fetchPlaylists() }
+    }
+
+    private fun showPlaylistDialog(list: List<PinnedPlaylist>) {
+        val ctx = context ?: return
+        val labels = list.map { it.name }.toTypedArray()
+        val adapter = ArrayAdapter(ctx, R.layout.item_quick_pick, android.R.id.text1, labels)
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.quick_playlist_title)
+            .setSingleChoiceItems(adapter, -1) { dialog, which ->
+                dialog.dismiss()
+                list.getOrNull(which)?.let { playPickedPlaylist(it) }
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** Starts the chosen playlist, continuing at its saved position when one exists. */
+    @Suppress("TooGenericExceptionCaught")
+    private fun playPickedPlaylist(playlist: PinnedPlaylist) {
+        HomePrefs.incrementPlayCount(playlist.id)
+        val progress = PlaylistResumeStore.get(playlist.id)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val songs = withContext(Dispatchers.IO) {
+                val remote = withTimeoutOrNull(PLAYLIST_FETCH_TIMEOUT_MS) {
+                    try {
+                        DownloadUtil.getTracksFromServerAsync(
+                            isArtist = false,
+                            id = playlist.id,
+                            isDirectory = false,
+                            name = playlist.name,
+                            isShare = false
+                        )
+                    } catch (all: Exception) {
+                        Timber.w(all, "Could not load playlist %s", playlist.id)
+                        emptyList<Track>()
+                    }
+                }.orEmpty()
+                remote.ifEmpty {
+                    runCatching {
+                        DownloadedTracks.scan()
+                            .filter { it.state != DownloadedTracks.State.PARTIAL }
+                            .map { it.track }
+                    }.getOrNull().orEmpty()
+                }
+            }
+            if (!isAdded) return@launch
+            if (songs.isEmpty()) {
+                Util.toast(getString(R.string.quick_playlist_empty), context = requireContext())
+                return@launch
+            }
+            mediaPlayerManager.resumePlaylistAt(
+                id = playlist.id,
+                name = playlist.name,
+                songs = songs,
+                index = progress?.index ?: 0,
+                position = progress?.position ?: 0
+            )
+            Util.toast(
+                getString(R.string.home_playlist_playing, playlist.name),
+                context = requireContext()
+            )
+        }
+    }
+
+    /**
+     * The play queue as a dialog, with the currently playing song pre-selected and scrolled
+     * into view. Picking a row jumps straight to it, including the shuffle index translation.
+     */
+    private fun showQueueQuickPick() {
+        val ctx = context ?: return
+        val tracks = runCatching {
+            mediaPlayerManager.playlistInPlayOrder.map { it.toTrack() }
+        }.getOrNull().orEmpty()
+        if (tracks.isEmpty()) {
+            Util.toast(getString(R.string.quick_queue_empty), context = requireContext())
+            return
+        }
+        val current = runCatching {
+            mediaPlayerManager.getCurrentShuffleIndex()
+        }.getOrDefault(-1)
+        val labels = tracks.mapIndexed { index, track ->
+            val detail = upNextLabel(track)
+            if (index == current) {
+                getString(R.string.quick_queue_current, detail)
+            } else {
+                detail
+            }
+        }.toTypedArray()
+        val adapter = ArrayAdapter(ctx, R.layout.item_quick_pick, android.R.id.text1, labels)
+        val dialog = MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.quick_queue_title)
+            .setSingleChoiceItems(adapter, current) { picker, which ->
+                picker.dismiss()
+                playFromQueue(which)
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+        if (current > 0) dialog.listView?.setSelection(current)
+    }
+
     // endregion
 
     companion object {
@@ -771,5 +1146,16 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         private const val REPEAT_OFF = 0
         private const val REPEAT_ALL = 1
         private const val REPEAT_ONE = 2
+        private const val FONT_STEP_SP = 2
+        private const val FONT_MIN_SP = 12
+        private const val FONT_MAX_SP = 36
+        private const val PLAYLIST_FETCH_TIMEOUT_MS = 8_000L
+        private const val PLAYLIST_FETCH_TTL_MS = 10 * 60 * 1000L
+        private const val UP_NEXT_COUNT = 2
+        private const val BACKDROP_SIZE_PX = 800
+        private const val SCRIM_ACCENT_RATIO = 0.22f
+        private const val LYRICS_SHADOW_RADIUS = 9f
+        private const val LYRICS_SHADOW_DY = 2f
+        private const val LYRICS_SHADOW_COLOR = 0xCC000000.toInt()
     }
 }

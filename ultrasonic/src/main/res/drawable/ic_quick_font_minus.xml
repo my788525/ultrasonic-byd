@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- byd.49 fullscreen quick tool icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+  <path
+      android:fillColor="#FFF"
+      android:pathData="M7,4L2,18h2.2l1.2,-3.5h6.2L13,18h2.2L10,4H7zM8.7,7.5h1.6l2,5.5H6.7L8.7,7.5zM15,10h7v2h-7z" />
+</vector>

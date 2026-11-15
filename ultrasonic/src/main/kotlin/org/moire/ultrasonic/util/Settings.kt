@@ -514,6 +514,15 @@ object Settings {
         by BooleanSetting(getKey(R.string.setting_key_resume_on_start), true)
 
     /**
+     * Remembers whether the driver left the player in fullscreen. Unlike the saved instance
+     * state this survives a cold start (the head unit kills the app with the car), so the
+     * next launch comes back to the big lyrics view the driver was using.
+     */
+    @JvmStatic
+    var playerFullscreen
+        by BooleanSetting(getKey(R.string.setting_key_player_fullscreen), false)
+
+    /**
      * Maps the DPAD up/down keys of a car steering wheel to previous/next track.
      * Disabled by default, because the same keys scroll the lists.
      */
