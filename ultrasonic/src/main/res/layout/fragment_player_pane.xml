@@ -410,15 +410,15 @@
             a:scaleType="fitCenter"
             a:src="@drawable/ic_sleep" />
 
-    </LinearLayout>
 
-    <!-- Fullscreen-only quick tools. A separate row keeps the seven transport buttons large
-         instead of squeezing twelve targets into a single strip on a narrow head unit. -->
+    <!-- Fullscreen-only quick tools. In fullscreen the pane has the full head-unit width,
+         so the five shortcuts share ONE row with the transport buttons. The whole block
+         stays GONE in the narrow two-pane layout, leaving the seven buttons untouched. -->
     <LinearLayout
         a:id="@+id/pane_quick_tools"
-        a:layout_width="match_parent"
+        a:layout_width="0dp"
         a:layout_height="wrap_content"
-        a:layout_marginTop="8dp"
+        a:layout_weight="1"
         a:gravity="center"
         a:orientation="horizontal"
         a:visibility="gone"
@@ -573,6 +573,8 @@
                 a:textColor="@color/pal_text_secondary"
                 a:textSize="10sp" />
         </LinearLayout>
+
+    </LinearLayout>
 
     </LinearLayout>
 
