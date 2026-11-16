@@ -186,6 +186,22 @@ object WordLyricsParser {
     }
 
     /**
+     * The number of characters in front of every word: [prefix] has one more entry than
+     * [words], so `prefix[i]` is the length of `words[0]` up to `words[i - 1]`.
+     *
+     * The wipe needs this for every single frame. Adding the word lengths up again each
+     * time costs one iteration per word of the line, so it is calculated once per line
+     * instead and handed to [sungFraction].
+     */
+    fun prefixLengths(words: List<TimedWord>): IntArray {
+        val prefix = IntArray(words.size + 1)
+        for (index in words.indices) {
+            prefix[index + 1] = prefix[index] + words[index].text.length
+        }
+        return prefix
+    }
+
+    /**
      * Fractional character offset of the wipe at [positionMs].
      *
      * Unlike [sungLength], which jumps a whole word at a time, this interpolates *inside* the
@@ -205,13 +221,25 @@ object WordLyricsParser {
         words: List<TimedWord>,
         positionMs: Long,
         lineEndMs: Long
+    ): Float = sungFraction(words, positionMs, lineEndMs, prefixLengths(words))
+
+    /**
+     * [sungFraction] with the character counts in front of the words already worked out.
+     *
+     * @param prefix the result of [prefixLengths] for the same [words].
+     */
+    fun sungFraction(
+        words: List<TimedWord>,
+        positionMs: Long,
+        lineEndMs: Long,
+        prefix: IntArray
     ): Float {
         if (words.isEmpty()) return 0f
         val index = wordIndexAt(words, positionMs)
         if (index < 0) return 0f
 
         val word = words[index]
-        val before = sungLength(words, index - 1).toFloat()
+        val before = prefix[index].toFloat()
         val length = word.text.length
         if (length == 0) return before
 

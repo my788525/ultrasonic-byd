@@ -120,8 +120,8 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     /** Track id + blur strength: changing the slider must reload the transformed bitmap. */
     private var lastBackdropKey: String? = null
 
-    /** Last applied visual settings signature, so a change in settings is picked up at once. */
-    private var lastAppearanceSignature = 0
+    /** Last applied visual settings counter, so a change in settings is picked up at once. */
+    private var lastAppearanceVersion = -1
     private var lastFullscreen = false
 
     /** The track whose lyrics are being shown, kept for the "search again" action in settings. */
@@ -241,6 +241,12 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
         decoratePane()
 
+        // A change of a lyric appearance setting redraws the lyrics right away instead of
+        // waiting for the next refresh.
+        disposables += RxBus.lyricsAppearanceChangedObservable.subscribe {
+            if (isAdded) applyLyricsAppearance()
+        }
+
         lyricsView?.let { lyrics ->
             syncedLyrics = SyncedLyricsView(
                 lyricsScroll,
@@ -252,7 +258,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             }
         }
         syncFullscreenButton()
-        lastAppearanceSignature = Settings.lyricsAppearanceSignature()
+        lastAppearanceVersion = Settings.lyricsAppearanceVersion()
         lastFullscreen = UiState.playerFullscreen
 
         playButton?.setOnClickListener { mediaPlayerManager.togglePlayPause() }
@@ -484,7 +490,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     /** Re-applies all lyric settings, called on resume and whenever their signature changes. */
     private fun applyLyricsAppearance() {
-        lastAppearanceSignature = Settings.lyricsAppearanceSignature()
+        lastAppearanceVersion = Settings.lyricsAppearanceVersion()
         lastFullscreen = UiState.playerFullscreen
         syncedLyrics?.applySettings(effectiveFontSp())
         syncFullscreenButton()
@@ -589,7 +595,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         // cost a new download. The signature changes on every such edit and the view rebuilds
         // its spannable in place. Fullscreen is polled too, in case a fragment transaction was
         // still pending when the activity announced the change.
-        if (Settings.lyricsAppearanceSignature() != lastAppearanceSignature ||
+        if (Settings.lyricsAppearanceVersion() != lastAppearanceVersion ||
             UiState.playerFullscreen != lastFullscreen
         ) {
             applyLyricsAppearance()
@@ -820,6 +826,9 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
      * song that is loading as a song that is stopped, starts the music again, and the music
      * then comes back on its own.
      */
+    /** The status that is on screen, so its background is not rebuilt every tick. */
+    private var lastStatusState: CarTransport.VisualState? = null
+
     private fun updateStatus() {
         val view = statusView ?: return
         val state = CarTransport.visualState(
@@ -847,6 +856,8 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
                 STATUS_COLOR_ERROR
             else -> STATUS_COLOR_WARNING
         }
+        if (lastStatusState == state) return
+        lastStatusState = state
         view.text = message
         view.visibility = View.VISIBLE
         view.setTextColor(statusColor)
@@ -882,8 +893,16 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private fun formatTime(millis: Int): String {
         if (millis <= 0) return "0:00"
         val totalSeconds = millis / 1000
-        return String.format("%d:%02d", totalSeconds / 60, totalSeconds % 60)
+        // The same second is formatted over and over while nothing changes, so the last
+        // result is kept.
+        if (totalSeconds == lastFormattedSeconds) return lastFormattedTime
+        lastFormattedSeconds = totalSeconds
+        lastFormattedTime = String.format("%d:%02d", totalSeconds / 60, totalSeconds % 60)
+        return lastFormattedTime
     }
+
+    private var lastFormattedSeconds = -1
+    private var lastFormattedTime = "0:00"
 
     /** Moves the playback by a fixed step, clamped to the length of the track. */
     private fun seekBy(deltaMs: Int) {
@@ -918,13 +937,21 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     /** The accent colour marks a toggle as on (shuffle/repeat); white means it is off. This is
      *  the same cue the sleep-timer uses, so an active mode is always readable at a glance. */
     private fun applyToggleTint(button: ImageButton?, active: Boolean) {
+        val buttonView = button ?: return
+        // The tint is only touched when it really changes. Rebuilding a colour state list
+        // every 500 ms for a button that did not change costs a draw pass for nothing.
+        if (toggleTintState[buttonView] == active) return
+        toggleTintState[buttonView] = active
         val color = if (active) {
             CarTheme.accent(requireContext(), CarPalette.current())
         } else {
             Color.WHITE
         }
-        button?.let { ImageViewCompat.setImageTintList(it, ColorStateList.valueOf(color)) }
+        ImageViewCompat.setImageTintList(buttonView, ColorStateList.valueOf(color))
     }
+
+    /** The last tint state of every toggle button, so an unchanged one is left alone. */
+    private val toggleTintState = java.util.WeakHashMap<ImageButton, Boolean>()
 
     override fun onSleepTimerActiveChanged(active: Boolean) {
         applySleepTint(active)
@@ -981,8 +1008,9 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         val all = CarPalette.values()
         val next = all[(all.indexOf(CarPalette.current()) + 1) % all.size]
         Settings.palette = next.key
-        // Repaint the scrim before the activity recreates, so the tint change is visible at once.
-        context?.let { decoratePane() }
+        // The activity rebuilds itself and paints the new palette from scratch, so the pane
+        // is not painted here as well: that paint was overwritten a moment later and only
+        // showed up as a flicker.
         Util.toast(
             getString(R.string.quick_theme_changed, getString(next.labelRes)),
             context = requireContext()
@@ -1169,7 +1197,15 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         private const val PLAYLIST_FETCH_TIMEOUT_MS = 8_000L
         private const val PLAYLIST_FETCH_TTL_MS = 10 * 60 * 1000L
         private const val UP_NEXT_COUNT = 2
-        private const val BACKDROP_SIZE_PX = 800
+        /**
+         * The backdrop is decoded at this size.
+         *
+         * The picture is blurred on a much smaller intermediate and is then scaled back up to
+         * the size of the pane, so a bigger decode buys nothing that can be seen. Decoding
+         * 320 px instead of 800 px costs a quarter of the memory and of the time and looks
+         * the same.
+         */
+        private const val BACKDROP_SIZE_PX = 320
         private const val LYRICS_SHADOW_RADIUS = 9f
         private const val LYRICS_SHADOW_DY = 2f
         private const val LYRICS_SHADOW_COLOR = 0xCC000000.toInt()

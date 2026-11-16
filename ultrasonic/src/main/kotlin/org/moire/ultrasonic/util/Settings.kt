@@ -13,6 +13,7 @@ import androidx.preference.PreferenceManager
 import java.util.regex.Pattern
 import org.moire.ultrasonic.R
 import org.moire.ultrasonic.app.UApp
+import org.moire.ultrasonic.service.RxBus
 
 /**
  * Contains convenience functions for reading and writing preferences
@@ -202,30 +203,71 @@ object Settings {
     )
 
     /**
-     * A single value that changes whenever any purely visual lyric setting changes. The three
-     * lyric surfaces poll it on their normal refresh, so a change made in settings takes effect
-     * as soon as the driver comes back - no restart and no re-download of the lyrics.
+     * Bumped whenever a purely visual lyric setting changes.
+     *
+     * The lyric surfaces used to notice such a change by building a signature out of 17
+     * preference values, twice a second, on each of them. Settings watches the preferences
+     * themselves instead: every write - from the settings screen or from a quick button -
+     * publishes [RxBus.lyricsAppearanceChangedPublisher], and the surfaces react to it.
+     * The counter is the safety net for a change that came in without the event.
      */
+    @Volatile
+    private var lyricsAppearanceCounter = 0
+
+    /** The counter as the lyric surfaces see it. */
     @JvmStatic
-    fun lyricsAppearanceSignature(): Int = listOf(
-        lyricsDisplayMode,
-        lyricsFontSizeSp.toString(),
-        lyricsAlignment,
-        lyricsLineSpacingDp.toString(),
-        lyricsCurrentLineAnchor.toString(),
-        lyricsInactiveAlpha.toString(),
-        lyricsAutoScroll.toString(),
-        lyricsBoldCurrent.toString(),
-        lyricsWipeFps.toString(),
-        lyricsFullscreenFontScale.toString(),
-        showLyricsSourceBadge.toString(),
-        lyricsTranslationMode,
-        lyricsTranslationFontScale.toString(),
-        showPlayerFullscreenButton.toString(),
-        backdropDim.toString(),
-        backdropTint.toString(),
-        backdropBlur.toString()
-    ).joinToString("|").hashCode()
+    fun lyricsAppearanceVersion(): Int = lyricsAppearanceCounter
+
+    /**
+     * The settings that only change the look of the lyrics. Their preference keys are the
+     * values of the `setting_key.*` strings, which is what the preference listener reports.
+     */
+    private val lyricsAppearanceKeys: Set<String> by lazy {
+        setOf(
+            getKey(R.string.setting_key_lyrics_display_mode),
+            getKey(R.string.setting_key_lyrics_alignment),
+            getKey(R.string.setting_key_lyrics_line_spacing),
+            getKey(R.string.setting_key_lyrics_current_line_anchor),
+            getKey(R.string.setting_key_lyrics_inactive_alpha),
+            getKey(R.string.setting_key_lyrics_auto_scroll),
+            getKey(R.string.setting_key_lyrics_bold_current),
+            getKey(R.string.setting_key_lyrics_wipe_fps),
+            getKey(R.string.setting_key_lyrics_fullscreen_font_scale),
+            getKey(R.string.setting_key_show_player_fullscreen_button),
+            getKey(R.string.setting_key_lyrics_translation_mode),
+            getKey(R.string.setting_key_lyrics_translation_font_scale),
+            getKey(R.string.setting_key_show_lyrics_source_badge),
+            getKey(R.string.setting_key_lyrics_font_size),
+            getKey(R.string.setting_key_backdrop_dim),
+            getKey(R.string.setting_key_backdrop_tint),
+            getKey(R.string.setting_key_backdrop_blur)
+        )
+    }
+
+    /**
+     * Watches the preferences for the lyric appearance settings.
+     *
+     * Registered once, when the settings are first touched. The listener is held in this
+     * object, so the preferences keep their weak reference to it alive.
+     */
+    private val lyricsAppearanceListener = SharedPreferences.OnSharedPreferenceChangeListener {
+        _, key ->
+        if (key != null && key in lyricsAppearanceKeys) {
+            lyricsAppearanceCounter++
+            RxBus.lyricsAppearanceChangedPublisher.onNext(Unit)
+        }
+    }
+
+    /** Makes sure the preference listener is registered. */
+    @JvmStatic
+    fun ensureLyricsAppearanceWatcher() {
+        if (!lyricsAppearanceWatcherInstalled) {
+            lyricsAppearanceWatcherInstalled = true
+            preferences.registerOnSharedPreferenceChangeListener(lyricsAppearanceListener)
+        }
+    }
+
+    private var lyricsAppearanceWatcherInstalled = false
 
     /**
      * Whether the small source badge ("LRCLIB", "Navidrome", ...) is shown at all. Off by

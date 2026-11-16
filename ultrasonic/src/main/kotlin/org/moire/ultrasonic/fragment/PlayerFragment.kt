@@ -192,7 +192,7 @@ class PlayerFragment :
 
     /** Watches the settings action that asks for a fresh online lookup. */
     private var lastReloadToken = 0L
-    private var lastAppearanceSignature = 0
+    private var lastAppearanceSignature = -1
     private lateinit var emptyTextView: TextView
     private lateinit var emptyView: ConstraintLayout
     private lateinit var songTitleTextView: TextView
@@ -476,6 +476,15 @@ class PlayerFragment :
             updateButtonStates(it.state)
         }
 
+        // A change of a lyric display setting reaches the player right away instead of
+        // waiting for the next refresh.
+        rxBusSubscription += RxBus.lyricsAppearanceChangedObservable.subscribe {
+            if (isAdded) {
+                lastAppearanceSignature = Settings.lyricsAppearanceVersion()
+                syncedLyrics?.applySettings(Settings.lyricsFontSizeSp)
+            }
+        }
+
         // Tell the driver that the music is waiting for the network. Without this the
         // player looks as if it was simply stuck.
         rxBusSubscription += RxBus.networkRecoveryObservable.subscribe { state ->
@@ -617,7 +626,7 @@ class PlayerFragment :
         view?.let { applyPalette(it) }
         // Every lyric display parameter is re-applied on resume, so a change made in settings
         // (while this fragment was in the background) is visible without restarting playback.
-        lastAppearanceSignature = Settings.lyricsAppearanceSignature()
+        lastAppearanceSignature = Settings.lyricsAppearanceVersion()
         syncedLyrics?.applySettings(Settings.lyricsFontSizeSp)
         if (mediaPlayerManager.currentMediaItem == null) {
             showPage(QUEUE_PAGE)
@@ -1430,7 +1439,7 @@ class PlayerFragment :
 
         // Visual settings are applied in place; no new lookup is needed for a font, alignment
         // or translation display change.
-        val appearance = Settings.lyricsAppearanceSignature()
+        val appearance = Settings.lyricsAppearanceVersion()
         if (appearance != lastAppearanceSignature) {
             lastAppearanceSignature = appearance
             syncedLyrics?.applySettings(Settings.lyricsFontSizeSp)

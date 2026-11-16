@@ -44,6 +44,18 @@ class RxBus {
         val themeChangedEventObservable: Observable<Unit> =
             themeChangedEventPublisher.observeOn(mainThread())
 
+        /**
+         * Published when a setting that only changes the look of the lyrics is edited.
+         *
+         * The lyric surfaces used to notice such a change by comparing a signature of 17
+         * preference values twice a second. The event reaches them right away, so the driver
+         * sees the change without waiting for the next refresh.
+         */
+        val lyricsAppearanceChangedPublisher: PublishSubject<Unit> =
+            PublishSubject.create()
+        val lyricsAppearanceChangedObservable: Observable<Unit> =
+            lyricsAppearanceChangedPublisher.observeOn(mainThread())
+
         val musicFolderChangedEventPublisher: PublishSubject<Folder> =
             PublishSubject.create()
         val musicFolderChangedEventObservable: Observable<Folder> =

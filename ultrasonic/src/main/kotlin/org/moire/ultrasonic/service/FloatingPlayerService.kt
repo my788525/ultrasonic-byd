@@ -200,7 +200,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private var timedLyrics: List<TimedLyric> = emptyList()
 
     /** Last applied lyric display settings, so the floating block rebuilds on a settings edit. */
-    private var lastLyricAppearance = 0
+    private var lastLyricAppearance = -1
     private var lyricIndex = -1
 
     /** True while the playback waits for the network to come back. */
@@ -282,6 +282,11 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         // to the running overlay as well.
         disposables += RxBus.themeChangedEventObservable.subscribe {
             applyAppearance()
+        }
+
+        // A change of a lyric display setting reaches the window right away.
+        disposables += RxBus.lyricsAppearanceChangedObservable.subscribe {
+            syncLyricAppearance()
         }
 
         // The driver has to know that the music is waiting for the network. A window that
@@ -1202,6 +1207,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             Timber.w(all, "Could not remove the floating window")
         }
         rootView = null
+        // The window is gone, so the 500 ms refresh has nobody to draw for. It is started
+        // again with the next showOverlay().
+        handler.removeCallbacks(updateRunnable)
     }
 
     /** A 28 dp dot at the top edge: the always-available way back from a manual hide. */
@@ -1827,7 +1835,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
      * importantly the translation mode) changed while the window was already on screen.
      */
     private fun syncLyricAppearance() {
-        val signature = Settings.lyricsAppearanceSignature()
+        val signature = Settings.lyricsAppearanceVersion()
         if (signature == lastLyricAppearance) return
         lastLyricAppearance = signature
         val sp = Settings.lyricsFontSizeSp.coerceIn(12, 30).toFloat()

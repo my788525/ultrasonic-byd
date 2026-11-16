@@ -80,6 +80,10 @@ class UApp : MultiDexApplication() {
             isFirstRun = Util.isFirstRun()
         }
 
+        // Watch the lyric appearance settings so the player surfaces can redraw as soon as
+        // one of them changes instead of waiting for their next refresh.
+        Settings.ensureLyricsAppearanceWatcher()
+
         startKoin()
         scheduleUpdateCheck()
     }
