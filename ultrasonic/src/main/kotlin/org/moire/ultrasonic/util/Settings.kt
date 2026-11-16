@@ -162,12 +162,6 @@ object Settings {
         getKey(R.string.setting_key_lyrics_fullscreen_font_scale), 130
     )
 
-    /** Show the one-tap fullscreen button in the right hand player pane. */
-    @JvmStatic
-    var showPlayerFullscreenButton by BooleanSetting(
-        getKey(R.string.setting_key_show_player_fullscreen_button), true
-    )
-
     /**
      * Translation display: `off` (original only), `show` (original plus translation when one
      * is available) or `only` (translation instead of the original). A line without a
@@ -233,7 +227,6 @@ object Settings {
             getKey(R.string.setting_key_lyrics_bold_current),
             getKey(R.string.setting_key_lyrics_wipe_fps),
             getKey(R.string.setting_key_lyrics_fullscreen_font_scale),
-            getKey(R.string.setting_key_show_player_fullscreen_button),
             getKey(R.string.setting_key_lyrics_translation_mode),
             getKey(R.string.setting_key_lyrics_translation_font_scale),
             getKey(R.string.setting_key_show_lyrics_source_badge),
@@ -526,10 +519,6 @@ object Settings {
     var forceLandscape
         by BooleanSetting(getKey(R.string.setting_key_force_landscape), true)
 
-    @JvmStatic
-    var twoPaneLayout
-        by BooleanSetting(getKey(R.string.setting_key_two_pane_layout), true)
-
     /**
      * Restores the last queue and continues playing right away when the app is opened.
      * A head unit is started together with the car, so this is the expected behaviour there.
@@ -537,20 +526,6 @@ object Settings {
     @JvmStatic
     var resumeOnStart
         by BooleanSetting(getKey(R.string.setting_key_resume_on_start), true)
-
-    /**
-     * Remembers whether the driver left the player in fullscreen. Unlike the saved instance
-     * state this survives a cold start (the head unit kills the app with the car), so the
-     * next launch comes back to the big lyrics view the driver was using.
-     */
-    @JvmStatic
-    var playerFullscreen
-        by BooleanSetting(getKey(R.string.setting_key_player_fullscreen), false)
-
-    /** Cold-start switch: whether the persisted fullscreen state is restored at all. */
-    @JvmStatic
-    var fullscreenOnStart
-        by BooleanSetting(getKey(R.string.setting_key_fullscreen_on_start), true)
 
     /**
      * Fullscreen cover backdrop, all 0..100 so they can be driven by SeekBarPreference.

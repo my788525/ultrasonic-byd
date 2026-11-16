@@ -515,7 +515,7 @@
         </LinearLayout>
 
         <LinearLayout
-            a:id="@+id/quick_font_minus"
+            a:id="@+id/quick_font"
             a:layout_width="0dp"
             a:layout_height="54dp"
             a:layout_weight="1"
@@ -532,20 +532,20 @@
                 a:layout_height="22dp"
                 a:contentDescription="@null"
                 a:scaleType="fitCenter"
-                a:src="@drawable/ic_quick_font_minus" />
+                a:src="@drawable/ic_quick_font" />
 
             <TextView
                 a:layout_width="wrap_content"
                 a:layout_height="wrap_content"
                 a:layout_marginTop="2dp"
                 a:maxLines="1"
-                a:text="@string/quick_tools_font_minus"
+                a:text="@string/quick_tools_font"
                 a:textColor="@color/pal_text_secondary"
                 a:textSize="10sp" />
         </LinearLayout>
 
         <LinearLayout
-            a:id="@+id/quick_font_plus"
+            a:id="@+id/quick_settings"
             a:layout_width="0dp"
             a:layout_height="54dp"
             a:layout_weight="1"
@@ -562,14 +562,14 @@
                 a:layout_height="22dp"
                 a:contentDescription="@null"
                 a:scaleType="fitCenter"
-                a:src="@drawable/ic_quick_font_plus" />
+                a:src="@drawable/ic_quick_settings" />
 
             <TextView
                 a:layout_width="wrap_content"
                 a:layout_height="wrap_content"
                 a:layout_marginTop="2dp"
                 a:maxLines="1"
-                a:text="@string/quick_tools_font_plus"
+                a:text="@string/quick_tools_settings"
                 a:textColor="@color/pal_text_secondary"
                 a:textSize="10sp" />
         </LinearLayout>

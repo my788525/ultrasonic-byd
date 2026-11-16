@@ -532,8 +532,6 @@
     <string name="lyrics_auto_scroll_summary">Smoothly scroll to the line that is being sung. Turn this off to keep the text where you put it.</string>
     <string name="lyrics_bold_current_title">Emphasise the current line</string>
     <string name="lyrics_bold_current_summary">Draw the active line slightly larger and in bold.</string>
-    <string name="player_fullscreen_button_title">Fullscreen player button</string>
-    <string name="player_fullscreen_button_summary">A one-tap button in the right player pane fills the screen with the player and its lyrics; tap it again to return to the two pane layout.</string>
     <string name="player_fullscreen_enter">Show the player fullscreen</string>
     <string name="player_fullscreen_exit">Return to the two pane layout</string>
     <string name="player_fullscreen_on">Fullscreen player</string>
@@ -585,8 +583,6 @@
     <string name="player_pane_status_offline">Waiting for the network…</string>
     <string name="queue_title">Queue</string>
     <string name="queue_remove">Take this song out of the queue</string>
-    <string name="settings.two_pane_title">Two pane layout</string>
-    <string name="settings.two_pane_summary">Show the media library on the left and the player with lyrics on the right while the app owns the whole screen. Disabled automatically in split screen.</string>
 
     <string name="common_close">Close</string>
     <string name="floating_menu_title">Floating window</string>
@@ -766,10 +762,13 @@
     <string name="quick_tools_theme">Theme</string>
     <string name="quick_tools_playlist">Playlists</string>
     <string name="quick_tools_queue">Queue</string>
-    <string name="quick_tools_font_minus">Font -</string>
-    <string name="quick_tools_font_plus">Font +</string>
+    <string name="quick_tools_font">Font</string>
+    <string name="quick_tools_settings">Settings</string>
+    <string name="quick_settings_failed">The settings could not be opened</string>
     <string name="quick_theme_changed">Color scheme: %1$s</string>
     <string name="quick_font_changed">Lyrics font: %1$d sp</string>
+    <string name="quick_font_title">Lyrics font size</string>
+    <string name="quick_font_unit">%1$d sp</string>
     <string name="quick_font_limit">Lyrics font is already at the %1$d sp limit</string>
     <string name="quick_playlist_title">Pick a playlist</string>
     <string name="quick_playlist_empty">No playlists available</string>
@@ -784,6 +783,4 @@
     <string name="backdrop_tint_summary">How strongly the mask takes on the selected theme colour. 0 keeps a neutral dark mask.</string>
     <string name="backdrop_blur_title">Software blur</string>
     <string name="backdrop_blur_summary">Lightweight downscale blur for the cover, no extra library and no GPU requirement. Set to 0 to turn it off.</string>
-    <string name="settings_fullscreen_on_start_title">Restore fullscreen on start</string>
-    <string name="settings_fullscreen_on_start_summary">Reopen in fullscreen if the player was fullscreen when the app closed. Turn off to always start in the two-pane layout.</string>
 </resources>

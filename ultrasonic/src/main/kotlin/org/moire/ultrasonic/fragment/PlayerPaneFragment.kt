@@ -26,7 +26,6 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.widget.ImageViewCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.Navigation
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -112,8 +111,8 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var quickTheme: View? = null
     private var quickPlaylist: View? = null
     private var quickQueue: View? = null
-    private var quickFontMinus: View? = null
-    private var quickFontPlus: View? = null
+    private var quickFont: View? = null
+    private var quickSettings: View? = null
     private var lastUpNextKey: String? = null
     private var backdropView: ImageView? = null
     private var backdropScrim: View? = null
@@ -207,37 +206,29 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         quickTheme = view.findViewById(R.id.quick_theme)
         quickPlaylist = view.findViewById(R.id.quick_playlist)
         quickQueue = view.findViewById(R.id.quick_queue)
-        quickFontMinus = view.findViewById(R.id.quick_font_minus)
-        quickFontPlus = view.findViewById(R.id.quick_font_plus)
+        quickFont = view.findViewById(R.id.quick_font)
+        quickSettings = view.findViewById(R.id.quick_settings)
         backdropView = view.findViewById(R.id.pane_backdrop)
         backdropScrim = view.findViewById(R.id.pane_backdrop_scrim)
 
         lastReloadToken = Settings.lyricsReloadToken
 
         headerCard?.setOnClickListener {
-            // In cinema mode the library is hidden, so opening the full screen player there
-            // would appear to do nothing. The header acts as a second "leave fullscreen" target.
-            if (UiState.playerFullscreen) {
-                (activity as? NavigationActivity)?.togglePlayerFullscreen()
-                return@setOnClickListener
-            }
-            runCatching {
-                Navigation.findNavController(requireActivity(), R.id.nav_host_fragment)
-                    .navigate(R.id.playerFragment)
-            }
+            // The player is the only screen, so the header opens the settings.
+            openSettings()
         }
 
         fullscreenButton?.setOnClickListener {
-            (activity as? NavigationActivity)?.togglePlayerFullscreen()
+            openSettings()
         }
         exitFullscreenButton?.setOnClickListener {
-            (activity as? NavigationActivity)?.togglePlayerFullscreen()
+            openSettings()
         }
         quickTheme?.setOnClickListener { cycleTheme() }
         quickPlaylist?.setOnClickListener { showPlaylistQuickPick() }
         quickQueue?.setOnClickListener { showQueueQuickPick() }
-        quickFontMinus?.setOnClickListener { adjustFontSize(-FONT_STEP_SP) }
-        quickFontPlus?.setOnClickListener { adjustFontSize(FONT_STEP_SP) }
+        quickFont?.setOnClickListener { showFontSizeSlider() }
+        quickSettings?.setOnClickListener { openSettings() }
 
         decoratePane()
 
@@ -503,15 +494,17 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private fun syncFullscreenButton() {
         val full = UiState.playerFullscreen
         fullscreenButton?.let { button ->
-            button.visibility =
-                if (!full && Settings.showPlayerFullscreenButton) View.VISIBLE else View.GONE
-            button.setImageResource(R.drawable.ic_fullscreen_enter)
+            // The player is always fullscreen, so this button opens the settings.
+            button.visibility = View.GONE
+        }
+        exitFullscreenButton?.let { button ->
+            button.visibility = View.VISIBLE
+            button.setImageResource(R.drawable.ic_quick_settings)
             context?.let { ctx ->
-                button.contentDescription = ctx.getString(R.string.player_fullscreen_enter)
+                button.contentDescription = ctx.getString(R.string.quick_tools_settings)
             }
             applyToggleTint(button, false)
         }
-        exitFullscreenButton?.visibility = if (full) View.VISIBLE else View.GONE
         upNextContainer?.visibility = if (full) View.VISIBLE else View.GONE
         quickTools?.visibility = if (full) View.VISIBLE else View.GONE
         if (full) renderUpNext(force = true) else lastUpNextKey = null
@@ -549,8 +542,8 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         quickTheme = null
         quickPlaylist = null
         quickQueue = null
-        quickFontMinus = null
-        quickFontPlus = null
+        quickFont = null
+        quickSettings = null
         backdropView = null
         backdropScrim = null
         lastBackdropKey = null
@@ -1018,23 +1011,84 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         RxBus.themeChangedEventPublisher.onNext(Unit)
     }
 
-    /** Steps the base lyrics font size; the appearance signature redraws without a download. */
-    private fun adjustFontSize(delta: Int) {
-        val current = Settings.lyricsFontSizeSp
-        val next = (current + delta).coerceIn(FONT_MIN_SP, FONT_MAX_SP)
-        if (next == current) {
-            Util.toast(
-                getString(R.string.quick_font_limit, effectiveFontSp()),
-                context = requireContext()
-            )
-            return
+    /**
+     * The lyrics font size on a slider.
+     *
+     * Two buttons could only step through the sizes, and they took the room that the
+     * settings button needs. One button with a slider covers the whole range at once, and
+     * the lyrics follow the finger while it is dragged.
+     */
+    private fun showFontSizeSlider() {
+        val ctx = context ?: return
+        val size = Settings.lyricsFontSizeSp.coerceIn(FONT_MIN_SP, FONT_MAX_SP)
+        val label = TextView(ctx).apply {
+            text = getString(R.string.quick_font_unit, size)
+            textSize = 18f
+            gravity = android.view.Gravity.CENTER
+            setPadding(0, 24, 0, 0)
         }
-        Settings.lyricsFontSizeSp = next
-        applyLyricsAppearance()
-        Util.toast(
-            getString(R.string.quick_font_changed, effectiveFontSp()),
-            context = requireContext()
-        )
+        val slider = SeekBar(ctx).apply {
+            max = FONT_MAX_SP - FONT_MIN_SP
+            progress = size - FONT_MIN_SP
+            setPadding(0, 0, 0, 0)
+        }
+        slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar, progress: Int, fromUser: Boolean) {
+                val value = (FONT_MIN_SP + progress).coerceIn(FONT_MIN_SP, FONT_MAX_SP)
+                label.text = getString(R.string.quick_font_unit, value)
+                if (!fromUser) return
+                // The lyrics follow the finger right away; the setting is written when the
+                // driver lets go, so a drag does not fill the preferences with values.
+                if (Settings.lyricsFontSizeSp != value) {
+                    Settings.lyricsFontSizeSp = value
+                    applyLyricsAppearance()
+                }
+            }
+
+            override fun onStartTrackingTouch(bar: SeekBar) = Unit
+
+            override fun onStopTrackingTouch(bar: SeekBar) {
+                Util.toast(
+                    getString(R.string.quick_font_changed, effectiveFontSp()),
+                    context = requireContext()
+                )
+            }
+        })
+
+        val container = android.widget.LinearLayout(ctx).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(48, 0, 48, 0)
+            addView(
+                label,
+                android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+            addView(
+                slider,
+                android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                    android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.quick_font_title)
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /**
+     * Opens the settings screen.
+     *
+     * The panel keeps playing in the background, so the music does not stop while the driver
+     * is in the settings.
+     */
+    private fun openSettings() {
+        (activity as? NavigationActivity)?.openSettingsScreen()
     }
 
     /**
@@ -1191,7 +1245,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         private const val REPEAT_OFF = 0
         private const val REPEAT_ALL = 1
         private const val REPEAT_ONE = 2
-        private const val FONT_STEP_SP = 2
         private const val FONT_MIN_SP = 12
         private const val FONT_MAX_SP = 36
         private const val PLAYLIST_FETCH_TIMEOUT_MS = 8_000L

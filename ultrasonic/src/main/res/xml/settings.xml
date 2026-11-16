@@ -35,12 +35,6 @@
             app:iconSpaceReserved="false"/>
         <CheckBoxPreference
             a:defaultValue="true"
-            a:key="@string/setting_key.two_pane_layout"
-            a:summary="@string/settings.two_pane_summary"
-            a:title="@string/settings.two_pane_title"
-            app:iconSpaceReserved="false"/>
-        <CheckBoxPreference
-            a:defaultValue="true"
             a:key="@string/setting_key.resume_on_start"
             a:summary="@string/settings.resume_on_start_summary"
             a:title="@string/settings.resume_on_start_title"
@@ -79,12 +73,6 @@
     <PreferenceCategory
         a:title="@string/backdrop_category_title"
         app:iconSpaceReserved="false">
-        <CheckBoxPreference
-            a:defaultValue="true"
-            a:key="@string/setting_key.fullscreen_on_start"
-            a:summary="@string/settings_fullscreen_on_start_summary"
-            a:title="@string/settings_fullscreen_on_start_title"
-            app:iconSpaceReserved="false"/>
         <SeekBarPreference
             a:defaultValue="50"
             a:key="@string/setting_key.backdrop_dim"
@@ -580,12 +568,6 @@
             a:key="@string/setting_key.lyrics_bold_current"
             a:summary="@string/lyrics_bold_current_summary"
             a:title="@string/lyrics_bold_current_title"
-            app:iconSpaceReserved="false"/>
-        <CheckBoxPreference
-            a:defaultValue="true"
-            a:key="@string/setting_key.show_player_fullscreen_button"
-            a:summary="@string/player_fullscreen_button_summary"
-            a:title="@string/player_fullscreen_button_title"
             app:iconSpaceReserved="false"/>
         <CheckBoxPreference
             a:defaultValue="false"

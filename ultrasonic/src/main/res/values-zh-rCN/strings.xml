@@ -512,8 +512,6 @@
     <string name="lyrics_auto_scroll_summary">平滑滚动到正在演唱的那一行；关闭后歌词保持在你拖动到的位置。</string>
     <string name="lyrics_bold_current_title">强调当前行</string>
     <string name="lyrics_bold_current_summary">把当前行略微放大并加粗。</string>
-    <string name="player_fullscreen_button_title">全屏播放按钮</string>
-    <string name="player_fullscreen_button_summary">在右侧播放面板显示一键按钮：点击让播放器与歌词占满全屏，再点一次回到两栏布局。</string>
     <string name="player_fullscreen_enter">全屏显示播放器</string>
     <string name="player_fullscreen_exit">返回两栏布局</string>
     <string name="player_fullscreen_on">已全屏显示播放器</string>
@@ -565,8 +563,6 @@
     <string name="player_pane_status_offline">正在等待网络…</string>
     <string name="queue_title">播放队列</string>
     <string name="queue_remove">把这首歌移出队列</string>
-    <string name="settings.two_pane_title">两栏布局</string>
-    <string name="settings.two_pane_summary">全屏时左侧显示媒体库/播放列表，右侧显示播放器与歌词；分屏时自动关闭。</string>
 
     <string name="common_close">关闭</string>
     <string name="floating_menu_title">悬浮窗</string>
@@ -742,10 +738,13 @@
     <string name="quick_tools_theme">主题</string>
     <string name="quick_tools_playlist">歌单</string>
     <string name="quick_tools_queue">播放列表</string>
-    <string name="quick_tools_font_minus">字号-</string>
-    <string name="quick_tools_font_plus">字号+</string>
+    <string name="quick_tools_font">字号</string>
+    <string name="quick_tools_settings">设置</string>
+    <string name="quick_settings_failed">无法打开设置</string>
     <string name="quick_theme_changed">配色主题：%1$s</string>
     <string name="quick_font_changed">歌词字号：%1$d sp</string>
+    <string name="quick_font_title">歌词字号</string>
+    <string name="quick_font_unit">%1$d sp</string>
     <string name="quick_font_limit">歌词字号已达上限 %1$d sp</string>
     <string name="quick_playlist_title">快速选择歌单</string>
     <string name="quick_playlist_empty">暂无可用歌单</string>
@@ -760,6 +759,4 @@
     <string name="backdrop_tint_summary">蒙版跟随当前主题配色的强度。设为 0 则为中性深色蒙版。</string>
     <string name="backdrop_blur_title">底图软件虚化</string>
     <string name="backdrop_blur_summary">对封面做轻量降采样虚化，不依赖额外库或 GPU；设为 0 即关闭虚化。</string>
-    <string name="settings_fullscreen_on_start_title">启动时恢复全屏</string>
-    <string name="settings_fullscreen_on_start_summary">上次退出时为全屏，下次启动仍进全屏；关闭后始终以双栏布局启动。</string>
 </resources>

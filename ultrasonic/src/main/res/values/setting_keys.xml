@@ -65,7 +65,6 @@
     <string name="setting_key.show_confirmation_dialog" translatable="false">showConfirmationDialog</string>
     <string name="setting_key.last_view_type" translatable="false">lastViewType</string>
     <string name="setting_key.force_landscape" translatable="false">ui.force_landscape</string>
-    <string name="setting_key.two_pane_layout" translatable="false">ui.two_pane_layout</string>
     <string name="setting_key.resume_on_start" translatable="false">playback.resume_on_start</string>
     <string name="setting_key.dpad_as_media_keys" translatable="false">ui.dpad_as_media_keys</string>
 
@@ -90,7 +89,6 @@
     <string name="setting_key.lyrics_bold_current" translatable="false">lyricsBoldCurrent</string>
     <string name="setting_key.lyrics_wipe_fps" translatable="false">lyricsWipeFps</string>
     <string name="setting_key.lyrics_fullscreen_font_scale" translatable="false">lyricsFullscreenFontScale</string>
-    <string name="setting_key.show_player_fullscreen_button" translatable="false">showPlayerFullscreenButton</string>
     <string name="setting_key.lyrics_translation_mode" translatable="false">lyricsTranslationMode</string>
     <string name="setting_key.online_lyrics_translation" translatable="false">onlineLyricsTranslation</string>
     <string name="setting_key.lyrics_translation_font_scale" translatable="false">lyricsTranslationFontScale</string>
@@ -116,9 +114,7 @@
     <string name="setting_key.update_check_on_start" translatable="false">update.check_on_start</string>
     <string name="setting_key.update_mirror_url" translatable="false">update.mirror_url</string>
     <string name="setting_key.update_skip_version" translatable="false">update.skip_version</string>
-    <string name="setting_key.player_fullscreen" translatable="false">ui.player_fullscreen</string>
     <!-- Cold-start layout + fullscreen backdrop tuning -->
-    <string name="setting_key.fullscreen_on_start" translatable="false">ui.fullscreen_on_start</string>
     <string name="setting_key.backdrop_dim" translatable="false">ui.backdrop_dim</string>
     <string name="setting_key.backdrop_tint" translatable="false">ui.backdrop_tint</string>
     <string name="setting_key.backdrop_blur" translatable="false">ui.backdrop_blur</string>

@@ -136,9 +136,7 @@ class NavigationActivity : ScopeActivity() {
 
     private companion object {
         /** Below this width two panes would squeeze the list too much. */
-        private const val TWO_PANE_MIN_WIDTH_DP = 720
-        private const val PLAYER_PANE_TAG = "twoPanePlayer"
-        private const val STATE_PLAYER_FULLSCREEN = "byd.playerFullscreen"
+        private const val PLAYER_PANE_TAG = "playerPanel"
 
         /** How long a media key has to be held before it turns into a seek. */
         private const val LONG_PRESS_MS = 600L
@@ -184,11 +182,9 @@ class NavigationActivity : ScopeActivity() {
         CarTheme.applyWindow(this)
         lastNightMode = CarTheme.isNight(this)
 
-        // A cold start has no saved instance state. Fall back to the persisted choice, but
-        // only while the "restore fullscreen on start" switch is on. Playback itself is
-        // governed solely by "resume on start"; fullscreen no longer forces an auto-resume.
-        playerFullscreen = savedInstanceState?.getBoolean(STATE_PLAYER_FULLSCREEN, false)
-            ?: (Settings.fullscreenOnStart && Settings.playerFullscreen)
+        // The player is always fullscreen and always on the screen, so there is no state to
+        // restore. Playback itself is governed solely by the "resume on start" switch.
+        playerFullscreen = true
 
         nowPlayingView = findViewById(R.id.now_playing_fragment)
         playerPane = findViewById(R.id.player_pane)
@@ -234,6 +230,15 @@ class NavigationActivity : ScopeActivity() {
 
         setupNavigationMenu(navController)
 
+        // The navigation graph needs a start destination, and the home screen was it. That
+        // meant the library was built on every cold start: its layout was inflated, its
+        // cover was loaded and its 500 ms timer ran behind the player. The stack is emptied
+        // right here, so the home screen never draws and is destroyed again at once. The
+        // navigation host stays in the layout for the settings screen.
+        runCatching {
+            navController.popBackStack(navController.graph.startDestinationId, true)
+        }
+
         navController.addOnDestinationChangedListener { _, destination, _ ->
             val dest: String = try {
                 resources.getResourceName(destination.id)
@@ -248,12 +253,16 @@ class NavigationActivity : ScopeActivity() {
             // backgrounded (paused) the window re-appears over the navigation map, which
             // onPause handles.
             FloatingPlayerService.setHostHidden(this, true)
-            // Handle the hiding of the NowPlaying fragment when the Player is active
-            if (currentFragmentId == R.id.playerFragment) {
-                hideNowPlaying()
+            // The settings screen is the only other screen: it is opened over the player.
+            if (currentFragmentId == R.id.settingsFragment) {
+                navHostView?.visibility = View.VISIBLE
+                toolbarView?.visibility = View.VISIBLE
+                playerPane?.visibility = View.GONE
+                exitFullscreenOnBack.isEnabled = true
             } else {
-                if (!nowPlayingHidden) showNowPlaying()
+                returnToPlayer()
             }
+            hideNowPlaying()
         }
 
         // Determine if this is a first run
@@ -310,89 +319,89 @@ class NavigationActivity : ScopeActivity() {
         // Enforce the landscape orientation of the head unit, unless we are in split screen
         applyOrientationPolicy()
 
-        // Show the permanent player on the right when the app owns the whole screen
-        updateTwoPaneLayout()
+        // The player panel is the screen.
+        showPlayerPane()
     }
 
     /**
-     * Enables the two pane layout (list on the left, player on the right) while the activity
-     * owns the whole display. In split screen the window is too narrow and the system already
-     * gives the user a way to see two apps side by side, so the layout falls back to a single
-     * pane there.
+     * The player panel is the screen.
+     *
+     * The two pane layout showed the library on the left and the player on the right. Both
+     * were alive at the same time, and on a head unit that was expensive: the library kept
+     * its lists and images alive behind the player, and every frame of the player had to be
+     * drawn next to them. The panel now owns the whole window, and the library is not built
+     * at all.
      */
-    private fun updateTwoPaneLayout() {
+    private fun showPlayerPane() {
         val pane = playerPane ?: return
+        pane.visibility = View.VISIBLE
 
-        val configuration = resources.configuration
-        val wideEnough = configuration.screenWidthDp >= TWO_PANE_MIN_WIDTH_DP
-        // Portrait means the car is parked: the home grid needs the full width for its single
-        // column of large tiles, so the permanent player is dropped even on a wide display.
-        val landscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val enabled = Settings.twoPaneLayout && wideEnough && landscape && !isInSplitScreen()
-
-        UiState.twoPane = enabled
-        pane.visibility = if (enabled) View.VISIBLE else View.GONE
-        // A narrow or split screen cannot hold a fullscreen player pane. Leaving fullscreen
-        // here keeps the layout consistent when the head unit rotates or enters multi window.
-        if (!enabled) playerFullscreen = false
-        applyPlayerFullscreen(showToast = false)
+        // The panel is always in its fullscreen form: the cover fills the screen and the
+        // lyrics are the large ones.
+        UiState.twoPane = true
+        playerFullscreen = true
+        UiState.playerFullscreen = true
 
         val fragmentManager = supportFragmentManager
-        val existing = fragmentManager.findFragmentById(R.id.player_pane)
-
-        if (enabled && existing == null) {
+        if (fragmentManager.findFragmentById(R.id.player_pane) == null) {
             fragmentManager.beginTransaction()
                 .replace(R.id.player_pane, PlayerPaneFragment(), PLAYER_PANE_TAG)
                 .commitAllowingStateLoss()
-        } else if (!enabled && existing != null) {
-            fragmentManager.beginTransaction()
-                .remove(existing)
-                .commitAllowingStateLoss()
         }
 
-        if (enabled) {
-            hideNowPlaying()
-        } else if (!nowPlayingHidden) {
-            showNowPlaying()
+        // The library and the toolbar are not on the screen while the player is.
+        navHostView?.visibility = View.GONE
+        toolbarView?.visibility = View.GONE
+        hideNowPlaying()
+    }
+
+    /**
+     * Shows the settings screen over the player.
+     *
+     * The player keeps playing in the background, so the music does not stop while the
+     * driver is in the settings.
+     */
+    fun openSettingsScreen() {
+        val navController = host?.navController ?: return
+        runCatching {
+            // The stack is cleared: the library is not built any more, so there is nothing
+            // behind the settings that the driver could go back to. The back key returns to
+            // the player instead.
+            navController.navigate(
+                R.id.settingsFragment,
+                null,
+                androidx.navigation.navOptions {
+                    // The library is not built, so the stack is cleared: there is nothing
+                    // behind the settings that the driver could go back to. The back key
+                    // returns to the player instead.
+                    popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                }
+            )
+        }.onFailure {
+            Timber.w(it, "Could not open the settings screen")
         }
     }
 
     /**
-     * One-tap "cinema" mode for the lyrics: the right hand player pane takes the whole content
-     * area, the library on the left and the toolbar step aside, and the same button (or the
-     * back key) restores the two pane layout. The lyric font is enlarged by the pane itself,
-     * following its own setting.
+     * Goes back to the player from the settings screen.
+     *
+     * The library is never built, so the settings screen has nowhere to go back to. The
+     * player is the only screen, and that is where the driver lands.
      */
-    fun togglePlayerFullscreen() {
-        if (!UiState.twoPane) return
-        playerFullscreen = !playerFullscreen
-        Settings.playerFullscreen = playerFullscreen
-        applyPlayerFullscreen(showToast = true)
-    }
-
-    fun isPlayerFullscreen(): Boolean = playerFullscreen
-
-    private fun applyPlayerFullscreen(showToast: Boolean) {
-        val full = playerFullscreen && UiState.twoPane
-        UiState.playerFullscreen = full
-        navHostView?.visibility = if (full) View.GONE else View.VISIBLE
-        toolbarView?.visibility = if (full) View.GONE else View.VISIBLE
-        exitFullscreenOnBack.isEnabled = full
-        // The pane also polls UiState, so a fragment transaction that is still pending cannot
-        // leave the button showing the wrong icon.
+    private fun returnToPlayer() {
+        navHostView?.visibility = View.GONE
+        toolbarView?.visibility = View.GONE
+        playerPane?.visibility = View.VISIBLE
+        UiState.playerFullscreen = true
         (supportFragmentManager.findFragmentByTag(PLAYER_PANE_TAG) as? PlayerPaneFragment)
-            ?.onFullscreenChanged(full)
-        if (showToast) {
-            Util.toast(
-                if (full) R.string.player_fullscreen_on else R.string.player_fullscreen_off,
-                context = this
-            )
-        }
+            ?.onFullscreenChanged(true)
     }
+
+    /** The panel is always in its fullscreen form. */
+    fun isPlayerFullscreen(): Boolean = true
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        outState.putBoolean(STATE_PLAYER_FULLSCREEN, playerFullscreen)
     }
 
     /**
@@ -446,8 +455,8 @@ class NavigationActivity : ScopeActivity() {
         }
         Timber.i("Multi window mode changed: %s", isInMultiWindowMode)
         applyOrientationPolicy()
-        // The right hand pane has to disappear as soon as the app shares the screen
-        window.decorView.post { updateTwoPaneLayout() }
+        // The player panel has to disappear as soon as the app shares the screen
+        window.decorView.post { showPlayerPane() }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -464,7 +473,7 @@ class NavigationActivity : ScopeActivity() {
             lastNightMode = night
             CarTheme.applyWindow(this)
         }
-        window.decorView.post { updateTwoPaneLayout() }
+        window.decorView.post { showPlayerPane() }
     }
 
     /**
@@ -838,12 +847,15 @@ class NavigationActivity : ScopeActivity() {
         setupActionBarWithNavController(navController, appBarConfig)
     }
 
-    /** The hardware/back gesture leaves fullscreen lyrics before doing anything else. */
+    /**
+     * The hardware/back gesture leaves the settings screen and lands on the player.
+     *
+     * The library is not built any more, so the settings screen has no other screen to go
+     * back to.
+     */
     private val exitFullscreenOnBack = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
-            playerFullscreen = false
-            Settings.playerFullscreen = false
-            applyPlayerFullscreen(showToast = false)
+            returnToPlayer()
         }
     }
 

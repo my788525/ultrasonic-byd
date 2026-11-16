@@ -1,25 +1,22 @@
 {
-  "versionCode": 535,
-  "versionName": "4.8.0-byd.53",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.53.apk",
-  "sha256": "87a2f754cc6f1b7de2ac2bfb8f9f2dbc179f9edc85dfb1f65413aaa46a746a0d",
-  "size": 11566071,
-  "publishedAt": "2026-11-16T01:47:30Z",
+  "versionCode": 536,
+  "versionName": "4.8.0-byd.54",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.54.apk",
+  "sha256": "8639b8061162c3e6e88c2d8c1c03cd026791b002e35a54faa183ae4745b1be51",
+  "size": 11565706,
+  "publishedAt": "2026-11-16T13:09:32Z",
   "changelog": [
-    "歌词逐字擦除改为复用固定的可变色 Span 对象，整首歌不再每帧新建对象，显著降低 GC 压力",
-    "逐字擦除帧循环改用 Choreographer 对齐屏幕刷新，不再用 33ms 定时器与刷新率互相漂移，擦除更均匀顺滑",
-    "每帧只重绘当前歌词行的矩形区域，不再整块重绘全部歌词行，全屏大字号加软件阴影时省下大量绘制",
-    "逐字偏移量按行预先计算，擦除时不再逐帧累加前面所有单词的字符数",
-    "浮窗隐藏后停掉 500ms 定时器，不再为看不见的窗口持续计算歌词",
-    "歌词外观设置改为事件驱动：修改设置后三个歌词界面立即重绘，同时保留计数兜底轮询",
-    "播放面板每 500ms 不再重复创建按钮着色、状态背景与时间字符串，只在值真正变化时重建",
-    "切主题不再重复绘制一次（避免闪烁），全屏底图解码尺寸由 800px 降为 320px，观感不变而内存与耗时降至约四分之一",
-    "版本 bump 至 4.8.0-byd.53 (versionCode 535)"
+    "砍掉左右分栏布局：应用只保留全屏播放界面，媒体库不再常驻后台运行，车机主线程与 GPU 负担显著下降",
+    "全屏界面底部新增「设置」按钮，一键进入配置页；退出设置即回到全屏播放，音乐全程不中断",
+    "歌词字号由「字号- / 字号+」两个按钮合并为一个「字号」按钮，点击弹出滑杆，拖动时歌词实时跟随变化",
+    "移除已失效的设置项：两栏布局、启动时恢复全屏、全屏播放按钮",
+    "顶栏与左侧按钮统一改为打开设置页（原分栏切换已无意义）",
+    "版本 bump 至 4.8.0-byd.54 (versionCode 536)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.53.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.53/NavMusic-4.8.0-byd.53.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.53/NavMusic-4.8.0-byd.53.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.53/NavMusic-4.8.0-byd.53.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.54.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.54/NavMusic-4.8.0-byd.54.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.54/NavMusic-4.8.0-byd.54.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.54/NavMusic-4.8.0-byd.54.apk"
   ]
 }
