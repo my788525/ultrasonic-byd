@@ -38,7 +38,12 @@ data class LyricsLoadResult(
     /** True when the time axis was invented by spreading plain text over the song length. */
     val synthetic: Boolean,
     /** True when the result came from a permanently saved online copy. */
-    val saved: Boolean = false
+    val saved: Boolean = false,
+    /**
+     * The length of the recording the lyrics were made for, in seconds. Zero when the lyrics
+     * came from the server, which always belongs to the song that is playing.
+     */
+    val lyricsDurationSec: Double = 0.0
 ) {
     val isEmpty: Boolean get() = lines.isEmpty() && text.isNullOrBlank()
 }
@@ -64,6 +69,8 @@ object LyricsLoader {
     private const val SERVER_TIMEOUT_MS = 8_000L
     private const val ONLINE_TIMEOUT_MS = 14_000L
     private const val MEMORY_CACHE_SIZE = 24
+
+
 
     private val memoryCache = LruCache<String, LyricsLoadResult>(MEMORY_CACHE_SIZE)
     private val prefetchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -122,7 +129,13 @@ object LyricsLoader {
         if (forceRefresh) {
             memoryCache.remove(track.id)
         } else {
-            memoryCache.get(track.id)?.let { return it }
+            memoryCache.get(track.id)?.let { cached ->
+                // The warm cache was matched against the length from the song list, while the
+                // song that plays now can be a little longer or shorter. A record of another
+                // recording is dropped instead of being used.
+                if (fitsTheSong(cached, effectiveDuration)) return cached
+                memoryCache.remove(track.id)
+            }
         }
 
         // Which source is asked first is a setting (online by default, see byd.46). The other
@@ -275,7 +288,8 @@ object LyricsLoader {
             labelRes = label,
             wordSynced = candidate.wordSynced,
             synthetic = candidate.synthetic,
-            saved = candidate.saved
+            saved = candidate.saved,
+            lyricsDurationSec = candidate.lyricsDurationSec
         )
     }
 
@@ -287,10 +301,25 @@ object LyricsLoader {
         val wordSynced: Boolean,
         val synthetic: Boolean,
         val fromCache: Boolean = false,
-        val saved: Boolean = false
+        val saved: Boolean = false,
+        /**
+         * The length of the recording the lyrics were made for, in seconds. Zero when the
+         * lyrics came from the server, which always belongs to the song that is playing.
+         */
+        val lyricsDurationSec: Double = 0.0
     ) {
         val isEmpty: Boolean get() = lines.isEmpty() && text.isNullOrBlank()
     }
+
+    /**
+     * Whether the lyrics belong to the song that is playing.
+     *
+     * The lyrics of the server always do. The lyrics from the online service carry the length
+     * of the recording they were made for, and a record of another recording has a time axis
+     * that does not fit the song: its lyrics would run ahead of the music.
+     */
+    private fun fitsTheSong(result: LyricsLoadResult, durationMs: Long): Boolean =
+        LyricsLengthGate.fits(result.lyricsDurationSec, durationMs / 1000.0)
 
     private fun fromServer(lyrics: Lyrics?, durationMs: Long): Candidate {
         val raw = lyrics?.text
@@ -353,7 +382,8 @@ object LyricsLoader {
             wordSynced = record.wordSynced,
             synthetic = synthetic,
             fromCache = record.fromCache,
-            saved = record.saved
+            saved = record.saved,
+            lyricsDurationSec = record.durationSec
         )
     }
 }

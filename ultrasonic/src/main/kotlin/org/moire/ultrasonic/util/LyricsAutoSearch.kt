@@ -86,6 +86,8 @@ object LyricsAutoSearch {
     /** Roughly 1500 songs (each song keeps an exact file and a normalised alias). */
     private const val MAX_CACHE_FILES = 3000
 
+
+
     private val PAREN_NOISE = Regex(
         """(?i)\s*\([^)]*(?:remaster|live|version|edit|mix|feat|ft\.?|official|audio|video)[^)]*\)"""
     )
@@ -184,7 +186,11 @@ object LyricsAutoSearch {
         if (!forceRefresh) {
             if (useSaved) {
                 val saved = savedCopy()
-                if (saved != null) return saved
+                // A copy that was saved while the matching was still weak can be a record of
+                // another recording, so it is checked like a fresh one.
+                if (saved != null) {
+                    return if (fitsTheSong(saved, durationSec)) saved else null
+                }
             }
             if (hasFreshNegative(exact)) return null
         }
@@ -244,11 +250,22 @@ object LyricsAutoSearch {
         }
 
         val record = parseRecord(body, fromCache = false)
-        return if (record != null) {
+        return if (record != null && fitsTheSong(record, durationSec)) {
             writePositive(exact, body)
             writePositive(alias, body)
             record
         } else {
+            // A record of another recording is dropped: its time axis does not belong to the
+            // song, so the lyrics would run ahead of the music. The server lyrics are used
+            // instead, they belong to the song by definition.
+            if (record != null) {
+                Timber.i(
+                    "Dropped a lyric record of a different length (%.0f s instead of %.0f s) for %s",
+                    record.durationSec,
+                    durationSec,
+                    cleanTitle
+                )
+            }
             // An instrumental or a broken payload must not erase a copy that was already good.
             val existing = if (useSaved) savedCopy() else null
             if (existing != null) return existing
@@ -302,6 +319,16 @@ object LyricsAutoSearch {
         }
     }
 
+    /**
+     * Whether the record belongs to the song that is playing.
+     *
+     * A record of another recording of the same song carries a time axis of that recording.
+     * Used on the song that is playing, its lyrics run ahead of the music, so the record is
+     * only used when the two lengths are close enough.
+     */
+    private fun fitsTheSong(record: LyricsRecord, durationSec: Double): Boolean =
+        LyricsLengthGate.fits(record.durationSec, durationSec)
+
     private fun cleanedQuery(title: String, artist: String): String {
         val cleanTitle = BRACKET_NOISE.replace(PAREN_NOISE.replace(title, " "), " ").trim()
         val cleanArtist = ARTIST_SPLIT.split(artist).firstOrNull().orEmpty().trim()
@@ -340,11 +367,27 @@ object LyricsAutoSearch {
         durationSec: Double
     ): Int {
         if (record.optBoolean("instrumental", false)) return Int.MIN_VALUE
-        var value = 0
+
+        val lowerTitle = title.lowercase(Locale.ROOT)
+        val foundTitle = record.optString("trackName").lowercase(Locale.ROOT)
+        // A record of another song is never the right one, whatever else it has.
+        if (foundTitle.isBlank() ||
+            !(lowerTitle.contains(foundTitle) || foundTitle.contains(lowerTitle))
+        ) {
+            return Int.MIN_VALUE
+        }
+
+        var value = 15
 
         val duration = record.optDouble("duration", 0.0)
         if (durationSec > 0 && duration > 0) {
             val difference = abs(duration - durationSec)
+            // A different recording of the same song - a longer remix, a live take, a
+            // compilation - has a time axis that does not belong to the song that is playing.
+            // Its lyrics run ahead of the music, so such a record is dropped instead of
+            // merely being penalised: the word sync bonus of 60 used to outweigh a length
+            // difference of up to 80 and let the wrong recording win.
+            if (!LyricsLengthGate.fits(duration, durationSec)) return Int.MIN_VALUE
             if (difference <= 2.0) value += 100
             else value -= (difference * 2).toInt().coerceAtMost(80)
         }
@@ -352,13 +395,8 @@ object LyricsAutoSearch {
         if (record.optString("syncedLyrics").isNotBlank()) value += 25
         if (record.optString("plainLyrics").isNotBlank()) value += 5
 
-        val lowerTitle = title.lowercase(Locale.ROOT)
         val lowerArtist = artist.lowercase(Locale.ROOT)
-        val foundTitle = record.optString("trackName").lowercase(Locale.ROOT)
         val foundArtist = record.optString("artistName").lowercase(Locale.ROOT)
-        if (foundTitle.isNotBlank() && (foundTitle.contains(lowerTitle) || lowerTitle.contains(foundTitle))) {
-            value += 15
-        }
         if (lowerArtist.length >= 3 &&
             foundArtist.contains(lowerArtist.take(6), ignoreCase = true)
         ) {

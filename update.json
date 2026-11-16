@@ -1,22 +1,22 @@
 {
-  "versionCode": 536,
-  "versionName": "4.8.0-byd.54",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.54.apk",
-  "sha256": "8639b8061162c3e6e88c2d8c1c03cd026791b002e35a54faa183ae4745b1be51",
-  "size": 11565706,
-  "publishedAt": "2026-11-16T13:09:32Z",
+  "versionCode": 537,
+  "versionName": "4.8.0-byd.55",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.55.apk",
+  "sha256": "410fca3614eaecc3a729e3274035c88b22b8317a495749aa3d6fbc86e0812d37",
+  "size": 11566451,
+  "publishedAt": "2026-11-16T14:04:11Z",
   "changelog": [
-    "砍掉左右分栏布局：应用只保留全屏播放界面，媒体库不再常驻后台运行，车机主线程与 GPU 负担显著下降",
-    "全屏界面底部新增「设置」按钮，一键进入配置页；退出设置即回到全屏播放，音乐全程不中断",
-    "歌词字号由「字号- / 字号+」两个按钮合并为一个「字号」按钮，点击弹出滑杆，拖动时歌词实时跟随变化",
-    "移除已失效的设置项：两栏布局、启动时恢复全屏、全屏播放按钮",
-    "顶栏与左侧按钮统一改为打开设置页（原分栏切换已无意义）",
-    "版本 bump 至 4.8.0-byd.54 (versionCode 536)"
+    "修复歌词跑得过快：在线歌词曾会选到同一首歌的另一版本（混音/现场/合辑），其时间轴不属于当前歌曲，导致高亮超前、歌词对不上",
+    "新增歌词长度闸门：歌词记录时长与歌曲时长相差超过 5 秒即判定为另一录音，直接弃用并回退服务器歌词",
+    "修正候选打分：逐字歌词的加分不再压过时长不符的惩罚，标题不匹配的记录直接淘汰",
+    "已保存的本地歌词副本与预取缓存同样按长度校验，避免旧的错配结果继续被使用",
+    "新增 LyricsLengthGate 统一长度判定，并配套单元测试",
+    "版本 bump 至 4.8.0-byd.55 (versionCode 537)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.54.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.54/NavMusic-4.8.0-byd.54.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.54/NavMusic-4.8.0-byd.54.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.54/NavMusic-4.8.0-byd.54.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.55.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.55/NavMusic-4.8.0-byd.55.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.55/NavMusic-4.8.0-byd.55.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.55/NavMusic-4.8.0-byd.55.apk"
   ]
 }
