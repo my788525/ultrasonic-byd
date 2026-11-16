@@ -89,34 +89,20 @@ object LyricsTranslation {
         if (lines.isEmpty()) return lines
 
         val bilingual = mergeEmbedded(lines)
-        val result = if (!Settings.onlineLyricsTranslation) {
-            bilingual
-        } else {
-            // A Navidrome library with its own translations needs no extra request.
-            val covered = bilingual.count { !it.translation.isNullOrBlank() }
-            if (covered * 2 >= bilingual.size) {
-                bilingual
-            } else {
-                val remote = fetch(
-                    context.applicationContext,
-                    track.title.orEmpty(),
-                    track.artist.orEmpty(),
-                    durationMs
-                )
-                if (remote.isNullOrEmpty()) bilingual else align(bilingual, remote)
-            }
-        }
-        // NetEase `tlyric` (and some embedded bilingual LRC) is often Traditional Chinese.
-        // Normalise only the translation slot to Simplified. Original text/words keep their
-        // exact characters so the karaoke wipe timeline is untouched. This is the single
-        // exit of apply(), so old Traditional bodies in the on-disk tlyric cache are
-        // converted on every read without any cache-key bump.
-        return result.map { line ->
-            line.translation?.let { text ->
-                val simplified = ChineseText.toSimplifiedChinese(text)
-                if (simplified === text) line else line.copy(translation = simplified)
-            } ?: line
-        }
+        if (!Settings.onlineLyricsTranslation) return bilingual
+
+        // A Navidrome library with its own translations needs no extra request.
+        val covered = bilingual.count { !it.translation.isNullOrBlank() }
+        if (covered * 2 >= bilingual.size) return bilingual
+
+        val remote = fetch(
+            context.applicationContext,
+            track.title.orEmpty(),
+            track.artist.orEmpty(),
+            durationMs
+        )
+        if (remote.isNullOrEmpty()) return bilingual
+        return align(bilingual, remote)
     }
 
     // -------------------------------------------------------------------------------------

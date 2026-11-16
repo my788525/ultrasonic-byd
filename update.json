@@ -1,21 +1,20 @@
 {
-  "versionCode": 533,
-  "versionName": "4.8.0-byd.51",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.51.apk",
-  "sha256": "474be163a29df8abf671c12b06377dc049479ec1971261e664c3b398004a5947",
-  "size": 11578522,
-  "publishedAt": "2026-11-16T00:06:45Z",
+  "versionCode": 534,
+  "versionName": "4.8.0-byd.52",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.52.apk",
+  "sha256": "9a0b7d75c7b79c39bcded5626de482693c648b884c02eead28d466170737d0b9",
+  "size": 11562281,
+  "publishedAt": "2026-11-16T00:20:43Z",
   "changelog": [
-    "中文歌词译文统一转为简体：内嵌双语 LRC 与网易云 tlyric 中的繁体字按 OpenCC 权威字表实时归一化",
-    "转换只作用于译文字段，原文与逐字时间轴完全不动，逐字高亮对齐不受影响；旧繁体缓存每次读取自动转换，无需清缓存",
-    "全屏底部两行操作按钮合并为一行：7 个播放控制按钮与主题/歌单/队列/字号 5 个快捷入口同排显示，充分利用全屏宽度",
-    "非全屏仍保持原有单行播放控制布局，快捷入口仅在全屏出现",
-    "版本 bump 至 4.8.0-byd.51 (versionCode 533)"
+    "撤销 byd.51 的繁体转简体：删除 ChineseText 转换器，歌词译文恢复以源数据为准，不再做任何二次加工",
+    "恢复 byd.50 的歌词翻译链路：内嵌双语 LRC 与网易云 tlyric 原样显示（含原有繁体字形），逐字高亮时间轴不变",
+    "保留 byd.51 的全屏底部按钮合并一行：7 个播放控制按钮与 5 个快捷入口同排显示",
+    "版本 bump 至 4.8.0-byd.52 (versionCode 534)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.51.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.51/NavMusic-4.8.0-byd.51.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.51/NavMusic-4.8.0-byd.51.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.51/NavMusic-4.8.0-byd.51.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.52.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.52/NavMusic-4.8.0-byd.52.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.52/NavMusic-4.8.0-byd.52.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.52/NavMusic-4.8.0-byd.52.apk"
   ]
 }
