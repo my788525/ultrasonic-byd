@@ -181,7 +181,7 @@ class MediaPlayerManager(
             cachedMediaItem = mediaItem
             // A playlist changes track: remember where we are so it can be resumed later.
             savePlaylistResume()
-            publishPlaybackState()
+            publishPlaybackState(mediaItem)
         }
 
         /*
@@ -454,10 +454,15 @@ class MediaPlayerManager(
         }
     }
 
-    private fun publishPlaybackState() {
+    private fun publishPlaybackState(
+        explicitItem: MediaItem? = null,
+        explicitIndex: Int? = null
+    ) {
+        val targetItem = explicitItem ?: currentMediaItem
+        val targetIndex = explicitIndex ?: (if (isShufflePlayEnabled) getCurrentShuffleIndex() else currentMediaItemIndex)
         val newState = RxBus.StateWithTrack(
-            track = currentMediaItem?.toTrack(),
-            index = if (isShufflePlayEnabled) getCurrentShuffleIndex() else currentMediaItemIndex,
+            track = targetItem?.toTrack(),
+            index = targetIndex,
             isPlaying = isPlaying,
             state = playbackState
         )
@@ -836,10 +841,22 @@ class MediaPlayerManager(
         when {
             prevIndex != C.INDEX_UNSET -> {
                 controller.seekTo(prevIndex, 0L)
+                runCatching {
+                    val window = androidx.media3.common.Timeline.Window()
+                    val prevItem = timeline.getWindow(prevIndex, window).mediaItem
+                    cachedMediaItem = prevItem
+                    publishPlaybackState(prevItem, prevIndex)
+                }
                 ensurePlaying()
             }
             index > 0 && !controller.shuffleModeEnabled -> {
                 controller.seekTo(index - 1, 0L)
+                runCatching {
+                    val window = androidx.media3.common.Timeline.Window()
+                    val prevItem = timeline.getWindow(index - 1, window).mediaItem
+                    cachedMediaItem = prevItem
+                    publishPlaybackState(prevItem, index - 1)
+                }
                 ensurePlaying()
             }
             else -> {
@@ -886,8 +903,20 @@ class MediaPlayerManager(
         )
         if (nextIndex != C.INDEX_UNSET) {
             controller.seekTo(nextIndex, 0L)
+            runCatching {
+                val window = androidx.media3.common.Timeline.Window()
+                val nextItem = timeline.getWindow(nextIndex, window).mediaItem
+                cachedMediaItem = nextItem
+                publishPlaybackState(nextItem, nextIndex)
+            }
         } else if (index < count - 1 && !controller.shuffleModeEnabled) {
             controller.seekTo(index + 1, 0L)
+            runCatching {
+                val window = androidx.media3.common.Timeline.Window()
+                val nextItem = timeline.getWindow(index + 1, window).mediaItem
+                cachedMediaItem = nextItem
+                publishPlaybackState(nextItem, index + 1)
+            }
         }
         ensurePlaying()
     }
@@ -1132,7 +1161,7 @@ class MediaPlayerManager(
     }
 
     val currentMediaItem: MediaItem?
-        get() = controller?.currentMediaItem
+        get() = controller?.currentMediaItem ?: cachedMediaItem
 
     val currentMediaItemIndex: Int
         get() = controller?.currentMediaItemIndex ?: -1

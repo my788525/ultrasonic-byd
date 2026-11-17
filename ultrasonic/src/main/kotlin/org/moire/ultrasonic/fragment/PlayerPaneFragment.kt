@@ -315,6 +315,14 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             updateState()
         }
 
+        disposables += RxBus.playerStateObservable.subscribe {
+            updateState()
+        }
+
+        disposables += RxBus.themeChangedEventObservable.subscribe {
+            applyTheme()
+        }
+
         updateState()
     }
 
@@ -996,18 +1004,30 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             .joinToString(" · ")
             .ifBlank { track.title.orEmpty() }
 
-    /** One tap walks through the six car color schemes; the activity rebuilds its window. */
+    fun applyTheme() {
+        val ctx = context ?: return
+        val palette = CarPalette.current()
+        decoratePane()
+        if (UiState.playerFullscreen) {
+            applyBackdropScrim(ctx, palette)
+        }
+        syncedLyrics?.setAccentColor(CarTheme.color(ctx, palette.accent))
+        applyLyricsAppearance()
+    }
+
+    /** One tap walks through the six car color schemes; dynamically updates without activity recreation. */
     private fun cycleTheme() {
         val all = CarPalette.values()
         val next = all[(all.indexOf(CarPalette.current()) + 1) % all.size]
         Settings.palette = next.key
-        // The activity rebuilds itself and paints the new palette from scratch, so the pane
-        // is not painted here as well: that paint was overwritten a moment later and only
-        // showed up as a flicker.
         Util.toast(
             getString(R.string.quick_theme_changed, getString(next.labelRes)),
             context = requireContext()
         )
+        // A single RxBus event drives every visible surface (this pane via its own
+        // subscription, the window + mini player via the activity, the overlay via the
+        // service). Re-painting here as well would draw the same pane up to three times
+        // in one frame, which is what made a theme switch take seconds.
         RxBus.themeChangedEventPublisher.onNext(Unit)
     }
 

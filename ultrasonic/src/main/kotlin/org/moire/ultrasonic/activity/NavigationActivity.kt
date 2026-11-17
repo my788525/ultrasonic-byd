@@ -290,7 +290,7 @@ class NavigationActivity : ScopeActivity() {
         }
 
         rxBusSubscription += RxBus.themeChangedEventObservable.subscribe {
-            recreate()
+            applyThemeDynamically()
         }
 
         rxBusSubscription += RxBus.activeServerChangedObservable.subscribe {
@@ -399,6 +399,18 @@ class NavigationActivity : ScopeActivity() {
 
     /** The panel is always in its fullscreen form. */
     fun isPlayerFullscreen(): Boolean = true
+
+    fun applyThemeDynamically() {
+        val palette = org.moire.ultrasonic.ui.CarPalette.current()
+        org.moire.ultrasonic.ui.CarTheme.applyWindow(this, palette)
+        lastNightMode = org.moire.ultrasonic.ui.CarTheme.isNight(this)
+
+        // The full-screen pane listens to themeChangedEventObservable itself and re-paints
+        // once; calling it here too would paint it twice per event.
+
+        (supportFragmentManager.findFragmentById(R.id.now_playing_fragment) as? org.moire.ultrasonic.fragment.NowPlayingFragment)
+            ?.applyPaletteFromActivity(palette)
+    }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)

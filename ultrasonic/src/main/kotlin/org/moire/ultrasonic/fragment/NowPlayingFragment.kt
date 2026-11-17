@@ -115,6 +115,14 @@ class NowPlayingFragment : ScopeFragment() {
         super.onDestroyView()
     }
 
+    /**
+     * Re-paint the mini player for a new palette without recreating the whole fragment.
+     * Called by [org.moire.ultrasonic.activity.NavigationActivity] on a theme change.
+     */
+    fun applyPaletteFromActivity(palette: CarPalette = CarPalette.current()) {
+        applyPalette(palette)
+    }
+
     private fun applyPalette(palette: CarPalette) {
         val ctx = context ?: return
         val accent = CarTheme.accent(ctx, palette)
