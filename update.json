@@ -1,22 +1,21 @@
 {
-  "versionCode": 538,
-  "versionName": "4.8.0-byd.56",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.56.apk",
-  "sha256": "79297b7678f82dcbb7ba4ebdef874fcedda73d83f9943b84158dc1aa76bdd0b3",
-  "size": 11567630,
-  "publishedAt": "2026-11-17T16:16:15Z",
+  "versionCode": 539,
+  "versionName": "4.8.0-byd.57",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.57.apk",
+  "sha256": "59b53dde4b19b0eb9016d27043248c0ee1743af97d01b5e93291153deb4008ed",
+  "size": 11568178,
+  "publishedAt": "2026-11-17T23:20:33Z",
   "changelog": [
-    "修复切歌后界面滞后约 15 秒：封面加载不再阻塞媒体会话，切歌瞬间立即发布新曲信息",
-    "封面未缓存时改为后台异步下载、磁盘命中快速返回，封面线程池扩为 2 线程",
-    "切歌/上一首/下一首立即发布新曲状态与索引，控制器未就绪时回退到缓存曲目",
-    "修复主题切换卡顿数秒：取消 Activity 整页重建，改为动态换肤且全链路只刷新一次",
-    "主题刷新统一为单一事件路径，移除同帧三重重绘；夜间模式只重绘窗口背景",
-    "版本 bump 至 4.8.0-byd.56 (versionCode 538)"
+    "修复启动后前 30 秒整机卡顿：全库缓存/数据库扫描从启动时立即执行改为延迟 45 秒，避开车机启动高峰",
+    "更新检查从启动后 8 秒延后到 60 秒，避免与播放恢复、缓存维护争抢 IO 与 CPU",
+    "悬浮窗播放按钮加状态守卫，不再每 500 毫秒重建 drawable",
+    "缓存清理任务可取消，服务销毁时不残留延迟任务",
+    "版本 bump 至 4.8.0-byd.57 (versionCode 539)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.56.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.56/NavMusic-4.8.0-byd.56.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.56/NavMusic-4.8.0-byd.56.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.56/NavMusic-4.8.0-byd.56.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.57.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.57/NavMusic-4.8.0-byd.57.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.57/NavMusic-4.8.0-byd.57.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.57/NavMusic-4.8.0-byd.57.apk"
   ]
 }
