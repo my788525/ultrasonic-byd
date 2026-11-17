@@ -154,10 +154,13 @@ class UApp : MultiDexApplication() {
         var instance: UApp? = null
 
         /**
-         * How long after the start the update file is asked for. A head unit needs a moment
-         * before its network is up, and asking too early costs four timeouts for nothing.
+         * How long after the start the update file is asked for. A head unit takes its time
+         * to bring the network up, and asking during the launch burst competes with playback
+         * restore and cache maintenance for IO and CPU, stalling the whole system. Waiting
+         * until things settle keeps the first half minute responsive; the driver is told
+         * about a new version by a notification, which he can deal with parked.
          */
-        private const val UPDATE_CHECK_DELAY_MS = 8_000L
+        private const val UPDATE_CHECK_DELAY_MS = 60_000L
 
         fun applicationContext(): Context {
             return instance!!.applicationContext

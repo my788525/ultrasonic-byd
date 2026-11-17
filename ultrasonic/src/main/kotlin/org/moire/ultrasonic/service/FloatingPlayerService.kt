@@ -233,6 +233,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     /** Dims the window after a few seconds without a touch, so it stops drawing the eye. */
     private val idleFadeRunnable = Runnable { fadeToIdle() }
 
+    /** Avoids rebuilding the play/pause drawable on every 500 ms refresh tick. */
+    private var lastShownPlaying: Boolean? = null
+
     /**
      * Manual fallback for a locked-down head unit: the notification action hides the
      * window for 30 seconds, then it comes back by itself. No permission is involved.
@@ -1207,6 +1210,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             Timber.w(all, "Could not remove the floating window")
         }
         rootView = null
+        lastShownPlaying = null
         // The window is gone, so the 500 ms refresh has nobody to draw for. It is started
         // again with the next showOverlay().
         handler.removeCallbacks(updateRunnable)
@@ -1564,9 +1568,13 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
             ensureLyrics(track)
         }
 
-        playButton?.setImageResource(
-            if (player?.isPlaying == true) R.drawable.media_pause else R.drawable.media_start
-        )
+        val isPlaying = player?.isPlaying == true
+        if (lastShownPlaying != isPlaying) {
+            lastShownPlaying = isPlaying
+            playButton?.setImageResource(
+                if (isPlaying) R.drawable.media_pause else R.drawable.media_start
+            )
+        }
 
         updateStatus(player)
         updateTransportAvailability(player)

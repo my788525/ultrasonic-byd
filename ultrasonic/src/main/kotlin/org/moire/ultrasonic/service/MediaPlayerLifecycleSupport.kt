@@ -13,6 +13,8 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import io.reactivex.rxjava3.disposables.CompositeDisposable
 import org.koin.core.component.KoinComponent
@@ -39,6 +41,9 @@ class MediaPlayerLifecycleSupport(
     private var headsetEventReceiver: BroadcastReceiver? = null
 
     private var rxBusSubscription = CompositeDisposable()
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val deferredCacheClean = Runnable { cacheCleaner.clean() }
 
     // Listen to lifecycle events
     init {
@@ -70,10 +75,24 @@ class MediaPlayerLifecycleSupport(
 
         registerHeadsetReceiver()
 
-        cacheCleaner.clean()
+        // A full cache/database sweep stats every offline track (twice) through the SAF tree.
+        // On the head unit's slow storage that saturates IO for tens of seconds and makes the
+        // whole car feel stuck right after launch. Defer it past the startup window; it is
+        // maintenance, not something the driver is waiting on. Download-driven cleanSpace()
+        // still runs on its own schedule.
+        scheduleDeferredCacheClean()
         created = true
         ratingManager = RatingManager.instance
         Timber.i("LifecycleSupport created")
+    }
+
+    /**
+     * Queue the full cache sweep well after startup. Cancelling any earlier request keeps it
+     * a single deferred pass even if [onCreate] is reached again through a media button.
+     */
+    private fun scheduleDeferredCacheClean() {
+        mainHandler.removeCallbacks(deferredCacheClean)
+        mainHandler.postDelayed(deferredCacheClean, CACHE_CLEAN_DELAY_MS)
     }
 
     private fun restoreLastSession(autoPlay: Boolean, afterRestore: Runnable?) {
@@ -90,6 +109,7 @@ class MediaPlayerLifecycleSupport(
 
         if (!created) return
         rxBusSubscription.dispose()
+        mainHandler.removeCallbacks(deferredCacheClean)
 
         applicationContext().unregisterReceiver(headsetEventReceiver)
 
@@ -229,5 +249,14 @@ class MediaPlayerLifecycleSupport(
                 Constants.CMD_PAUSE -> mediaPlayerManager.pause()
             }
         }
+    }
+
+    companion object {
+        /**
+         * Wait until well after the launch burst before walking the whole cache. A head unit
+         * is still busy bringing up the launcher, navigation and media session in the first
+         * half minute; a full-tree stat pass there stalls every app, not just this one.
+         */
+        private const val CACHE_CLEAN_DELAY_MS = 45_000L
     }
 }
