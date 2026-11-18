@@ -199,6 +199,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private var lyricsTrackId: String? = null
     private var timedLyrics: List<TimedLyric> = emptyList()
 
+    /** The in-flight floating lyrics lookup, cancelled on track change to stop zombie searches. */
+    private var floatingLyricsJob: kotlinx.coroutines.Job? = null
+
     /** Last applied lyric display settings, so the floating block rebuilds on a settings edit. */
     private var lastLyricAppearance = -1
     private var lyricIndex = -1
@@ -1717,6 +1720,9 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
     private fun ensureLyrics(track: Track?, forceRefresh: Boolean = false) {
         val id = track?.id
         if (id == lyricsTrackId && !forceRefresh) return
+        // Stop the previous song's lookup before starting this one; otherwise rapid skips
+        // leave several full-length online searches running on the shared IO pool.
+        floatingLyricsJob?.cancel()
         lyricsTrackId = id
         timedLyrics = emptyList()
         lyricIndex = -1
@@ -1737,7 +1743,7 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
         // player: online lyrics first, Navidrome only as a fallback (including enhanced word
         // timings), with its deadline and rate limit handling. Duplicating that chain here
         // used to mean a raw Thread on every song change, no online fallback and no timeout.
-        lyricsScope.launch {
+        floatingLyricsJob = lyricsScope.launch {
             val result = runCatching {
                 LyricsLoader.load(appContext, track, durationMs, forceRefresh)
             }.onFailure { Timber.w(it, "Could not load lyrics for the floating window") }

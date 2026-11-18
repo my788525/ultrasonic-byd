@@ -156,6 +156,9 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var syncedLyrics: SyncedLyricsView? = null
     private var seekBarTracking = false
 
+    /** The in-flight lyrics lookup, cancelled on track change so old searches stop at once. */
+    private var lyricsLoadJob: kotlinx.coroutines.Job? = null
+
     private val handler = Handler(Looper.getMainLooper())
     private val disposables = CompositeDisposable()
     private val updateRunnable = object : Runnable {
@@ -536,6 +539,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     override fun onDestroyView() {
         handler.removeCallbacks(updateRunnable)
         syncedLyrics?.stopAnimation()
+        lyricsLoadJob?.cancel()
         disposables.clear()
         headerCard = null
         stageCard = null
@@ -695,6 +699,11 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         val synced = syncedLyrics ?: return
         lyricsTrack = track
 
+        // A track change must stop the previous lookup immediately. The old code let every
+        // cancelled song run its full ~30 s server + online + translation chain on the shared
+        // IO pool; several rapid skips stacked those zombie lookups and starved the UI of IO.
+        lyricsLoadJob?.cancel()
+
         if (track == null) {
             synced.setSourceLabel(null)
             synced.showPlaceholder(getString(R.string.player_pane_idle_hint))
@@ -711,17 +720,20 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         val context = requireContext().applicationContext
         val durationMs = mediaPlayerManager.playerDuration.toLong()
 
-        viewLifecycleOwner.lifecycleScope.launch {
+        lyricsLoadJob = viewLifecycleOwner.lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     LyricsLoader.load(context, track, durationMs, forceRefresh)
                 }.getOrNull()
             }
 
-            // Warm the next song in play order while this one is on screen. The playlist has
-            // to be read on the main thread; LyricsLoader deduplicates this against the same
-            // prefetch made by the floating window.
-            if (isAdded && Settings.prefetchLyrics) {
+            // Drop results from a song the driver has already skipped past.
+            if (!isAdded || currentLyricsTrackId != track.id) return@launch
+
+            // Warm the next song in play order only while this one is still on screen. Doing
+            // this after the id check stops expired lookups from prefetching a now-irrelevant
+            // next track and adding more load to the IO pool during a rapid skip burst.
+            if (Settings.prefetchLyrics) {
                 val next = runCatching {
                     val items = mediaPlayerManager.playlistInPlayOrder
                     val current = mediaPlayerManager.getCurrentShuffleIndex()
@@ -729,8 +741,6 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
                 }.getOrNull()
                 LyricsLoader.prefetch(context, next, (next?.duration ?: 0) * 1_000L)
             }
-
-            if (!isAdded || currentLyricsTrackId != track.id) return@launch
 
             if (result == null || result.isEmpty) {
                 synced.setSourceLabel(
