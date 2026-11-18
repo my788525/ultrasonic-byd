@@ -163,8 +163,17 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private val disposables = CompositeDisposable()
     private val updateRunnable = object : Runnable {
         override fun run() {
-            updateState()
-            handler.postDelayed(this, UPDATE_INTERVAL_MS)
+            // One bad refresh (a transient binder hiccup while the controller reconnects, an
+            // odd metadata value, ...) must never end the 500 ms loop. If it did, the cover,
+            // lyrics and play/pause icon would all freeze on their last values while the music
+            // kept playing - exactly the "UI looks dead" symptom. Always reschedule.
+            try {
+                updateState()
+            } catch (t: Throwable) {
+                Timber.w(t, "Player pane refresh failed; keeping the update loop alive")
+            } finally {
+                handler.postDelayed(this, UPDATE_INTERVAL_MS)
+            }
         }
     }
 

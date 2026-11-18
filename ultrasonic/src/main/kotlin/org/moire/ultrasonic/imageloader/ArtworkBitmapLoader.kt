@@ -12,14 +12,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.media3.common.util.BitmapLoader
-import com.google.common.util.concurrent.FutureCallback
-import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.ListeningExecutorService
 import com.google.common.util.concurrent.MoreExecutors
 import java.io.File
 import java.io.IOException
-import java.util.LinkedHashMap
 import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -33,58 +30,29 @@ class ArtworkBitmapLoader : BitmapLoader, KoinComponent {
 
     private val imageLoaderProvider: ImageLoaderProvider by inject()
 
-    // Artwork is only drawn as a small notification / media-session icon. Decode on a SINGLE
-    // thread so at most one bitmap is ever being allocated, and downsample to ICON_SIZE_PX so
-    // each bitmap is ~0.25 MB instead of the ~4.6 MB full-resolution original. A fixed pool
-    // with an unbounded queue let rapid track changes pile up full-size decodes, which caused
-    // repeated GC pauses that froze the UI while audio (on its own thread) kept playing.
+    // Artwork is only a small notification / media-session icon. Downsample every decode to
+    // ICON_SIZE_PX so each bitmap is ~0.25 MB instead of a ~4.6 MB full-resolution original;
+    // that is what made rapid skips stutter under GC pressure (the real byd.59 fix).
+    //
+    // Keep the concurrency model deliberately simple. byd.56 proved the one rule that matters
+    // for track switching: a cache miss must fail FAST so MediaSession can finish building the
+    // metadata/notification and deliver onMediaItemTransition at once. byd.59 wrapped these
+    // calls in a single-thread executor + @Synchronized + an in-flight LRU + a directExecutor
+    // callback that re-locked the loader; that choked the MediaSession refresh path and brought
+    // back the 15 s "UI stuck on the previous song" stall. Do not reintroduce locking/caching
+    // here without a measurement on the real head unit.
     private val executorService: ListeningExecutorService by lazy {
         MoreExecutors.listeningDecorator(
-            Executors.newSingleThreadExecutor { runnable ->
-                Thread(runnable, "artwork-decode").apply { isDaemon = true }
-            }
+            Executors.newFixedThreadPool(2)
         )
     }
 
-    // Media3 re-requests artwork on every metadata / notification refresh. Reuse the in-flight
-    // (or last completed) future for the same uri so a burst of refreshes cannot enqueue N
-    // decodes. Bound the map so the entries do not grow with the number of songs played; the
-    // access-order LRU evicts the least recently used entry beyond MAX_TRACKED_URIS.
-    private val recentUris = object :
-        LinkedHashMap<String, ListenableFuture<Bitmap>>(MAX_TRACKED_URIS, 0.75f, true) {
-        override fun removeEldestEntry(
-            eldest: MutableMap.MutableEntry<String, ListenableFuture<Bitmap>>?
-        ): Boolean = size > MAX_TRACKED_URIS
-    }
-
-    @Synchronized
     override fun decodeBitmap(data: ByteArray): ListenableFuture<Bitmap> {
         return executorService.submit<Bitmap> { decode(data) }
     }
 
-    @Synchronized
     override fun loadBitmap(uri: Uri): ListenableFuture<Bitmap> {
-        val key = uri.toString()
-        recentUris[key]?.let { return it }
-        val future = executorService.submit<Bitmap> { load(uri) }
-        recentUris[key] = future
-        // A failed load means the cover was not on disk yet. Drop it from the cache so the
-        // next metadata refresh can retry after the background download has finished —
-        // otherwise a cached failure would permanently hide a cover that is now available.
-        // A successful future stays cached and is reused without re-decoding.
-        Futures.addCallback(
-            future,
-            object : FutureCallback<Bitmap> {
-                override fun onSuccess(result: Bitmap?) {}
-                override fun onFailure(t: Throwable) {
-                    synchronized(this@ArtworkBitmapLoader) {
-                        if (recentUris[key] === future) recentUris.remove(key)
-                    }
-                }
-            },
-            MoreExecutors.directExecutor()
-        )
-        return future
+        return executorService.submit<Bitmap> { load(uri) }
     }
 
     private fun decode(data: ByteArray): Bitmap {
@@ -154,7 +122,5 @@ class ArtworkBitmapLoader : BitmapLoader, KoinComponent {
     private companion object {
         /** Longest edge of the decoded artwork; media-session icons never need full size. */
         const val ICON_SIZE_PX = 256
-        /** Upper bound on remembered artwork requests, so the map cannot grow per song. */
-        const val MAX_TRACKED_URIS = 32
     }
 }

@@ -228,8 +228,16 @@ class FloatingPlayerService : Service(), KoinComponent, SleepTimerManager.Listen
 
     private val updateRunnable = object : Runnable {
         override fun run() {
-            updateState()
-            handler.postDelayed(this, UPDATE_INTERVAL_MS)
+            // Keep the refresh loop alive even if one tick throws (e.g. a transient
+            // controller/binder hiccup). Otherwise the cover, lyrics and play/pause icon
+            // freeze while audio keeps playing - the "UI is dead" symptom on the head unit.
+            try {
+                updateState()
+            } catch (t: Throwable) {
+                Timber.w(t, "Floating player refresh failed; keeping the update loop alive")
+            } finally {
+                handler.postDelayed(this, UPDATE_INTERVAL_MS)
+            }
         }
     }
 
