@@ -35,9 +35,18 @@ class BackdropBlurTransformation(private val strength: Int) : Transformation {
 
         val blurred = boxBlur(small, radius)
         if (blurred !== small) small.recycle()
-        // Do NOT recycle `source`: Picasso owns its lifecycle and recycles it after
-        // the transformation. Recycling it here corrupts a bitmap that may still be
-        // in the memory cache or shown by another view, forcing repeated decode/download.
+        // Picasso 2.8 CONTRACT: when transform() returns a DIFFERENT bitmap than its
+        // input, the transformation MUST recycle the input itself. Otherwise
+        // BitmapHunter.applyCustomTransformations() posts an IllegalStateException
+        // ("... mutated input Bitmap but failed to recycle the original") to the MAIN
+        // thread Handler -> uncaught -> instant force-close. Verified by decompiling
+        // the 2.8 AAR; this does NOT apply to Picasso 3.x, which recycles for you.
+        // byd.61 removed this on that 3.x assumption and only avoided crashing because
+        // the old targetW threshold (209) made small === source for typical covers;
+        // byd.62's 114 threshold made small !== source the common case -> crash.
+        // When small === source, small.recycle() above already covers it; recycle() on
+        // an already-recycled bitmap is a safe no-op, so this is correct either way.
+        source.recycle()
         return blurred
     }
 
