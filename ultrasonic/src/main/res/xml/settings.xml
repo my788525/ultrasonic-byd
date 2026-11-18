@@ -73,6 +73,12 @@
     <PreferenceCategory
         a:title="@string/backdrop_category_title"
         app:iconSpaceReserved="false">
+        <CheckBoxPreference
+            a:defaultValue="true"
+            a:key="@string/setting_key.show_backdrop"
+            a:summary="@string/backdrop_show_summary"
+            a:title="@string/backdrop_show_title"
+            app:iconSpaceReserved="false" />
         <SeekBarPreference
             a:defaultValue="50"
             a:key="@string/setting_key.backdrop_dim"

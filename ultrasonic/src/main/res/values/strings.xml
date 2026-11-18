@@ -767,6 +767,8 @@
     <string name="quick_queue_empty">The play queue is empty</string>
     <string name="quick_queue_current">Now playing  %1$s</string>
     <!-- byd.50: fullscreen backdrop tuning and explicit cold-start switches -->
+    <string name="backdrop_show_title">Show cover backdrop</string>
+    <string name="backdrop_show_summary">Show the blurred album cover behind fullscreen lyrics. Turn off to skip all backdrop loading and blur work on every track change - useful if switching songs feels slow.</string>
     <string name="backdrop_category_title">Fullscreen backdrop</string>
     <string name="backdrop_dim_title">Backdrop brightness</string>
     <string name="backdrop_dim_summary">Higher values darken the cover with a thicker mask so lyrics stay readable; lower values keep the artwork bright.</string>

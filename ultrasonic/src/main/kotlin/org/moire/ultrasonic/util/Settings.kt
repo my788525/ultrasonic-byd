@@ -233,7 +233,8 @@ object Settings {
             getKey(R.string.setting_key_lyrics_font_size),
             getKey(R.string.setting_key_backdrop_dim),
             getKey(R.string.setting_key_backdrop_tint),
-            getKey(R.string.setting_key_backdrop_blur)
+            getKey(R.string.setting_key_backdrop_blur),
+            getKey(R.string.setting_key_show_backdrop)
         )
     }
 
@@ -537,6 +538,15 @@ object Settings {
 
     @JvmStatic
     var backdropBlur by IntSetting(getKey(R.string.setting_key_backdrop_blur), 35)
+
+    /**
+     * Master switch for the fullscreen cover backdrop. Turning it off skips ALL
+     * backdrop image loading and software blur on every track change, and hides the
+     * backdrop + scrim. It doubles as a diagnostic: if skipping songs is smooth with
+     * this off, the backdrop decode/blur path is the source of the stall.
+     */
+    @JvmStatic
+    var showCoverBackdrop by BooleanSetting(getKey(R.string.setting_key_show_backdrop), true)
 
     /**
      * Maps the DPAD up/down keys of a car steering wheel to previous/next track.

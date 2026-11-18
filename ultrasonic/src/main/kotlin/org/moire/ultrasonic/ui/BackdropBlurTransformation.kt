@@ -34,7 +34,9 @@ class BackdropBlurTransformation(private val strength: Int) : Transformation {
 
         val blurred = boxBlur(small, radius)
         if (blurred !== small) small.recycle()
-        source.recycle()
+        // Do NOT recycle `source`: Picasso owns its lifecycle and recycles it after
+        // the transformation. Recycling it here corrupts a bitmap that may still be
+        // in the memory cache or shown by another view, forcing repeated decode/download.
         return blurred
     }
 

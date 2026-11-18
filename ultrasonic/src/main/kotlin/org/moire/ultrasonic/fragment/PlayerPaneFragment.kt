@@ -419,11 +419,16 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             if (full) LYRICS_SHADOW_COLOR else Color.TRANSPARENT
         )
 
-        backdropView?.visibility = if (full) View.VISIBLE else View.GONE
-        backdropScrim?.visibility = if (full) View.VISIBLE else View.GONE
-        if (full) {
+        val backdropOn = full && Settings.showCoverBackdrop
+        backdropView?.visibility = if (backdropOn) View.VISIBLE else View.GONE
+        backdropScrim?.visibility = if (backdropOn) View.VISIBLE else View.GONE
+        if (backdropOn) {
             applyBackdropScrim(ctx, palette)
             loadBackdrop(currentTrack)
+        } else {
+            // Make sure a pending image from a previous track is not left behind.
+            backdropView?.setImageDrawable(null)
+            lastBackdropKey = null
         }
     }
 
@@ -459,7 +464,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     /** Loads the current cover at a size that still looks clean when cropped to the full pane. */
     private fun loadBackdrop(track: Track?, force: Boolean = false) {
-        if (!UiState.playerFullscreen) return
+        if (!UiState.playerFullscreen || !Settings.showCoverBackdrop) return
         val blur = Settings.backdropBlur.coerceIn(0, 100)
         val key = "${track?.id}|$blur"
         if (!force && key == lastBackdropKey) return
