@@ -118,6 +118,8 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
     private var backdropScrim: View? = null
     /** Track id + blur strength: changing the slider must reload the transformed bitmap. */
     private var lastBackdropKey: String? = null
+    /** Key queued for the debounced backdrop load (see [backdropLoadRunnable]). */
+    private var pendingBackdropKey: String? = null
 
     /** Last applied visual settings counter, so a change in settings is picked up at once. */
     private var lastAppearanceVersion = -1
@@ -173,6 +175,41 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
                 Timber.w(t, "Player pane refresh failed; keeping the update loop alive")
             } finally {
                 handler.postDelayed(this, UPDATE_INTERVAL_MS)
+            }
+        }
+    }
+
+    /**
+     * Decoding a cover and running the software box blur is by far the heaviest work on a
+     * track switch. Doing it on the switch frame allocated several large int arrays +
+     * bitmaps per skip; a rapid skip burst stacked those and the resulting GC pause froze
+     * the entire head unit. Deferring by a short debounce means a burst only ever loads
+     * the final track, and the switch frame is free for buttons/lyrics to update instantly.
+     */
+    private val backdropLoadRunnable = object : Runnable {
+        override fun run() {
+            if (!isAdded || !UiState.playerFullscreen || !Settings.showCoverBackdrop) return
+            val key = pendingBackdropKey ?: return
+            val blur = Settings.backdropBlur.coerceIn(0, 100)
+            // A newer track / setting arrived while waiting: let that runnable win.
+            if ("${currentTrack?.id}|$blur" != key) return
+            if (key == lastBackdropKey) return
+            lastBackdropKey = key
+            val target = backdropView ?: return
+            val track = currentTrack
+            if (track == null) {
+                target.setImageResource(R.drawable.car_backdrop_placeholder)
+                return
+            }
+            val transformation = if (blur > 0) BackdropBlurTransformation(blur) else null
+            imageLoaderProvider.executeOn { loader ->
+                // Guard again after the IO->Main hop: the driver may have skipped again.
+                if (isAdded && currentTrack?.id == track.id && Settings.showCoverBackdrop) {
+                    loader.loadImage(
+                        target, track, false, BACKDROP_SIZE_PX,
+                        R.drawable.car_backdrop_placeholder, transformation
+                    )
+                }
             }
         }
     }
@@ -427,8 +464,10 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
             loadBackdrop(currentTrack)
         } else {
             // Make sure a pending image from a previous track is not left behind.
+            handler.removeCallbacks(backdropLoadRunnable)
             backdropView?.setImageDrawable(null)
             lastBackdropKey = null
+            pendingBackdropKey = null
         }
     }
 
@@ -462,27 +501,18 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         )
     }
 
-    /** Loads the current cover at a size that still looks clean when cropped to the full pane. */
+    /**
+     * Schedules the backdrop load. No decode or blur happens on the switch frame: we
+     * debounce so a burst of skips collapses into one load of the final track.
+     */
     private fun loadBackdrop(track: Track?, force: Boolean = false) {
         if (!UiState.playerFullscreen || !Settings.showCoverBackdrop) return
         val blur = Settings.backdropBlur.coerceIn(0, 100)
         val key = "${track?.id}|$blur"
         if (!force && key == lastBackdropKey) return
-        lastBackdropKey = key
-        val target = backdropView ?: return
-        if (track == null) {
-            target.setImageResource(R.drawable.car_backdrop_placeholder)
-            return
-        }
-        val transformation = if (blur > 0) BackdropBlurTransformation(blur) else null
-        imageLoaderProvider.executeOn { loader ->
-            if (isAdded) {
-                loader.loadImage(
-                    target, track, false, BACKDROP_SIZE_PX,
-                    R.drawable.car_backdrop_placeholder, transformation
-                )
-            }
-        }
+        pendingBackdropKey = key
+        handler.removeCallbacks(backdropLoadRunnable)
+        handler.postDelayed(backdropLoadRunnable, BACKDROP_LOAD_DELAY_MS)
     }
 
     override fun onResume() {
@@ -545,6 +575,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     override fun onPause() {
         handler.removeCallbacks(updateRunnable)
+        handler.removeCallbacks(backdropLoadRunnable)
         syncedLyrics?.stopAnimation()
         sleepTimerManager.removeListener(this)
         super.onPause()
@@ -552,6 +583,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
 
     override fun onDestroyView() {
         handler.removeCallbacks(updateRunnable)
+        handler.removeCallbacks(backdropLoadRunnable)
         syncedLyrics?.stopAnimation()
         lyricsLoadJob?.cancel()
         disposables.clear()
@@ -573,6 +605,7 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
         backdropView = null
         backdropScrim = null
         lastBackdropKey = null
+        pendingBackdropKey = null
         lastPlayingState = null
         lastQueueIndex = -2
         super.onDestroyView()
@@ -1299,10 +1332,13 @@ class PlayerPaneFragment : ScopeFragment(), SleepTimerManager.Listener {
          *
          * The picture is blurred on a much smaller intermediate and is then scaled back up to
          * the size of the pane, so a bigger decode buys nothing that can be seen. Decoding
-         * 320 px instead of 800 px costs a quarter of the memory and of the time and looks
-         * the same.
+         * 192 px keeps the decode small and cheap; the software blur works on an even
+         * smaller intermediate, so a bigger decode buys nothing that can be seen.
          */
-        private const val BACKDROP_SIZE_PX = 320
+        private const val BACKDROP_SIZE_PX = 192
+
+        /** Debounce so a rapid skip burst only loads (and blurs) the final track. */
+        private const val BACKDROP_LOAD_DELAY_MS = 180L
         private const val LYRICS_SHADOW_RADIUS = 9f
         private const val LYRICS_SHADOW_DY = 2f
         private const val LYRICS_SHADOW_COLOR = 0xCC000000.toInt()

@@ -16,7 +16,8 @@ import kotlin.math.min
  * and unavailable in this build. Instead the cover is downscaled to a tiny bitmap, a separable
  * box blur runs over those few thousand pixels, and the ImageView scales that bitmap back up
  * with bilinear filtering. The result is the same soft look at a fraction of the cost, with no
- * native library and no extra permission.
+ * native library and no extra permission. The working image is deliberately small:
+ * blur buffers are the allocation that caused GC stalls on rapid track changes.
  *
  * @param strength 0..100; 0 means "no blur" and is handled by the caller (no transformation).
  */
@@ -27,10 +28,10 @@ class BackdropBlurTransformation(private val strength: Int) : Transformation {
         if (level <= 0 || source.width < 2 || source.height < 2) return source
 
         // A stronger setting means a smaller downsample (softer) and a wider blur kernel.
-        val targetW = min(source.width, max(24, (300 - level * 2.6f).toInt()))
+        val targetW = min(source.width, max(20, (160 - level * 1.3f).toInt()))
         val targetH = max(1, (source.height.toLong() * targetW / source.width).toInt())
         val small = Bitmap.createScaledBitmap(source, targetW, targetH, true)
-        val radius = (level / 24 + 1).coerceIn(1, 5)
+        val radius = (level / 32 + 1).coerceIn(1, 3)
 
         val blurred = boxBlur(small, radius)
         if (blurred !== small) small.recycle()
