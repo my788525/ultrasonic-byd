@@ -599,9 +599,6 @@
     <string name="home_playlists_title">我的歌单</string>
     <string name="home_resume_playlist">继续播放：%s</string>
     <string name="home_playlist_playing">正在播放：%s</string>
-    <string name="home_playlist_count_all">全部</string>
-    <string name="home_playlist_count_title">首页歌单显示行数</string>
-    <string name="home_playlist_count_summary">设置第一屏显示几行歌单（4 个 = 1 行，8 个 = 2 行）。无论选多少，左右滑动都能查看全部歌单；「全部」保留 4 行。</string>
 
     <!-- 车机界面：悬浮窗 -->
     <string name="settings_floating_title">悬浮窗</string>
@@ -715,12 +712,6 @@
     <string name="update_notification_text">到「设置」里下载并安装</string>
     <string name="update_no_changelog">这个版本没有发布更新说明</string>
     <string name="home_playlists_hint">左右滑动查看更多 \u203A</string>
-    <string name="home_playlist_pin_title">首页优先显示的歌单</string>
-    <string name="home_playlist_pin_summary">勾选优先排在最前的歌单；未勾选的歌单左右滑动仍可查看，不会被隐藏。</string>
-    <string name="home_playlist_pin_dialog_title">选择首页优先显示的歌单</string>
-    <string name="home_playlist_pin_reset">恢复自动排序</string>
-    <string name="home_playlist_pin_empty">还没有加载歌单，请先打开一次首页。</string>
-    <string name="home_playlist_pin_saved">首页歌单已更新</string>
     <string name="floating_temp_hide_action">隐藏 30 秒</string>
     <string name="floating_manual_hide_action">隐藏浮窗</string>
     <string name="floating_manual_show_action">显示浮窗</string>

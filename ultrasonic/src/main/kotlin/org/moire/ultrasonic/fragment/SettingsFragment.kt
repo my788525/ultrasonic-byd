@@ -43,7 +43,6 @@ import org.moire.ultrasonic.util.ConfirmationDialog
 import org.moire.ultrasonic.util.Constants
 import org.moire.ultrasonic.util.ErrorDialog
 import org.moire.ultrasonic.util.FileUtil.ultrasonicDirectory
-import org.moire.ultrasonic.util.HomePrefs
 import org.moire.ultrasonic.util.InfoDialog
 import org.moire.ultrasonic.util.SelectCacheActivityContract
 import org.moire.ultrasonic.util.Settings
@@ -108,7 +107,6 @@ class SettingsFragment :
         setupCacheLocationPreference()
         setupBluetoothDevicePreferences()
         setupUpdatePreferences()
-        setupHomePlaylistPreferences()
         setupLyricsPreferences()
     }
 
@@ -180,48 +178,6 @@ class SettingsFragment :
             }
             true
         }
-    }
-
-    /**
-     * Lets the driver pin playlists to the front of the home grid. Pinning never hides the
-     * others: the grid scrolls sideways, so every playlist stays one swipe away.
-     */
-    private fun setupHomePlaylistPreferences() {
-        findPreference<Preference>(getString(R.string.setting_key_home_playlists_pinned))
-            ?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-                showPinnedPlaylistsDialog()
-                true
-            }
-    }
-
-    private fun showPinnedPlaylistsDialog() {
-        val context = context ?: return
-        val playlists = HomePrefs.getCachedPlaylists()
-        if (playlists.isEmpty()) {
-            toast(R.string.home_playlist_pin_empty, context = context)
-            return
-        }
-        val selected = HomePrefs.getVisiblePlaylistIds().orEmpty()
-        val checked = BooleanArray(playlists.size) { i -> selected.contains(playlists[i].id) }
-        val names = playlists.map { it.name }.toTypedArray()
-
-        MaterialAlertDialogBuilder(context)
-            .setTitle(R.string.home_playlist_pin_dialog_title)
-            .setMultiChoiceItems(names, checked) { _, which, isChecked ->
-                checked[which] = isChecked
-            }
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                HomePrefs.setVisiblePlaylistIds(
-                    playlists.filterIndexed { i, _ -> checked[i] }.map { it.id }.toSet()
-                )
-                toast(R.string.home_playlist_pin_saved, context = context)
-            }
-            .setNeutralButton(R.string.home_playlist_pin_reset) { _, _ ->
-                HomePrefs.clearVisiblePlaylistIds()
-                toast(R.string.home_playlist_pin_saved, context = context)
-            }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
     }
 
     /**

@@ -404,12 +404,10 @@ class HomeFragment : ScopeFragment() {
         homePlaylistAdapter?.submitList(ranked)
     }
 
-    /** Rows visible on the first screen: 4 playlists = one row, 8 = two rows, and so on. */
+    /** Rows visible on the first screen: two rows, fully scrollable sideways. */
     private fun playlistRows(): Int {
-        val count = Settings.homePlaylistCount
-        val visible = if (count <= 0) 16 else count // "All": four rows, still fully scrollable
         val maxRows = if (columns() == 1) 2 else 4
-        return (visible / columns().coerceAtLeast(1)).coerceIn(1, maxRows)
+        return 2.coerceIn(1, maxRows)
     }
 
     /** Exact height for the horizontal playlist grid so every row is measured and drawn. */
@@ -449,27 +447,19 @@ class HomeFragment : ScopeFragment() {
     }
 
     /**
-     * Orders the home playlists without ever truncating: playlists pinned in Settings come
-     * first, then the most-played ones, then the rest in server order. The count setting only
-     * controls how many rows are visible at once; sideways scrolling always reaches every
-     * playlist, regardless of that setting or the pin selection.
+     * Orders the home playlists without ever truncating: the most-played ones first, then the
+     * rest in server order. Two rows are visible at once, but sideways scrolling always reaches
+     * every playlist.
      */
     private fun rankedTopPlaylists(list: List<PinnedPlaylist>): List<PinnedPlaylist> {
-        val pinned = HomePrefs.getVisiblePlaylistIds().orEmpty()
         val counts = HomePrefs.getAllPlayCounts()
         // Build the arrival-order index once instead of an O(n^2) indexOf per comparison.
         val order = HashMap<String, Int>(list.size)
         list.forEachIndexed { index, playlist -> order[playlist.id] = index }
-        val byPlays = list.sortedWith(
+        return list.sortedWith(
             compareByDescending<PinnedPlaylist> { counts[it.id] ?: 0 }
                 .thenBy { order[it.id] ?: Int.MAX_VALUE }
         )
-        if (pinned.isEmpty()) return byPlays
-        // Pinned playlists keep the play-count order among themselves. Otherwise a custom
-        // selection would freeze the first tiles forever and tapping one would never reorder
-        // the home screen, which is exactly what the driver notices.
-        val front = byPlays.filter { pinned.contains(it.id) }
-        return front + byPlays.filterNot { pinned.contains(it.id) }
     }
 
     private fun setupLibraryGrid(root: View) {
