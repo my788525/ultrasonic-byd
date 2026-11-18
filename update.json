@@ -1,21 +1,20 @@
 {
-  "versionCode": 542,
-  "versionName": "4.8.0-byd.60",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.60.apk",
-  "sha256": "be1937a8cf01cf5236894b9db4a5493ba36c182672191363cb259eab52345b4c",
-  "size": 11562956,
-  "publishedAt": "2026-11-18T13:50:27Z",
+  "versionCode": 543,
+  "versionName": "4.8.0-byd.61",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.61.apk",
+  "sha256": "ccb989d9fe6425c1deebd9ecc56a5fa8b08c627be9b535fd639b3d7ce1435585",
+  "size": 11564085,
+  "publishedAt": "2026-11-18T23:18:47Z",
   "changelog": [
-    "修复切歌后 15 秒才显示下一曲歌词、封面、播放按钮不更新的问题：恢复封面加载不阻塞媒体会话的 fail-fast 模型，切歌瞬间立即刷新界面",
-    "封面加载去掉 byd.59 引入的单线程+同步锁+LRU缓存+回调重锁机制，恢复经真车验证的 2 线程池无锁模型，避免阻塞 MediaSession 刷新链路",
-    "保留 256px 缩放解码：单张封面内存仍约 0.25MB，切多首歌不会因大位图频繁 GC 卡死",
-    "加固全屏面板与悬浮窗的 500ms 刷新循环：单次刷新异常不再终止循环，杜绝封面/歌词/播放按钮一起冻结",
-    "版本 bump 至 4.8.0-byd.60 (versionCode 542)"
+    "新增全屏封面底图显示开关（设置 → 全屏底图 → 显示封面底图）：关闭后切歌将完全跳过底图加载与软件虚化，用于排查切歌卡顿来源",
+    "修复全屏底图软件虚化中对 source.recycle() 的误用：Picasso 拥有该位图生命周期并在变换后自行回收，提前 recycle 会破坏内存缓存/共享位图，触发反复下载解码与内存抖动（可能造成整机卡顿）",
+    "底图开关即时生效：切换后立即重绘并显隐底图，无需重启",
+    "版本 bump 至 4.8.0-byd.61 (versionCode 543)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.60.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.60/NavMusic-4.8.0-byd.60.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.60/NavMusic-4.8.0-byd.60.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.60/NavMusic-4.8.0-byd.60.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.61.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.61/NavMusic-4.8.0-byd.61.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.61/NavMusic-4.8.0-byd.61.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.61/NavMusic-4.8.0-byd.61.apk"
   ]
 }
