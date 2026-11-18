@@ -1,21 +1,21 @@
 {
-  "versionCode": 539,
-  "versionName": "4.8.0-byd.57",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.57.apk",
-  "sha256": "59b53dde4b19b0eb9016d27043248c0ee1743af97d01b5e93291153deb4008ed",
-  "size": 11568178,
-  "publishedAt": "2026-11-17T23:20:33Z",
+  "versionCode": 540,
+  "versionName": "4.8.0-byd.58",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.58.apk",
+  "sha256": "c2d27565b97f74d46dbfcf89546749bf2e2ae7acb33e5bc99647f037927951f7",
+  "size": 11562121,
+  "publishedAt": "2026-11-18T12:55:23Z",
   "changelog": [
-    "修复启动后前 30 秒整机卡顿：全库缓存/数据库扫描从启动时立即执行改为延迟 45 秒，避开车机启动高峰",
-    "更新检查从启动后 8 秒延后到 60 秒，避免与播放恢复、缓存维护争抢 IO 与 CPU",
-    "悬浮窗播放按钮加状态守卫，不再每 500 毫秒重建 drawable",
-    "缓存清理任务可取消，服务销毁时不残留延迟任务",
-    "版本 bump 至 4.8.0-byd.57 (versionCode 539)"
+    "移除设置页中无用的「首页歌单」分组：首页歌单显示行数、首页优先显示的歌单两项配置",
+    "首页歌单行数固定为 2 行，左右滑动仍可查看全部歌单",
+    "首页歌单排序统一为按播放次数，移除已无入口的置顶歌单逻辑与存储",
+    "清理对应的设置键、中英文案、数组资源与相关代码，无功能残留",
+    "版本 bump 至 4.8.0-byd.58 (versionCode 540)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.57.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.57/NavMusic-4.8.0-byd.57.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.57/NavMusic-4.8.0-byd.57.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.57/NavMusic-4.8.0-byd.57.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.58.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.58/NavMusic-4.8.0-byd.58.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.58/NavMusic-4.8.0-byd.58.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.58/NavMusic-4.8.0-byd.58.apk"
   ]
 }
