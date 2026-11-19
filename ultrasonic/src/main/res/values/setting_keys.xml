@@ -117,4 +117,5 @@
     <string name="setting_key.backdrop_tint" translatable="false">ui.backdrop_tint</string>
     <string name="setting_key.backdrop_blur" translatable="false">ui.backdrop_blur</string>
     <string name="setting_key.show_backdrop" translatable="false">ui.show_backdrop</string>
+    <string name="setting_key.server_settings" translatable="false">server.settings_entry</string>
 </resources>

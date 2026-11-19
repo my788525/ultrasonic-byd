@@ -1,20 +1,21 @@
 {
-  "versionCode": 545,
-  "versionName": "4.8.0-byd.63",
-  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.63.apk",
-  "sha256": "43a071de28da449c472908128e71fc63d9f9b830b2200523869d10f55efb1e83",
-  "size": 11564895,
-  "publishedAt": "2026-11-18T23:59:39Z",
+  "versionCode": 546,
+  "versionName": "4.8.0-byd.64",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.64.apk",
+  "sha256": "13630ab5db28336ad54b0c81b3811d3ecad72f5db7d1e4152f998a547dea9e34",
+  "size": 11566135,
+  "publishedAt": "2026-11-19T14:27:50Z",
   "changelog": [
-    "修复 byd.62 开启全屏底图直接闪退的问题：恢复 Picasso 2.8 Transformation 契约要求的 source.recycle()，返回新位图时必须由变换本身回收输入位图",
-    "根因：byd.61 误按 Picasso 3.x 语义删除了 source.recycle()，因旧阈值 209 使缩放返回源图本身而侥幸未崩；byd.62 将阈值降到 114 后多数封面走新位图路径，source 无人回收，Picasso 向主线程抛 IllegalStateException 导致闪退（已反编译 2.8 AAR 确认）",
-    "保留 byd.62 全部性能优化：切歌零解码/模糊、180ms 防抖、过期请求丢弃、192px 解码与小虚化工作图",
-    "版本 bump 至 4.8.0-byd.63 (versionCode 545)"
+    "修复全新安装后无法设置服务器、左侧边栏菜单所有选项点击无反应的问题（byd.54 埋下的潜伏 bug）",
+    "根因一：导航目的地监听器只放行 settingsFragment，服务器选择/编辑页及所有侧栏菜单目的地都被 returnToPlayer() 隐藏，导致点击无视觉反应；改为放行设置/关于/服务器选择/服务器编辑/库页面等所有侧栏目的地，播放器仍为默认界面",
+    "根因二：isFirstRun 在 IO 协程异步赋值，Activity.onCreate 同步读取，新安装常读到默认 false 导致欢迎对话框（引导配置服务器）不弹；改为同步计算",
+    "补齐 dead end：欢迎文案承诺「在设置中配置服务器」但设置页无入口，现于设置页顶部新增「服务器设置」入口直达服务器配置",
+    "版本 bump 至 4.8.0-byd.64 (versionCode 546)"
   ],
   "downloadUrls": [
-    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.63.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.63/NavMusic-4.8.0-byd.63.apk?raw=1",
-    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.63/NavMusic-4.8.0-byd.63.apk",
-    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.63/NavMusic-4.8.0-byd.63.apk"
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.64.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.64/NavMusic-4.8.0-byd.64.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.64/NavMusic-4.8.0-byd.64.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.64/NavMusic-4.8.0-byd.64.apk"
   ]
 }

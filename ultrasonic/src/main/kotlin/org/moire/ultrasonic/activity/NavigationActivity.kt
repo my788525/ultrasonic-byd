@@ -135,6 +135,28 @@ class NavigationActivity : ScopeActivity() {
     private var currentFragmentId: Int = 0
 
     private companion object {
+        // Any destination the driver can navigate to from the sidebar (plus the config
+        // screens) must actually render. byd.54 only allowed settingsFragment, which made
+        // every other sidebar item a dead entry and hid the server selector so a fresh
+        // install could not be configured. The player stays the DEFAULT screen
+        // (showPlayerPane/returnToPlayer); these only appear when explicitly navigated to.
+        // playerFragment/menu_exit are excluded: the former returns to the player, the
+        // latter exits. homeFragment is excluded because it is the start destination and
+        // navigating there (e.g. after adding the demo server) must land on the player.
+        private val overlayDestinations = setOf(
+            R.id.mainFragment,
+            R.id.searchFragment,
+            R.id.playlistsFragment,
+            R.id.downloadsFragment,
+            R.id.bookmarksFragment,
+            R.id.chatFragment,
+            R.id.podcastFragment,
+            R.id.trackCollectionFragment,
+            R.id.settingsFragment,
+            R.id.aboutFragment,
+            R.id.serverSelectorFragment,
+            R.id.editServerFragment,
+        )
         /** Below this width two panes would squeeze the list too much. */
         private const val PLAYER_PANE_TAG = "playerPanel"
 
@@ -253,8 +275,10 @@ class NavigationActivity : ScopeActivity() {
             // backgrounded (paused) the window re-appears over the navigation map, which
             // onPause handles.
             FloatingPlayerService.setHostHidden(this, true)
-            // The settings screen is the only other screen: it is opened over the player.
-            if (currentFragmentId == R.id.settingsFragment) {
+            // Configuration screens (settings, server selector/editor, about) are shown
+            // over the player. byd.54 only allowed settingsFragment here, which hid the
+            // server selector on fresh installs and made every drawer item a no-op.
+            if (currentFragmentId in overlayDestinations) {
                 navHostView?.visibility = View.VISIBLE
                 toolbarView?.visibility = View.VISIBLE
                 playerPane?.visibility = View.GONE

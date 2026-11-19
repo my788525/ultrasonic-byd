@@ -68,6 +68,13 @@ class UApp : MultiDexApplication() {
 
         Timber.d("onCreate called")
 
+        // Compute the first-run flag synchronously: NavigationActivity.onCreate reads it
+        // immediately to decide whether to show the welcome dialog, whose only purpose is
+        // to guide a fresh install to the server setup screen. Doing this in the IO
+        // coroutine raced with the Activity, which read the default `false` and skipped the
+        // dialog entirely -> no way to configure a server on a new install.
+        isFirstRun = Util.isFirstRun()
+
         // In general we should not access the settings from the main thread to avoid blocking...
         ioScope.launch {
             if (Settings.debugLogToFile) {
@@ -77,7 +84,6 @@ class UApp : MultiDexApplication() {
             // Populate externalFilesDir early
             FileUtil.cachedUltrasonicDirectory = FileUtil.ultrasonicDirectory
             Storage.mediaRoot.value
-            isFirstRun = Util.isFirstRun()
         }
 
         // Watch the lyric appearance settings so the player surfaces can redraw as soon as

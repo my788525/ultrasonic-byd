@@ -12,6 +12,7 @@ import android.provider.SearchRecentSuggestions
 import android.view.View
 import androidx.annotation.StringRes
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
 import androidx.preference.CheckBoxPreference
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -102,6 +103,14 @@ class SettingsFragment :
         customCacheLocation = findPreference(getString(R.string.setting_key_custom_cache_location))
         cacheLocation = findPreference(getString(R.string.setting_key_cache_location))
         checkUpdatePreference = findPreference(getString(R.string.setting_key_update_check_now))
+
+        // Fresh-install entry point: reach the server selector from the settings screen,
+        // as promised by the welcome dialog. Reliable without the sidebar drawer gesture.
+        findPreference<Preference>(getString(R.string.setting_key_server_settings))
+            ?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+                findNavController().navigate(R.id.serverSelectorFragment)
+                true
+            }
 
         setupClearSearchPreference()
         setupCacheLocationPreference()

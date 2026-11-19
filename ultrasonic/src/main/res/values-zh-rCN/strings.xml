@@ -118,6 +118,8 @@
     <string name="menu.downloads">下载</string>
     <string name="menu.exit">退出</string>
     <string name="menu.settings">设置</string>
+    <string name="settings.server_entry_title">服务器设置</string>
+    <string name="settings.server_entry_summary">添加、编辑或选择音乐服务器</string>
     <string name="menu.refresh">刷新</string>
     <string name="music_library.label">媒体库</string>
     <string name="music_library.label_offline">离线媒体</string>
