@@ -1,0 +1,21 @@
+{
+  "versionCode": 546,
+  "versionName": "4.8.0-byd.64",
+  "downloadUrl": "https://raw.githubusercontent.com/my788525/ultrasonic-byd/apk/NavMusic-4.8.0-byd.64.apk",
+  "sha256": "13630ab5db28336ad54b0c81b3811d3ecad72f5db7d1e4152f998a547dea9e34",
+  "size": 11566135,
+  "publishedAt": "2026-11-19T14:27:50Z",
+  "changelog": [
+    "修复全新安装后无法设置服务器、左侧边栏菜单所有选项点击无反应的问题（byd.54 埋下的潜伏 bug）",
+    "根因一：导航目的地监听器只放行 settingsFragment，服务器选择/编辑页及所有侧栏菜单目的地都被 returnToPlayer() 隐藏，导致点击无视觉反应；改为放行设置/关于/服务器选择/服务器编辑/库页面等所有侧栏目的地，播放器仍为默认界面",
+    "根因二：isFirstRun 在 IO 协程异步赋值，Activity.onCreate 同步读取，新安装常读到默认 false 导致欢迎对话框（引导配置服务器）不弹；改为同步计算",
+    "补齐 dead end：欢迎文案承诺「在设置中配置服务器」但设置页无入口，现于设置页顶部新增「服务器设置」入口直达服务器配置",
+    "版本 bump 至 4.8.0-byd.64 (versionCode 546)"
+  ],
+  "downloadUrls": [
+    "https://cdn.jsdelivr.net/gh/my788525/ultrasonic-byd@apk/NavMusic-4.8.0-byd.64.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.64/NavMusic-4.8.0-byd.64.apk?raw=1",
+    "https://ghfast.top/https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.64/NavMusic-4.8.0-byd.64.apk",
+    "https://github.com/my788525/ultrasonic-byd/releases/download/v4.8.0-byd.64/NavMusic-4.8.0-byd.64.apk"
+  ]
+}
